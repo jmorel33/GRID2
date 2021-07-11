@@ -40,6 +40,9 @@
 #include <font_OSD.h>
 #include <lines.h>
 
+// **************************************************************************************** L O O S E   S T R U C T U R E S
+
+
 // **************************************************************************************** G R I D   S T R U C T U R E S
 #define NAMELENGTH_MAX 80
 #define GRID_MAX_CELLS 65536
@@ -51,7 +54,6 @@ typedef struct EX_cell {
     unsigned short value;                           // value of cell
     unsigned char lines;                            // lines feature
     unsigned short cycle_id;                        // cell animation sequence number
-    float angle;                                    // degree of angle used to rotate the cell
     unsigned short fg_color_id;                     // palette index color for cell
     unsigned short fg_color_cycle_id;               // color cycle index
     unsigned short bg_color_id;                     // palette index color for cell background
@@ -63,6 +65,9 @@ typedef struct EX_cell {
     Vector2 scale;                                  // (x,y) cell scale
     Vector2 scale_speed;                            // (x,y) cell scale speed
     Vector2 scroll_speed;                           // (x,y) cell scroll speed
+    float angle;                                    // degree of angle used to rotate the cell
+    float fg_brightness;                            // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+    float bg_brightness;                            // background brightness (values 0...1 divides, values 1 to 255 multiply)
     Color color_mask;                               // RGBA color mask of cell
     Color shadow_mask;                              // shadow RGBA mask
 } EX_cell;
@@ -72,7 +77,6 @@ typedef struct EX_layer {
     unsigned int state;                             // all flags for grid
     int asset_id;                                   // tilset used for this layer
     Vector2 size;                                   // total cells x and y
-    float angle;                                    // degree of angle to rotate layer
     unsigned short fg_color_id;                     // palette index color for cell
     unsigned short fg_color_cycle_id;               // color cycle index
     unsigned short bg_color_id;                     // palette index color for cell background
@@ -80,18 +84,15 @@ typedef struct EX_layer {
     unsigned short lines_color_id;                  // palette index color for cell background
     unsigned short lines_color_cycle_id;            // color cycle index
     Vector2 offset;                                 // displacement from top left (x,y)
-    Vector2 c1_offset;                              // c1 blocks corner displacement (x,y)
-    Vector2 c2_offset;                              // c2 blocks corner displacement (x,y)
-    Vector2 c3_offset;                              // c3 blocks corner displacement (x,y)
-    Vector2 c4_offset;                              // c4 blocks corner displacement (x,y)
+    Vector2 displace[4];                            // cell corner displacement (x,y)
     Vector2 scale;                                  // (x,y) cell scale
     Vector2 scale_speed;                            // (x,y) cell scale speed
     Vector2 scroll_speed;                           // layer scroll speed (x,y)
-    Vector2 shadow;                                 // shadow displacement (x,y)
-    Vector2 shadow_c1;                              // c1 blocks corner displacement (x,y)
-    Vector2 shadow_c2;                              // c2 blocks corner displacement (x,y)
-    Vector2 shadow_c3;                              // c3 blocks corner displacement (x,y)
-    Vector2 shadow_c4;                              // c4 blocks corner displacement (x,y)
+    float angle;                                    // degree of angle to rotate layer
+    float fg_brightness;                            // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+    float bg_brightness;                            // background brightness (values 0...1 divides, values 1 to 255 multiply)
+    Vector2 shadow;                                 // shadow corner displacement (x,y)
+    Vector2 shadow_displace[4];                      // shadow corners displacement (x,y)
     Color   color_mask;                             // RGBA color mask of layer
     Color   shadow_mask;                            // shadow RGBA mask
     EX_cell mouse;                                  // mouse cursor
@@ -449,157 +450,117 @@ void DrawQuadSprite ( Texture texture , Vector2 position, Vector2 scale, Color c
     (Vector2) { 0,0 } , 0 , color );
 }
 
-
 // Draw a color-filled rectangle with pro parameters
-void DrawRectangleProSK(Rectangle rec, Vector2 origin, Vector2 skew, float rotation, Color color) {
+void DrawRectangleProSK(Rectangle rec, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
     rlCheckRenderBatchLimit(4);
 
-    Vector2 topLeft = { 0 };
-    Vector2 topRight = { 0 };
-    Vector2 bottomLeft = { 0 };
-    Vector2 bottomRight = { 0 };
+    const static inline Texture   texShapes = { 1, 1, 1, 1, 7 };
+    const static inline Rectangle texShapesRec = { 0, 0, 1, 1 };
 
-    // Only calculate rotation if needed
-    if (rotation == 0.0f)
-    {
+    Vector2 topLeft = { 0 }, topRight = { 0 }, bottomLeft = { 0 }, bottomRight = { 0 };
+
+    if (rotation == 0.0f) {
         float x = rec.x - origin.x;
         float y = rec.y - origin.y;
         topLeft = (Vector2){ x, y };
         topRight = (Vector2){ x + rec.width, y };
         bottomLeft = (Vector2){ x, y + rec.height };
         bottomRight = (Vector2){ x + rec.width, y + rec.height };
-    }
-    else
-    {
+    } else {
         float sinRotation = sinf(rotation*DEG2RAD);
         float cosRotation = cosf(rotation*DEG2RAD);
         float x = rec.x;
         float y = rec.y;
         float dx = -origin.x;
         float dy = -origin.y;
-
         topLeft.x = x + dx*cosRotation - dy*sinRotation;
         topLeft.y = y + dx*sinRotation + dy*cosRotation;
-
         topRight.x = x + (dx + rec.width)*cosRotation - dy*sinRotation;
         topRight.y = y + (dx + rec.width)*sinRotation + dy*cosRotation;
-
         bottomLeft.x = x + dx*cosRotation - (dy + rec.height)*sinRotation;
         bottomLeft.y = y + dx*sinRotation + (dy + rec.height)*cosRotation;
-
         bottomRight.x = x + (dx + rec.width)*cosRotation - (dy + rec.height)*sinRotation;
         bottomRight.y = y + (dx + rec.width)*sinRotation + (dy + rec.height)*cosRotation;
     }
 
-    Texture   texShapes = { 1, 1, 1, 1, 7 };
-    Rectangle texShapesRec = { 0, 0, 1, 1 };
-
     rlSetTexture(texShapes.id);
     rlBegin(RL_QUADS);
-
         rlNormal3f(0.0f, 0.0f, 1.0f);
-        rlColor4ub(color.r, color.g, color.b, color.a);
-
          // Bottom-left corner for texture and quad
+        rlColor4ub(color[0].r, color[0].g, color[0].b, color[0].a);
         rlTexCoord2f(texShapesRec.x/texShapes.width, texShapesRec.y/texShapes.height);
         rlVertex2f(topLeft.x + skew.x, topLeft.y);
-
         // Bottom-right corner for texture and quad
+        rlColor4ub(color[1].r, color[1].g, color[1].b, color[1].a);
         rlTexCoord2f(texShapesRec.x/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
         rlVertex2f(bottomLeft.x, bottomLeft.y);
-
         // Top-right corner for texture and quad
+        rlColor4ub(color[2].r, color[2].g, color[2].b, color[2].a);
         rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
         rlVertex2f(bottomRight.x, bottomRight.y + skew.y);
-
         // Top-left corner for texture and quad
+        rlColor4ub(color[3].r, color[3].g, color[3].b, color[3].a);
         rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, texShapesRec.y/texShapes.height);
         rlVertex2f(topRight.x + skew.x, topRight.y + skew.y);
-
     rlEnd();
-    rlSetTexture(0);
 }
 
 // Draw a part of a texture (defined by a rectangle) with 'pro' parameters
 // NOTE: origin is relative to destination rectangle size
-void DrawTextureProSK (Texture texture, Rectangle source, Rectangle dest, Vector2 origin, Vector2 skew, float rotation, Color tint) {
-    
-    // Check if texture is valid
-    if (texture.id > 0)
-    {
+void DrawTextureProSK (Texture texture, Rectangle source, Rectangle dest, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
+    if (texture.id > 0) {
         float width = (float)texture.width;
         float height = (float)texture.height;
-
         bool flipX = false;
-
         if (source.width < 0) { flipX = true; source.width *= -1; }
         if (source.height < 0) source.y -= source.height;
+        Vector2 topLeft = { 0 };        Vector2 topRight = { 0 };        Vector2 bottomLeft = { 0 };        Vector2 bottomRight = { 0 };
 
-        Vector2 topLeft = { 0 };
-        Vector2 topRight = { 0 };
-        Vector2 bottomLeft = { 0 };
-        Vector2 bottomRight = { 0 };
-
-        // Only calculate rotation if needed
-        if (rotation == 0.0f)
-        {
+        if (rotation == 0.0f) { // do not calculate rotation
             float x = dest.x - origin.x;
             float y = dest.y - origin.y;
             topLeft = (Vector2){ x, y };
             topRight = (Vector2){ x + dest.width, y };
             bottomLeft = (Vector2){ x, y + dest.height };
             bottomRight = (Vector2){ x + dest.width, y + dest.height };
-        }
-        else
-        {
+        } else {  // calculate rotation
             float sinRotation = sinf(rotation*DEG2RAD);
             float cosRotation = cosf(rotation*DEG2RAD);
             float x = dest.x;
             float y = dest.y;
             float dx = -origin.x;
             float dy = -origin.y;
-
             topLeft.x = x + dx*cosRotation - dy*sinRotation;
             topLeft.y = y + dx*sinRotation + dy*cosRotation;
-
             topRight.x = x + (dx + dest.width)*cosRotation - dy*sinRotation;
             topRight.y = y + (dx + dest.width)*sinRotation + dy*cosRotation;
-
             bottomLeft.x = x + dx*cosRotation - (dy + dest.height)*sinRotation;
             bottomLeft.y = y + dx*sinRotation + (dy + dest.height)*cosRotation;
-
             bottomRight.x = x + (dx + dest.width)*cosRotation - (dy + dest.height)*sinRotation;
             bottomRight.y = y + (dx + dest.width)*sinRotation + (dy + dest.height)*cosRotation;
         }
 
         rlCheckRenderBatchLimit(4);     // Make sure there is enough free space on the batch buffer
-
         rlSetTexture(texture.id);
         rlBegin(RL_QUADS);
-            rlColor4ub(tint.r, tint.g, tint.b, tint.a);
             rlNormal3f(0.0f, 0.0f, 1.0f);                          // Normal vector pointing towards viewer
-
             // Bottom-left corner for texture and quad
-            if (flipX) rlTexCoord2f((source.x + source.width)/width, source.y/height);
-            else rlTexCoord2f(source.x/width, source.y/height);
+            rlColor4ub(color[0].r, color[0].g, color[0].b, color[0].a);
+            if (flipX) rlTexCoord2f((source.x + source.width)/width, source.y/height); else rlTexCoord2f(source.x/width, source.y/height);
             rlVertex2f(topLeft.x + skew.x, topLeft.y);
-
             // Bottom-right corner for texture and quad
-            if (flipX) rlTexCoord2f((source.x + source.width)/width, (source.y + source.height)/height);
-            else rlTexCoord2f(source.x/width, (source.y + source.height)/height);
+            rlColor4ub(color[1].r, color[1].g, color[1].b, color[1].a);
+            if (flipX) rlTexCoord2f((source.x + source.width)/width, (source.y + source.height)/height); else rlTexCoord2f(source.x/width, (source.y + source.height)/height);
             rlVertex2f(bottomLeft.x, bottomLeft.y);
-
             // Top-right corner for texture and quad
-            if (flipX) rlTexCoord2f(source.x/width, (source.y + source.height)/height);
-            else rlTexCoord2f((source.x + source.width)/width, (source.y + source.height)/height);
+            rlColor4ub(color[2].r, color[2].g, color[2].b, color[2].a);
+            if (flipX) rlTexCoord2f(source.x/width, (source.y + source.height)/height); else rlTexCoord2f((source.x + source.width)/width, (source.y + source.height)/height);
             rlVertex2f(bottomRight.x, bottomRight.y + skew.y);
-
             // Top-left corner for texture and quad
-            if (flipX) rlTexCoord2f(source.x/width, source.y/height);
-            else rlTexCoord2f((source.x + source.width)/width, (source.y)/height);
+            rlColor4ub(color[3].r, color[3].g, color[3].b, color[3].a);
+            if (flipX) rlTexCoord2f(source.x/width, source.y/height); else rlTexCoord2f((source.x + source.width)/width, (source.y)/height);
             rlVertex2f(topRight.x + skew.x, topRight.y + skew.y);
         rlEnd();
-        rlSetTexture(0);
     }
 }
 
@@ -643,38 +604,46 @@ Color gtia_ntsc_to_rgb(int val) {
 }
 
 
-Color get_color(int palette_id, unsigned short id) {
+Color get_palette_color(int palette_id, unsigned short id) {
     Color *color = sys.asset.palette[palette_id];
     return color[id];
 }
 
-Color get_color_set_alpha(int palette_id, unsigned short id, float alpha) {
+Color get_palette_color_pro(int palette_id, unsigned short id, float alpha) {
     Color *color = sys.asset.palette[palette_id];
-    Color color_with_alpha = {color[id].r, color[id].g, color[id].b, alpha};
-    return color_with_alpha;
+    return (Color){color[id].r, color[id].g, color[id].b, alpha};
 }
 
-Color get_pixel_color(Image* image, Vector2 position) {
-    //((Color *)image.data)[y*image.width + x].r
-    //((char *)image.data)[y*image.width + x]
-    return (Color){0};
+Color get_pixel_color(Image *image, Vector2 position) {
+    unsigned int offset = (position.y * image->width + position.x) * 4;
+    Color *data = &image->data;
+    return data[offset];
+//    unsigned char r = data[offset];
+//    unsigned char g = data[offset + 1];
+//    unsigned char b = data[offset + 2];
+//    unsigned char a = data[offset + 3];
+//    return (Color){r, g, b, a};
 }
-
 
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
 
 typedef enum {
-    GRID_RESERVED           = 0b11111100000000000000000000000000, // protect value from being changed
-    GRID_PROTECTED          = 0b00000010000000000000000000000000, // protect value from being changed
-    GRID_HIDDEN             = 0b00000001000000000000000000000000, // hide value (not displayed)
-    GRID_CELLDIS            = 0b00000000100000000000000000000000, // turn on cell corners C1 to C4 displacements
-    GRID_LINESSEQ           = 0b00000000010000000000000000000000, // turn on lines sequencing
-    GRID_COLORSEQ           = 0b00000000001000000000000000000000, // turn on color sequencing
-    GRID_VALUESEQ           = 0b00000000000100000000000000000000, // turn on cell value sequencing
-    GRID_MOUSE_BACKGROUND   = 0b00000000000010000000000000000000, // turn on mouse cursor background display *** MAY BE REPLACED
-    GRID_MOUSE_FOREGROUND   = 0b00000000000001000000000000000000, // turn on mouse cursor foreground display *** MAY BE REPLACED
+    GRID_BGBLEND_LLEFT      = 0b10000000000000000000000000000000, // background vertex color blend lower left
+    GRID_BGBLEND_LRIGHT     = 0b01000000000000000000000000000000, // background vertex color blend lower right
+    GRID_BGBLEND_URIGHT     = 0b00100000000000000000000000000000, // background vertex color blend upper right
+    GRID_BGBLEND_ULEFT      = 0b00010000000000000000000000000000, // background vertex color blend upper left
+    GRID_FGBLEND_LLEFT      = 0b00001000000000000000000000000000, // foreground vertex color blend lower left
+    GRID_FGBLEND_LRIGHT     = 0b00000100000000000000000000000000, // foreground vertex color blend lower right
+    GRID_FGBLEND_URIGHT     = 0b00000010000000000000000000000000, // foreground vertex color blend upper right
+    GRID_FGBLEND_ULEFT      = 0b00000001000000000000000000000000, // foreground vertex color blend upper left
+    GRID_PROTECTED          = 0b00000000100000000000000000000000, // protect value from being changed
+    GRID_HIDDEN             = 0b00000000010000000000000000000000, // hide value (not displayed)
+    GRID_CELLDIS            = 0b00000000001000000000000000000000, // turn on cell corners C1 to C4 displacements
+    GRID_LINESSEQ           = 0b00000000000100000000000000000000, // turn on lines sequencing
+    GRID_COLORSEQ           = 0b00000000000010000000000000000000, // turn on color sequencing
+    GRID_VALUESEQ           = 0b00000000000001000000000000000000, // turn on cell value sequencing
     GRID_AUTOSCRX           = 0b00000000000000100000000000000000, // turn on automatic scrolling on x axis
     GRID_AUTOSCRY           = 0b00000000000000010000000000000000, // turn on automatic scrolling on y axis
     GRID_ROTATION           = 0b00000000000000001000000000000000, // turn on rotation 
@@ -733,46 +702,67 @@ Rectangle get_tilezone_from_code(int asset_id, int code) {
 
 //        plot_character(ex_scrolltext[s].font, ch, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].bg_color, state);
 void plot_character(int asset_id, int palette_id, int code, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color color_fg, Color color_bg, unsigned int state) {
-
+    Color vertex_colors[4];
     if (!(state & GRID_ROTATION)) angle = 0.f;
 
     if (state & GRID_BACKGROUND) {
+        vertex_colors[0] = color_bg;
+        vertex_colors[1] = color_bg;
+        vertex_colors[2] = color_bg;
+        vertex_colors[3] = color_bg;
         DrawRectangleProSK(
             (Rectangle) { position.x, position.y, scale.x, scale.y },
-            (Vector2) {0,0}, (Vector2) {0,0}, angle, color_bg);
+            (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
     }
     if (state & GRID_FOREGROUND) {
             if (state & GRID_SHADOW) {
+                vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
+                vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
+                vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
+                vertex_colors[3] = (Color) {0.f, 0.f, 0.f, 48.f};
                 DrawTextureProSK(sys.asset.tex[asset_id],
                     get_tilezone_from_code(asset_id, code),
                     (Rectangle) { position.x + shadow.x, position.y + shadow.y, scale.x, scale.y },
-                    (Vector2) {0,0}, skew, angle, (Color) {0.f, 0.f, 0.f, 48.f});
+                    (Vector2) {0,0}, skew, angle, vertex_colors);
             };
+            vertex_colors[0] = color_fg;
+            vertex_colors[1] = color_fg;
+            vertex_colors[2] = color_fg;
+            vertex_colors[3] = color_fg;
             DrawTextureProSK(sys.asset.tex[asset_id],
                 get_tilezone_from_code(asset_id, code),
                 (Rectangle) { position.x, position.y , scale.x, scale.y },
-                (Vector2) {0,0}, skew, angle, color_fg);
+                (Vector2) {0,0}, skew, angle, vertex_colors);
     }
 }
 
 bool init_cell_linear(EX_cell *cell, unsigned int cell_state, unsigned int color_id, unsigned int bg_color_id) {
     cell->state = cell_state;
     cell->value = 0;
-    cell->angle = 0;
     cell->fg_color_id = color_id;
     cell->bg_color_id = bg_color_id;
     cell->offset = (Vector2) {0,0};
     cell->scale = (Vector2) {1,1};
+    cell->angle = 0;
+    cell->fg_brightness = 1.f;
+    cell->bg_brightness = 1.f;
+
     return 0;
 }
 
 bool init_layer(int page_id, int layer_id, Vector2 size, unsigned int layer_state, unsigned int cell_state, int asset_id) {
     int cell_count = (int)size.x * (int)size.y;
+    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
+    layer->size = size;
+    layer->state = layer_state;
+    layer->cell_count = cell_count;
+    layer->cell = calloc(cell_count, sizeof(EX_cell));
+    layer->offset = (Vector2) {0,0};
+    layer->scale = (Vector2) {1,1};
+    layer->angle = 0;
+    layer->fg_brightness = 1.f;
+    layer->bg_brightness = 1.f;
 
-    sys.video.page[page_id].layer[layer_id].size = size;
-    sys.video.page[page_id].layer[layer_id].state = layer_state;
-    sys.video.page[page_id].layer[layer_id].cell_count = cell_count;
-    sys.video.page[page_id].layer[layer_id].cell = calloc(cell_count, sizeof(EX_cell));
     EX_cell *cell = &sys.video.page[page_id].layer[layer_id].cell[0];
     for (int i = 0; i < cell_count; i++) {
         init_cell_linear(&cell[i], cell_state, 0, 0);
@@ -1038,7 +1028,6 @@ typedef enum {
     GRIDFIELD_VALUE                = 0b00010000000000000000000000000000,   // value of cell
     GRIDFIELD_LINES                = 0b00000010000000000000000000000000,   // lines feature
     GRIDFIELD_CYCLE                = 0b00000000000010000000000000000000,   // cell animation sequence number
-    GRIDFIELD_ANGLE                = 0b00000000000001000000000000000000,   // degree of angle used to rotate the cell
     GRIDFIELD_FG_COLOR             = 0b00000000000000100000000000000000,   // palette index color for cell
     GRIDFIELD_FG_COLOR_CYCLE       = 0b00000000000000010000000000000000,   // color cycle index
     GRIDFIELD_BG_COLOR             = 0b00000000000000001000000000000000,   // palette index color for cell background
@@ -1050,8 +1039,11 @@ typedef enum {
     GRIDFIELD_SCALE                = 0b00000000000000000000001000000000,   // (x,y) cell scale
     GRIDFIELD_SCALE_SPEED          = 0b00000000000000000000000100000000,   // (x,y) cell scale speed
     GRIDFIELD_SCROLL_SPEED         = 0b00000000000000000000000010000000,   // (x,y) cell scroll speed
-    GRIDFIELD_COLOR_MASK           = 0b00000000000000000000000001000000,   // RGBA color mask of cell
-    GRIDFIELD_SHADOW_MASK          = 0b00000000000000000000000000100000,   // shadow RGBA mask
+    GRIDFIELD_ANGLE                = 0b00000000000000000000000001000000,   // degree of angle used to rotate the cell
+    GRIDFIELD_FG_BRIGHTNESS        = 0b00000000000000000000000000100000,   // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+    GRIDFIELD_BG_BRIGHTNESS        = 0b00000000000000000000000000010000,   // background brightness (values 0...1 divides, values 1 to 255 multiply)
+    GRIDFIELD_COLOR_MASK           = 0b00000000000000000000000000001000,   // RGBA color mask of cell
+    GRIDFIELD_SHADOW_MASK          = 0b00000000000000000000000000000100,   // shadow RGBA mask
     GRIDFIELD_ALL                  = 0b01111111111111111111111111111111,   // all fields
     GRIDFIELD_ALL_BUT_STATE        = 0b00111111111111111111111111111111    // all fields except the state of the cell
 } gridfield_features;
@@ -1069,26 +1061,28 @@ void init_cell (int page_id, int layer_id, Rectangle target, EX_cell info_cell, 
             for (int y = target.y; y++; y < (target.y + target.height)) {
                 if (y >= 0 && y < lsy) {
                     target_offset = lsx * y + x;
-                    if (state & GRIDFIELD_ALL)                   target_cell[target_offset]                       = info_cell;      // all flags for cell
+                    if (state & GRIDFIELD_ALL)                   target_cell[target_offset]                       = info_cell;
                     else {
-                        if (state & GRIDFIELD_STATE)             target_cell[target_offset].state                 = info_cell.state;                // state
-                        if (state & GRIDFIELD_VALUE)             target_cell[target_offset].value                 = info_cell.value;                // value
-                        if (state & GRIDFIELD_LINES)             target_cell[target_offset].lines                 = info_cell.lines;                // lines
-                        if (state & GRIDFIELD_CYCLE)             target_cell[target_offset].cycle_id              = info_cell.cycle_id;             // cell animation sequence number
-                        if (state & GRIDFIELD_ANGLE)             target_cell[target_offset].angle                 = info_cell.angle;                // degree of angle used to rotate the cell
-                        if (state & GRIDFIELD_FG_COLOR)          target_cell[target_offset].fg_color_id           = info_cell.fg_color_id;          // palette index color for cell
-                        if (state & GRIDFIELD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = info_cell.fg_color_cycle_id;    // color cycle index
-                        if (state & GRIDFIELD_BG_COLOR)          target_cell[target_offset].bg_color_id           = info_cell.bg_color_id;          // palette index color for cell background
-                        if (state & GRIDFIELD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = info_cell.bg_color_cycle_id;    // color cycle index
-                        if (state & GRIDFIELD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = info_cell.lines_color_id;       // palette index color for cell background
-                        if (state & GRIDFIELD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = info_cell.lines_color_cycle_id; // color cycle index
-                        if (state & GRIDFIELD_OFFSET)            target_cell[target_offset].offset                = info_cell.offset;               // displacement from top left (x,y)
-                        if (state & GRIDFIELD_SKEW)              target_cell[target_offset].skew                  = info_cell.skew;                 // horizontal and vertical skew
-                        if (state & GRIDFIELD_SCALE)             target_cell[target_offset].scale                 = info_cell.scale;                // (x,y) cell scale
-                        if (state & GRIDFIELD_SCALE_SPEED)       target_cell[target_offset].scale_speed           = info_cell.scale_speed;          // (x,y) cell scale speed
-                        if (state & GRIDFIELD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed          = info_cell.scroll_speed;         // (x,y) cell scroll speed
-                        if (state & GRIDFIELD_COLOR_MASK)        target_cell[target_offset].color_mask            = info_cell.color_mask;           // RGBA color mask of cell
-                        if (state & GRIDFIELD_SHADOW_MASK)       target_cell[target_offset].shadow_mask           = info_cell.shadow_mask;          // shadow RGBA mask
+                        if (state & GRIDFIELD_STATE)             target_cell[target_offset].state                 = info_cell.state;
+                        if (state & GRIDFIELD_VALUE)             target_cell[target_offset].value                 = info_cell.value;
+                        if (state & GRIDFIELD_LINES)             target_cell[target_offset].lines                 = info_cell.lines;
+                        if (state & GRIDFIELD_CYCLE)             target_cell[target_offset].cycle_id              = info_cell.cycle_id;
+                        if (state & GRIDFIELD_FG_COLOR)          target_cell[target_offset].fg_color_id           = info_cell.fg_color_id;
+                        if (state & GRIDFIELD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = info_cell.fg_color_cycle_id;
+                        if (state & GRIDFIELD_BG_COLOR)          target_cell[target_offset].bg_color_id           = info_cell.bg_color_id;
+                        if (state & GRIDFIELD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = info_cell.bg_color_cycle_id;
+                        if (state & GRIDFIELD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = info_cell.lines_color_id;
+                        if (state & GRIDFIELD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = info_cell.lines_color_cycle_id;
+                        if (state & GRIDFIELD_OFFSET)            target_cell[target_offset].offset                = info_cell.offset;
+                        if (state & GRIDFIELD_SKEW)              target_cell[target_offset].skew                  = info_cell.skew;
+                        if (state & GRIDFIELD_SCALE)             target_cell[target_offset].scale                 = info_cell.scale;
+                        if (state & GRIDFIELD_SCALE_SPEED)       target_cell[target_offset].scale_speed           = info_cell.scale_speed;
+                        if (state & GRIDFIELD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed          = info_cell.scroll_speed;
+                        if (state & GRIDFIELD_ANGLE)             target_cell[target_offset].angle                 = info_cell.angle;
+                        if (state & GRIDFIELD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness         = info_cell.fg_brightness;
+                        if (state & GRIDFIELD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness         = info_cell.bg_brightness;
+                        if (state & GRIDFIELD_COLOR_MASK)        target_cell[target_offset].color_mask            = info_cell.color_mask;
+                        if (state & GRIDFIELD_SHADOW_MASK)       target_cell[target_offset].shadow_mask           = info_cell.shadow_mask;
                     }
                 }
             }
@@ -1139,26 +1133,28 @@ void copy_cell_in_layer(int page_id, int layer_id, Rectangle source, Vector2 tar
                 if (x >= 0 && ((x + tx) < lsx) && (x + tx) >= 0) {
                     source_offset = lsx * y + x;
                     target_offset = lsx * (y + ty) + (x + tx);
-                    if (state & GRIDFIELD_ALL)                   cell[target_offset]                       = cell[source_offset];                      // all flags for cell
+                    if (state & GRIDFIELD_ALL)                   cell[target_offset]                       = cell[source_offset];
                     else {
-                        if (state & GRIDFIELD_STATE)             cell[target_offset].state                 = cell[source_offset].state;                // state
-                        if (state & GRIDFIELD_VALUE)             cell[target_offset].value                 = cell[source_offset].value;                // value
-                        if (state & GRIDFIELD_LINES)             cell[target_offset].lines                 = cell[source_offset].lines;                // lines
-                        if (state & GRIDFIELD_CYCLE)             cell[target_offset].cycle_id              = cell[source_offset].cycle_id;             // cell animation sequence number
-                        if (state & GRIDFIELD_ANGLE)             cell[target_offset].angle                 = cell[source_offset].angle;                // degree of angle used to rotate the cell
-                        if (state & GRIDFIELD_FG_COLOR)          cell[target_offset].fg_color_id           = cell[source_offset].fg_color_id;          // palette index color for cell
-                        if (state & GRIDFIELD_FG_COLOR_CYCLE)    cell[target_offset].fg_color_cycle_id     = cell[source_offset].fg_color_cycle_id;    // color cycle index
-                        if (state & GRIDFIELD_BG_COLOR)          cell[target_offset].bg_color_id           = cell[source_offset].bg_color_id;          // palette index color for cell background
-                        if (state & GRIDFIELD_BG_COLOR_CYCLE)    cell[target_offset].bg_color_cycle_id     = cell[source_offset].bg_color_cycle_id;    // color cycle index
-                        if (state & GRIDFIELD_LINES_COLOR)       cell[target_offset].lines_color_id        = cell[source_offset].lines_color_id;       // palette index color for cell background
-                        if (state & GRIDFIELD_LINES_COLOR_CYCLE) cell[target_offset].lines_color_cycle_id  = cell[source_offset].lines_color_cycle_id; // color cycle index
-                        if (state & GRIDFIELD_OFFSET)            cell[target_offset].offset                = cell[source_offset].offset;               // displacement from top left (x,y)
-                        if (state & GRIDFIELD_SKEW)              cell[target_offset].skew                  = cell[source_offset].skew;                 // horizontal and vertical skew
-                        if (state & GRIDFIELD_SCALE)             cell[target_offset].scale                 = cell[source_offset].scale;                // (x,y) cell scale
-                        if (state & GRIDFIELD_SCALE_SPEED)       cell[target_offset].scale_speed           = cell[source_offset].scale_speed;          // (x,y) cell scale speed
-                        if (state & GRIDFIELD_SCROLL_SPEED)      cell[target_offset].scroll_speed          = cell[source_offset].scroll_speed;         // (x,y) cell scroll speed
-                        if (state & GRIDFIELD_COLOR_MASK)        cell[target_offset].color_mask            = cell[source_offset].color_mask;           // RGBA color mask of cell
-                        if (state & GRIDFIELD_SHADOW_MASK)       cell[target_offset].shadow_mask           = cell[source_offset].shadow_mask;          // shadow RGBA mask
+                        if (state & GRIDFIELD_STATE)             cell[target_offset].state                 = cell[source_offset].state;
+                        if (state & GRIDFIELD_VALUE)             cell[target_offset].value                 = cell[source_offset].value;
+                        if (state & GRIDFIELD_LINES)             cell[target_offset].lines                 = cell[source_offset].lines;
+                        if (state & GRIDFIELD_CYCLE)             cell[target_offset].cycle_id              = cell[source_offset].cycle_id;
+                        if (state & GRIDFIELD_FG_COLOR)          cell[target_offset].fg_color_id           = cell[source_offset].fg_color_id;
+                        if (state & GRIDFIELD_FG_COLOR_CYCLE)    cell[target_offset].fg_color_cycle_id     = cell[source_offset].fg_color_cycle_id;
+                        if (state & GRIDFIELD_BG_COLOR)          cell[target_offset].bg_color_id           = cell[source_offset].bg_color_id;
+                        if (state & GRIDFIELD_BG_COLOR_CYCLE)    cell[target_offset].bg_color_cycle_id     = cell[source_offset].bg_color_cycle_id;
+                        if (state & GRIDFIELD_LINES_COLOR)       cell[target_offset].lines_color_id        = cell[source_offset].lines_color_id;
+                        if (state & GRIDFIELD_LINES_COLOR_CYCLE) cell[target_offset].lines_color_cycle_id  = cell[source_offset].lines_color_cycle_id;
+                        if (state & GRIDFIELD_OFFSET)            cell[target_offset].offset                = cell[source_offset].offset;
+                        if (state & GRIDFIELD_SKEW)              cell[target_offset].skew                  = cell[source_offset].skew;
+                        if (state & GRIDFIELD_SCALE)             cell[target_offset].scale                 = cell[source_offset].scale;
+                        if (state & GRIDFIELD_SCALE_SPEED)       cell[target_offset].scale_speed           = cell[source_offset].scale_speed;
+                        if (state & GRIDFIELD_SCROLL_SPEED)      cell[target_offset].scroll_speed          = cell[source_offset].scroll_speed;
+                        if (state & GRIDFIELD_ANGLE)             cell[target_offset].angle                 = cell[source_offset].angle;
+                        if (state & GRIDFIELD_FG_BRIGHTNESS)     cell[target_offset].fg_brightness         = cell[source_offset].fg_brightness;
+                        if (state & GRIDFIELD_BG_BRIGHTNESS)     cell[target_offset].bg_brightness         = cell[source_offset].bg_brightness;
+                        if (state & GRIDFIELD_COLOR_MASK)        cell[target_offset].color_mask            = cell[source_offset].color_mask;
+                        if (state & GRIDFIELD_SHADOW_MASK)       cell[target_offset].shadow_mask           = cell[source_offset].shadow_mask;
                     }
                 }
                 x += xi; if (xi == 1) {if (x >= xb) break;} else if (x < xb) break;
@@ -1192,26 +1188,28 @@ void copy_cell_to_layer(int source_page_id, int source_layer_id, Rectangle sourc
                 if ( (y + ty) < lsy && (y + ty) < lty && (y + ty) >= 0 ) {
                     source_offset = lsx * y + x;
                     target_offset = ltx * (y + ty) + (x + tx);
-                    if (state & GRIDFIELD_ALL)                   target_cell[target_offset]                       = source_cell[source_offset];                      // all flags for cell
+                    if (state & GRIDFIELD_ALL)                   target_cell[target_offset]                       = source_cell[source_offset];
                     else {
-                        if (state & GRIDFIELD_STATE)             target_cell[target_offset].state                 = source_cell[source_offset].state;                // state
-                        if (state & GRIDFIELD_VALUE)             target_cell[target_offset].value                 = source_cell[source_offset].value;                // value
-                        if (state & GRIDFIELD_LINES)             target_cell[target_offset].lines                 = source_cell[source_offset].lines;                // lines
-                        if (state & GRIDFIELD_CYCLE)             target_cell[target_offset].cycle_id              = source_cell[source_offset].cycle_id;             // cell animation sequence number
-                        if (state & GRIDFIELD_ANGLE)             target_cell[target_offset].angle                 = source_cell[source_offset].angle;                // degree of angle used to rotate the cell
-                        if (state & GRIDFIELD_FG_COLOR)          target_cell[target_offset].fg_color_id           = source_cell[source_offset].fg_color_id;          // palette index color for cell
-                        if (state & GRIDFIELD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = source_cell[source_offset].fg_color_cycle_id;    // color cycle index
-                        if (state & GRIDFIELD_BG_COLOR)          target_cell[target_offset].bg_color_id           = source_cell[source_offset].bg_color_id;          // palette index color for cell background
-                        if (state & GRIDFIELD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = source_cell[source_offset].bg_color_cycle_id;    // color cycle index
-                        if (state & GRIDFIELD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = source_cell[source_offset].lines_color_id;       // palette index color for cell background
-                        if (state & GRIDFIELD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = source_cell[source_offset].lines_color_cycle_id; // color cycle index
-                        if (state & GRIDFIELD_OFFSET)            target_cell[target_offset].offset                = source_cell[source_offset].offset;               // displacement from top left (x,y)
-                        if (state & GRIDFIELD_SKEW)              target_cell[target_offset].skew                  = source_cell[source_offset].skew;                 // horizontal and vertical skew
-                        if (state & GRIDFIELD_SCALE)             target_cell[target_offset].scale                 = source_cell[source_offset].scale;                // (x,y) cell scale
-                        if (state & GRIDFIELD_SCALE_SPEED)       target_cell[target_offset].scale_speed           = source_cell[source_offset].scale_speed;          // (x,y) cell scale speed
-                        if (state & GRIDFIELD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed          = source_cell[source_offset].scroll_speed;         // (x,y) cell scroll speed
-                        if (state & GRIDFIELD_COLOR_MASK)        target_cell[target_offset].color_mask            = source_cell[source_offset].color_mask;           // RGBA color mask of cell
-                        if (state & GRIDFIELD_SHADOW_MASK)       target_cell[target_offset].shadow_mask           = source_cell[source_offset].shadow_mask;          // shadow RGBA mask
+                        if (state & GRIDFIELD_STATE)             target_cell[target_offset].state                 = source_cell[source_offset].state;
+                        if (state & GRIDFIELD_VALUE)             target_cell[target_offset].value                 = source_cell[source_offset].value;
+                        if (state & GRIDFIELD_LINES)             target_cell[target_offset].lines                 = source_cell[source_offset].lines;
+                        if (state & GRIDFIELD_CYCLE)             target_cell[target_offset].cycle_id              = source_cell[source_offset].cycle_id;
+                        if (state & GRIDFIELD_FG_COLOR)          target_cell[target_offset].fg_color_id           = source_cell[source_offset].fg_color_id;
+                        if (state & GRIDFIELD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = source_cell[source_offset].fg_color_cycle_id;
+                        if (state & GRIDFIELD_BG_COLOR)          target_cell[target_offset].bg_color_id           = source_cell[source_offset].bg_color_id;
+                        if (state & GRIDFIELD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = source_cell[source_offset].bg_color_cycle_id;
+                        if (state & GRIDFIELD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = source_cell[source_offset].lines_color_id;
+                        if (state & GRIDFIELD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = source_cell[source_offset].lines_color_cycle_id;
+                        if (state & GRIDFIELD_OFFSET)            target_cell[target_offset].offset                = source_cell[source_offset].offset;
+                        if (state & GRIDFIELD_SKEW)              target_cell[target_offset].skew                  = source_cell[source_offset].skew;
+                        if (state & GRIDFIELD_SCALE)             target_cell[target_offset].scale                 = source_cell[source_offset].scale;
+                        if (state & GRIDFIELD_SCALE_SPEED)       target_cell[target_offset].scale_speed           = source_cell[source_offset].scale_speed;
+                        if (state & GRIDFIELD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed          = source_cell[source_offset].scroll_speed;
+                        if (state & GRIDFIELD_ANGLE)             target_cell[target_offset].angle                 = source_cell[source_offset].angle;
+                        if (state & GRIDFIELD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness         = source_cell[source_offset].fg_brightness;
+                        if (state & GRIDFIELD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness         = source_cell[source_offset].bg_brightness;
+                        if (state & GRIDFIELD_COLOR_MASK)        target_cell[target_offset].color_mask            = source_cell[source_offset].color_mask;
+                        if (state & GRIDFIELD_SHADOW_MASK)       target_cell[target_offset].shadow_mask           = source_cell[source_offset].shadow_mask;
                     }
                 }
             }
@@ -1233,7 +1231,7 @@ void render_layer(int layer_id) {
             // we have the cell data we can use it to draw our background, foreground and shadow
             // calculate position x,y
             // ascii code is in c.value
-            // reading color from palette get_color(palette,id);
+            // reading color from palette get_palette_color(palette,id);
 /*
                     unsigned int state = GRID_FOREGROUND | GRID_RED | GRID_GREEN | GRID_BLUE | GRID_SCALE_X | GRID_SCALE_Y;
                     if (ex_scrolltext[s].bg_color_flag > 0) state |= GRID_BACKGROUND;
@@ -1246,8 +1244,8 @@ void render_layer(int layer_id) {
                         ex_scrolltext[s].skew,
                         (Vector2) {2, 2},
                         ex_scrolltext[s].text_angle, 
-                        get_color_set_alpha(palette_id, ex_scrolltext[s].fg_color, ex_scrolltext[s].alpha), 
-                        get_color_set_alpha(palette_id, ex_scrolltext[s].bg_color, ex_scrolltext[s].alpha), 
+                        get_palette_color_pro(palette_id, ex_scrolltext[s].fg_color, ex_scrolltext[s].alpha), 
+                        get_palette_color_pro(palette_id, ex_scrolltext[s].bg_color, ex_scrolltext[s].alpha), 
                         state);
 */
         }
@@ -2131,7 +2129,7 @@ static void update_marquee_animation(int asset_id, int palette_id, Vector2 logos
         for(int i = 0; i < logosize.y; i++) {
             if (palptr_loop > 255) {palptr_loop -= 256;} else if (palptr_loop < 0) {palptr_loop += 256;};
             
-            Color rgba = get_color(palette_id, palptr_loop);
+            Color rgba = get_palette_color(palette_id, palptr_loop);
             
             float shadow_alpha = (transparency * shadow_transparency);
             if (shadow_alpha > 0) {
@@ -2213,7 +2211,7 @@ static void update_canopy(int asset_id) {
         int col_idx;
         ex_canopy.sin_value_old.x = ex_canopy.sin_value.x;
         ex_canopy.sin_value_old.y = ex_canopy.sin_value.y;
-
+        Color vertex_colors[4];
         for(int y = (ex_canopy.cells_y - 1); y >= 0; y -= 1) {
             for(int x = (ex_canopy.cells_x - 1); x >= 0; x -= 1) {
                 float x_sin = fast_sin(ex_canopy.sin_value.x);
@@ -2225,22 +2223,28 @@ static void update_canopy(int asset_id) {
                 if (y<(ex_canopy.cells_y-1)) {cell_size.y = ((ex_canopy.grid[y+1][x].y - ex_canopy.grid[y][x].y) + 1.f);} else {cell_size.y = ex_canopy.cell_size.y;};
                     
                 if (cell_size.x > 0 && cell_size.y > 0) {
-                    // Was meant for shadow but looks kind of ugly
-                    //DrawRectangle(ex_canopy.grid[y][x].x + ex_canopy.cell_size.x, ex_canopy.grid[y][x].y + ex_canopy.cell_size.y, cell_size.x, cell_size.y, 
-                    //(Color) { 0.0,0.0,0.0,64 } );
-
                     col_idx = (int)(y_sin * 4.0f); if (col_idx > 3) col_idx = 3;
-                    DrawRectangle(ex_canopy.grid[y][x].x, ex_canopy.grid[y][x].y, cell_size.x, cell_size.y, 
-                    get_color(ex_canopy.palette_id,-col_idx + ex_canopy.pal_idx_cells));
+                    vertex_colors[0] = get_palette_color(ex_canopy.palette_id,-col_idx + ex_canopy.pal_idx_cells);
+                    vertex_colors[1] = vertex_colors[0];
+                    vertex_colors[2] = vertex_colors[0];
+                    vertex_colors[3] = vertex_colors[0];
+                    DrawRectangleProSK(
+                    (Rectangle){ex_canopy.grid[y][x].x, ex_canopy.grid[y][x].y, cell_size.x, cell_size.y}, 
+                    (Vector2) {0.f, 0.f}, (Vector2) {0.f, 0.f}, 0.f,
+                    vertex_colors);
 
                     // draw text from a grid
                     col_idx = (int)(y_sin * 7.0f); if (col_idx > 6) col_idx = 6;
+                    vertex_colors[0] = get_palette_color(ex_canopy.palette_id,-col_idx + ex_canopy.pal_idx_text);
+                    vertex_colors[1] = vertex_colors[0];
+                    vertex_colors[2] = vertex_colors[0];
+                    vertex_colors[3] = vertex_colors[0];
                     float value = (float)(sys.asset.data[asset_id][y * ex_canopy.cells_x + x]);
-                    DrawTexturePro(sys.asset.tex[ex_canopy.font_id],
+                    DrawTextureProSK(sys.asset.tex[ex_canopy.font_id],
                     get_tilezone_from_code(ex_canopy.font_id, value),
                     (Rectangle) {ex_canopy.grid[y][x].x, ex_canopy.grid[y][x].y, cell_size.x, cell_size.y},
-                    (Vector2) {0.f, 0.f},0.f,
-                    get_color(ex_canopy.palette_id,-col_idx + ex_canopy.pal_idx_text));
+                    (Vector2) {0.f, 0.f}, (Vector2) {0.f, 0.f},0.f,
+                    vertex_colors);
                 }
                 ex_canopy.sin_value.y += (ex_canopy.adjustment.y + fast_sin(sys.video.frame_time_inc[sys.video.current_virtual]) * 0.005f);
             }
@@ -2462,8 +2466,8 @@ static void update_scrolltext(int s, float text_scale) {
                         ex_scrolltext[s].skew,
                         (Vector2) {2, 2},
                         ex_scrolltext[s].text_angle, 
-                        get_color_set_alpha(palette_id, ex_scrolltext[s].fg_color, ex_scrolltext[s].alpha), 
-                        get_color_set_alpha(palette_id, ex_scrolltext[s].bg_color, ex_scrolltext[s].alpha), 
+                        get_palette_color_pro(palette_id, ex_scrolltext[s].fg_color, ex_scrolltext[s].alpha), 
+                        get_palette_color_pro(palette_id, ex_scrolltext[s].bg_color, ex_scrolltext[s].alpha), 
                         state);
                 };
             } else {
