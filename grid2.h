@@ -10,23 +10,25 @@
 // GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][
 #pragma once
 
-#include "raylib.h"             // works on version 3.8 development
+#define SUPPORT_TRACELOG 1
+#include "utils.h"           // Required for: TRACELOG macros
+#include "raylib.h"          // works on version 3.8 development
 #include "raymath.h"
-#include "rlgl.h"               // raylib OpenGL abstraction layer to OpenGL 1.1, 3.3 or ES2
+#include "rlgl.h"            // raylib OpenGL abstraction layer to OpenGL 1.1, 3.3 or ES2
 #include <GLFW/glfw3.h>
 
 //#include <windows.h> 
-#include <stdlib.h>  // header of the general purpose standard library
+#include <stdlib.h>         // header of the general purpose standard library
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 #include <limits.h>
-#include <string.h>  // set of functions implementing operations on strings
-//#include <strsafe.h> // replace standard C string handling and I/O functions including printf, strlen, strcpy and strcat
-//#include <tchar.h>  // for string functions makes code compliant to both Unicode and non-unicode environments
-//#include <errno.h>   // A value (the error number) is stored in errno by certain library functions when they detect errors
-//#include <unistd.h>  // provides access to the POSIX operating system API
-//#include <fcntl.h> // system-wide table of files opened by all processes, called the file table
+#include <string.h>         // set of functions implementing operations on strings
+//#include <strsafe.h>      // replace standard C string handling and I/O functions including printf, strlen, strcpy and strcat
+//#include <tchar.h>        // for string functions makes code compliant to both Unicode and non-unicode environments
+//#include <errno.h>        // A value (the error number) is stored in errno by certain library functions when they detect errors
+//#include <unistd.h>       // provides access to the POSIX operating system API
+//#include <fcntl.h>        // system-wide table of files opened by all processes, called the file table
 
 // **************************************************************************************** B A S E   A S S E T S
 #include <VGACOLORS.h>
@@ -50,54 +52,54 @@
 #define GRID_MAX_LAYERS 16
 
 typedef struct EX_cell {
-    unsigned int state;                             // all flags for cell
-    unsigned short value;                           // value of cell
-    unsigned char lines;                            // lines feature
-    unsigned short cycle_id;                        // cell animation sequence number
-    unsigned short fg_color_id;                     // palette index color for cell
-    unsigned short fg_color_cycle_id;               // color cycle index
-    unsigned short bg_color_id;                     // palette index color for cell background
-    unsigned short bg_color_cycle_id;               // color cycle index
-    unsigned short lines_color_id;                  // palette index color for cell background
-    unsigned short lines_color_cycle_id;            // color cycle index
-    Vector2 offset;                                 // displacement from top left (x,y)
-    Vector2 skew;                                   // horizontal and vertical skew
-    Vector2 scale;                                  // (x,y) cell scale
-    Vector2 scale_speed;                            // (x,y) cell scale speed
-    Vector2 scroll_speed;                           // (x,y) cell scroll speed
-    float angle;                                    // degree of angle used to rotate the cell
-    float fg_brightness;                            // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
-    float bg_brightness;                            // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    Color color_mask;                               // RGBA color mask of cell
-    Color shadow_mask;                              // shadow RGBA mask
+    unsigned int state;                         // all flags for cell
+    unsigned short value;                       // value of cell
+    unsigned char lines;                        // lines feature
+    unsigned short cycle_id;                    // cell animation sequence number
+    unsigned short fg_color_id;                 // palette index color for cell
+    unsigned short fg_color_cycle_id;           // color cycle index
+    unsigned short bg_color_id;                 // palette index color for cell background
+    unsigned short bg_color_cycle_id;           // color cycle index
+    unsigned short lines_color_id;              // palette index color for cell background
+    unsigned short lines_color_cycle_id;        // color cycle index
+    Vector2 offset;                             // displacement from top left (x,y)
+    Vector2 skew;                               // horizontal and vertical skew
+    Vector2 scale;                              // (x,y) cell scale
+    Vector2 scale_speed;                        // (x,y) cell scale speed
+    Vector2 scroll_speed;                       // (x,y) cell scroll speed
+    float angle;                                // degree of angle used to rotate the cell
+    float fg_brightness;                        // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+    float bg_brightness;                        // background brightness (values 0...1 divides, values 1 to 255 multiply)
+    Color color_mask;                           // RGBA color mask of cell
+    Color shadow_mask;                          // shadow RGBA mask
 } EX_cell;
 
 typedef struct EX_layer {
     char name[NAMELENGTH_MAX + 1];
-    unsigned int state;                             // all flags for grid
-    int asset_id;                                   // tilset used for this layer
-    Vector2 size;                                   // total cells x and y
-    unsigned short fg_color_id;                     // palette index color for cell
-    unsigned short fg_color_cycle_id;               // color cycle index
-    unsigned short bg_color_id;                     // palette index color for cell background
-    unsigned short bg_color_cycle_id;               // color cycle index
-    unsigned short lines_color_id;                  // palette index color for cell background
-    unsigned short lines_color_cycle_id;            // color cycle index
-    Vector2 offset;                                 // displacement from top left (x,y)
-    Vector2 displace[4];                            // cell corner displacement (x,y)
-    Vector2 scale;                                  // (x,y) cell scale
-    Vector2 scale_speed;                            // (x,y) cell scale speed
-    Vector2 scroll_speed;                           // layer scroll speed (x,y)
-    float angle;                                    // degree of angle to rotate layer
-    float fg_brightness;                            // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
-    float bg_brightness;                            // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    Vector2 shadow;                                 // shadow corner displacement (x,y)
-    Vector2 shadow_displace[4];                      // shadow corners displacement (x,y)
-    Color   color_mask;                             // RGBA color mask of layer
-    Color   shadow_mask;                            // shadow RGBA mask
-    EX_cell mouse;                                  // mouse cursor
-    EX_cell keyboard;                               // key cursor
-    EX_cell mask;                                   // used for when replicating
+    unsigned int state;                         // all flags for grid
+    int asset_id;                               // tilset used for this layer
+    Vector2 size;                               // total cells x and y
+    unsigned short fg_color_id;                 // palette index color for cell
+    unsigned short fg_color_cycle_id;           // color cycle index
+    unsigned short bg_color_id;                 // palette index color for cell background
+    unsigned short bg_color_cycle_id;           // color cycle index
+    unsigned short lines_color_id;              // palette index color for cell background
+    unsigned short lines_color_cycle_id;        // color cycle index
+    Vector2 offset;                             // displacement from top left (x,y)
+    Vector2 displace[4];                        // cell corner displacement (x,y)
+    Vector2 scale;                              // (x,y) cell scale
+    Vector2 scale_speed;                        // (x,y) cell scale speed
+    Vector2 scroll_speed;                       // layer scroll speed (x,y)
+    float angle;                                // degree of angle to rotate layer
+    float fg_brightness;                        // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+    float bg_brightness;                        // background brightness (values 0...1 divides, values 1 to 255 multiply)
+    Vector2 shadow;                             // shadow corner displacement (x,y)
+    Vector2 shadow_displace[4];                 // shadow corners displacement (x,y)
+    Color   color_mask;                         // RGBA color mask of layer
+    Color   shadow_mask;                        // shadow RGBA mask
+    EX_cell mouse;                              // mouse cursor
+    EX_cell keyboard;                           // key cursor
+    EX_cell mask;                               // used for when replicating
     unsigned int cell_count;
     EX_cell* cell; // could be NULL
 } EX_layer;
@@ -105,8 +107,8 @@ typedef struct EX_layer {
 typedef struct EX_page {
     unsigned int state;
     char name[NAMELENGTH_MAX + 1];
-    int layer_count;                                // total number of layers
-    EX_layer* layer;                                // could be NULL
+    int layer_count;                            // total number of layers
+    EX_layer* layer;                            // could be NULL
 } EX_page;
 
 // **************************************************************************************** A S S E T   S T R U C T U R E S
@@ -114,11 +116,11 @@ typedef struct EX_page {
 #define MAXPALETTECOLORS 256
 
 typedef struct EX_tileset {
-    Vector2 tilesize;   // Tile size
-    Vector2 count;       // number of tiles (x, y)
-    Texture tex;        // Characters texture atlas
-    unsigned int total; // Number of Tiles
-    int ascii_start;    // if tileset if character font, identifies ascii code first tile
+    Vector2 tilesize;                           // Tile size
+    Vector2 count;                              // number of tiles (x, y)
+    Texture tex;                                // Characters texture atlas
+    unsigned int total;                         // Number of Tiles
+    int ascii_start;                            // if tileset if character font, identifies ascii code first tile
 } EX_tileset;
 
 typedef struct EX_asset {
@@ -128,18 +130,18 @@ typedef struct EX_asset {
 
     unsigned int asset_type[MAXASSETS];
     unsigned int state[MAXASSETS];
-    int data_size[MAXASSETS];               // storage space size in bytes
+    int data_size[MAXASSETS];                   // storage space size in bytes
 
-    Image img[MAXASSETS];                   // storage space for unpacked images
-    Texture tex[MAXASSETS];                 // storage space for textures
-    Color *palette[MAXASSETS];              // storage space for indexed colors
-    unsigned int palette_colors[MAXASSETS]; // total number of colors in palette
-    EX_tileset tileset[MAXASSETS];          // storage space for texture based fonts
-    RenderTexture framebuffer[MAXASSETS];   // storage space for frame buffer
-    Font font[MAXASSETS];                   // storage space for texture based fonts
-    Music music[MAXASSETS];                 // storage space for unpacked music
-    Shader shader[MAXASSETS];               // storage space for shaders
-    unsigned char *data[MAXASSETS];         // storage space for any text, data, JSON, LUA ...
+    Image img[MAXASSETS];                       // storage space for unpacked images
+    Texture tex[MAXASSETS];                     // storage space for textures
+    Color *palette[MAXASSETS];                  // storage space for indexed colors
+    unsigned int palette_colors[MAXASSETS];     // total number of colors in palette
+    EX_tileset tileset[MAXASSETS];              // storage space for texture based fonts
+    RenderTexture framebuffer[MAXASSETS];       // storage space for frame buffer
+    Font font[MAXASSETS];                       // storage space for texture based fonts
+    Music music[MAXASSETS];                     // storage space for unpacked music
+    Shader shader[MAXASSETS];                   // storage space for shaders
+    unsigned char *data[MAXASSETS];             // storage space for any text, data, JSON, LUA ...
 } EX_asset;
 
 // **************************************************************************************** A U D I O   S T R U C T U R E S
@@ -173,7 +175,7 @@ typedef struct EX_audio {
 #define PRIMARYDISPLAY 0
 #define MENUDISPLAY 1
 #define INGAMEDISPLAY 2
-#define PAUSEDISPLAY 3
+#define UNFOCUSEDDISPLAY 3
 #define TERMINALDISPLAY 4
 
 typedef struct EX_video {
@@ -226,9 +228,104 @@ typedef struct EX_game {
 
 } EX_game;
 
-typedef struct EX_application {
-    
-} EX_application;
+typedef enum {
+    PROGRAM_DEINIT              = 0b10000000000000000000000000000000,
+    PROGRAM_INITIALIZE          = 0b01000000000000000000000000000000,
+    PROGRAM_INIT_TITLE          = 0b00100000000000000000000000000000,
+    PROGRAM_IN_TITLE            = 0b00010000000000000000000000000000,
+    PROGRAM_RESERVED1           = 0b00001000000000000000000000000000, // *********
+    PROGRAM_INIT_MENU1          = 0b00000100000000000000000000000000,
+    PROGRAM_IN_MENU1            = 0b00000010000000000000000000000000,
+    PROGRAM_INIT_MENU2          = 0b00000001000000000000000000000000,
+    PROGRAM_IN_MENU2            = 0b00000000100000000000000000000000,
+    PROGRAM_INIT_MENU3          = 0b00000000010000000000000000000000,
+    PROGRAM_IN_MENU3            = 0b00000000001000000000000000000000,
+    PROGRAM_INIT_MENU4          = 0b00000000000100000000000000000000,
+    PROGRAM_IN_MENU4            = 0b00000000000010000000000000000000,
+    PROGRAM_GAME_RESUME         = 0b00000000000001000000000000000000,
+    PROGRAM_GAME_PLAY           = 0b00000000000000100000000000000000,
+    PROGRAM_INIT_GAME           = 0b00000000000000010000000000000000,
+    PROGRAM_GAME_NEXT           = 0b00000000000000001000000000000000,
+    PROGRAM_GAMEOVER            = 0b00000000000000000100000000000000,
+    PROGRAM_GAME_DEATH          = 0b00000000000000000010000000000000,
+    PROGRAM_OFF_FOCUS           = 0b00000000000000000001000000000000,
+    PROGRAM_SWITCHBOARD         = 0b11111111111111111111000000000000, // to filter out base states
+    PROGRAM_EXIT                = 0b10000000000000000000100000000000,
+    PROGRAM_DEBUG               = 0b00000000000000000000010000000000,
+    PROGRAM_SHOW_TERMINAL       = 0b00000000000000000000001000000000,
+    PROGRAM_GAME_PAUSED         = 0b00000000000000000000000100000000,
+    PROGRAM_IN_GAME             = 0b00000000000000000000000001000000,
+    PROGRAM_RUNNING             = 0b00000000000000000000000000100000,
+    PROGRAM_AUDIO_INITIALIZED   = 0b00000000000000000000000000001000,
+    PROGRAM_TERMINAL_INITIALIZED= 0b00000000000000000000000000000100,
+    PROGRAM_ASSETS_INITIALIZED  = 0b00000000000000000000000000000010,
+    PROGRAM_VIDEO_INITIALIZED   = 0b00000000000000000000000000000001,
+    PROGRAM_SERVICES            = 0b00000000000000000000111111111111, // to filter out switchboard states
+    PROGRAM_NULL                = 0b00000000000000000000000000000000  // in case that happens... (should never)
+} program_state;
+
+const char* debug_program_state(unsigned int state) {
+    switch (state) {
+    case PROGRAM_DEINIT:              return "SWITCHBOARD: PROGRAM_DEINIT";
+    case PROGRAM_INITIALIZE:          return "SWITCHBOARD: PROGRAM_INITIALIZE";
+    case PROGRAM_INIT_TITLE:          return "SWITCHBOARD: PROGRAM_INIT_TITLE";
+    case PROGRAM_IN_TITLE:            return "SWITCHBOARD: PROGRAM_IN_TITLE";
+    case PROGRAM_INIT_MENU1:          return "SWITCHBOARD: PROGRAM_INIT_MENU1";
+    case PROGRAM_IN_MENU1:            return "SWITCHBOARD: PROGRAM_IN_MENU1";
+    case PROGRAM_INIT_MENU2:          return "SWITCHBOARD: PROGRAM_INIT_MENU2";
+    case PROGRAM_IN_MENU2:            return "SWITCHBOARD: PROGRAM_IN_MENU2";
+    case PROGRAM_INIT_MENU3:          return "SWITCHBOARD: PROGRAM_INIT_MENU3";
+    case PROGRAM_IN_MENU3:            return "SWITCHBOARD: PROGRAM_IN_MENU3";
+    case PROGRAM_INIT_MENU4:          return "SWITCHBOARD: PROGRAM_INIT_MENU4";
+    case PROGRAM_IN_MENU4:            return "SWITCHBOARD: PROGRAM_IN_MENU4";
+    case PROGRAM_GAME_RESUME:         return "SWITCHBOARD: PROGRAM_GAME_RESUME";
+    case PROGRAM_GAME_PLAY:           return "SWITCHBOARD: PROGRAM_GAME_PLAY";
+    case PROGRAM_INIT_GAME:           return "SWITCHBOARD: PROGRAM_INIT_GAME";
+    case PROGRAM_GAME_NEXT:           return "SWITCHBOARD: PROGRAM_GAME_NEXT";
+    case PROGRAM_GAMEOVER:            return "SWITCHBOARD: PROGRAM_GAMEOVER";
+    case PROGRAM_GAME_DEATH:          return "SWITCHBOARD: PROGRAM_GAME_DEATH";
+    case PROGRAM_EXIT:                return "BASE STATES: PROGRAM_EXIT";
+    case PROGRAM_DEBUG:               return "BASE STATES: PROGRAM_DEBUG";
+    case PROGRAM_SHOW_TERMINAL:       return "BASE STATES: PROGRAM_SHOW_TERMINAL";
+    case PROGRAM_GAME_PAUSED:         return "BASE STATES: PROGRAM_GAME_PAUSED";
+    case PROGRAM_IN_GAME:             return "BASE STATES: PROGRAM_IN_GAME";
+    case PROGRAM_RUNNING:             return "BASE STATES: PROGRAM_RUNNING";
+    case PROGRAM_OFF_FOCUS:           return "BASE STATES: PROGRAM_OFF_FOCUS";
+    case PROGRAM_AUDIO_INITIALIZED:   return "BASE STATES: PROGRAM_AUDIO_INITIALIZED";
+    case PROGRAM_TERMINAL_INITIALIZED:return "BASE STATES: PROGRAM_TERMINAL_INITIALIZED";
+    case PROGRAM_ASSETS_INITIALIZED:  return "BASE STATES: PROGRAM_ASSETS_INITIALIZED";
+    case PROGRAM_VIDEO_INITIALIZED:   return "BASE STATES: PROGRAM_VIDEO_INITIALIZED";
+    case PROGRAM_NULL:                return "BASE STATES: PROGRAM_NULL";
+    }
+}
+
+typedef enum {
+    CHEAT_INFINITE_LIVES        = 0b10000000000000000000000000000000,
+    CHEAT_INFINITE_POWER        = 0b01000000000000000000000000000000,
+    CHEAT_INFINITE_TIME         = 0b00100000000000000000000000000000,
+    CHEAT_NO_COLLISION          = 0b00010000000000000000000000000000,
+    CHEAT_POWERUPS              = 0b00001000000000000000000000000000,
+    CHEAT_NAVIGATE_LEVELS       = 0b00000100000000000000000000000000,
+    CHEAT_DEATH                 = 0b00000010000000000000000000000000,
+    CHEAT_SUMMON                = 0b00000001000000000000000000000000,
+    CHEAT_END_GAME              = 0b00000000100000000000000000000000,
+    CHEAT_EDITOR_ADVANCED       = 0b00000000000000000000000000100000,
+    CHEAT_EDITOR_BASIC          = 0b00000000000000000000000000010000,
+    CHEAT_TERMINAL_ADVANCED     = 0b00000000000000000000000000001000,
+    CHEAT_TERMINAL_BASIC        = 0b00000000000000000000000000000100,
+    CHEAT_DEBUG_ADVANCED        = 0b00000000000000000000000000000010,
+    CHEAT_DEBUG_BASIC           = 0b00000000000000000000000000000001,
+    CHEAT_OFF                   = 0b00000000000000000000000000000000,
+    CHEAT_GODMODE               = 0b11111111111111111111111111111111
+} program_cheats;
+
+typedef struct EX_program {
+        unsigned int state;
+        unsigned int previous_state;
+        unsigned int cheats;
+        char name[NAMELENGTH_MAX + 1];
+        unsigned int status;
+} EX_program;
 
 
 // **************************************************************************************** S Y S T E M   S T R U C T U R E S
@@ -238,9 +335,7 @@ typedef struct EX_system {
     EX_asset        asset;
     EX_audio        audio;
     EX_video        video;
-    EX_application  app;
-    bool pause;
-
+    EX_program      program;
 } EX_system;
 
 EX_system sys;
@@ -348,9 +443,9 @@ uint8_t fifo_getc() {
 	printf("'%s'\n", fifo_data);    
 */
 
-#define BITS_ON(a,b)  (a |= b)
-#define BITS_OFF(a,b) (a &= ~b)
-#define INIT(a, b)    (a = b)
+#define BITS_ON(a,b)  (a |= (b))
+#define BITS_OFF(a,b) (a &= ~(b))
+#define INIT(a, b)    (a = (b))
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -1390,10 +1485,10 @@ void update_assets(void) {
 }
 
 int load_asset (unsigned int assettype, const char* fileName, const char* fileType, const unsigned char* fileData, int dataSize, int pak) {
-    debug_console_out("int load_asset (unsigned int assettype, const char* fileName, const char* fileType, const unsigned char* fileData, int dataSize, int pak)");
+    debug_console_out("int load_asset");
     int id = sys.asset.total_assets;
 
-    INIT(sys.asset.state[id], ASSET_INITIALIZED & assettype);
+    INIT(sys.asset.state[id], ASSET_INITIALIZED | assettype);
 
     if (fileName > NULL) strcpy(sys.asset.name, fileName);
 
@@ -1587,7 +1682,7 @@ static void unload_asset(unsigned int id) {
             case ASSET_ICON :
             UnloadImage(sys.asset.img[id]);
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
@@ -1596,7 +1691,7 @@ static void unload_asset(unsigned int id) {
             UnloadImagePalette(sys.asset.palette[id]);
             UnloadTexture(sys.asset.tex[id]);
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
@@ -1604,7 +1699,7 @@ static void unload_asset(unsigned int id) {
             UnloadImage(sys.asset.img[id]);
             UnloadTexture(sys.asset.tex[id]);
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
@@ -1612,7 +1707,7 @@ static void unload_asset(unsigned int id) {
             UnloadImage(sys.asset.img[id]);
             UnloadTexture(sys.asset.font[id].texture);
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
@@ -1620,21 +1715,21 @@ static void unload_asset(unsigned int id) {
             UnloadImage(sys.asset.img[id]);
             UnloadTexture(sys.asset.tileset[id].tex);
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
             case ASSET_FRAMEBUFFER :
             UnloadRenderTexture(sys.asset.framebuffer[id]);
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
             case ASSET_SHADER :
             UnloadShader(sys.asset.shader[id]);
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
@@ -1642,37 +1737,37 @@ static void unload_asset(unsigned int id) {
             StopMusicStream(sys.asset.music[id]); // in case it is still playing
             UnloadMusicStream(sys.asset.music[id]);
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
             case ASSET_WAV : // incomplete*********************************** get raylib functionality
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
             case ASSET_MP3 : // incomplete*********************************** get raylib functionality
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
             case ASSET_AUDIOSTREAM :
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
             case ASSET_TEXT :
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
             case ASSET_DATA :
             sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED & assettype);
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
             break;
 
@@ -1865,7 +1960,7 @@ static Vector2 ratio_info(int x, int y) {
     return p;
 }
 
-bool init_display_properties(bool hide_mouse, const char* title) {
+bool init_display_properties(bool hide_mouse) {
     bool status;
     INIT(sys.video.windowstate_normal, 0);
     //sys.video.windowstate_normal = FLAG_WINDOW_UNDECORATED; // AVOID AT ALL COST (SCREEN TEARING when VSYNC)
@@ -1883,13 +1978,14 @@ bool init_display_properties(bool hide_mouse, const char* title) {
     BITS_ON(sys.video.windowstate_paused, FLAG_VSYNC_HINT);
 
     SetConfigFlags(sys.video.windowstate_normal);
-    InitWindow(0, 0, title);
+    InitWindow(0, 0, sys.program.name);
     sys.video.current_physical = GetCurrentMonitor();
     if (hide_mouse) HideCursor();
     sys.video.physical_res[sys.video.current_physical] = (Vector2) {GetMonitorWidth(sys.video.current_physical), GetMonitorHeight(sys.video.current_physical)};
     sys.video.refresh_rate[sys.video.current_physical] = GetMonitorRefreshRate(sys.video.current_physical);
 
     status = IsWindowReady();
+
     return status;
 }
 
@@ -1901,7 +1997,12 @@ void update_display(void) {
             sys.video.next_physical_clear = false;
         };
         draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[display]]);
-        update_debug(true);
+
+        if (sys.program.state & PROGRAM_DEBUG) {
+            // if debug functionalities activated
+            // DISPLAY MANAGE DEBUG INFORMATION
+            update_debug(true);
+        }
 	EndDrawing();
 
     sys.video.window_focus = IsWindowFocused();
@@ -1917,9 +2018,9 @@ void update_display(void) {
     sys.video.prev_time[display] = current_time;
 
    if (sys.video.window_focus) {        // ************** GO TO APP MODE
-        if (sys.pause) {
+        if (sys.program.state & PROGRAM_OFF_FOCUS) {
             if (GetKeyPressed() != 0) {
-                sys.pause = false;
+                BITS_OFF(sys.program.state, PROGRAM_OFF_FOCUS);
                 flip_frame_buffer(PRIMARYDISPLAY, true);
                 ClearWindowState(sys.video.windowstate_normal ^ sys.video.windowstate_paused);
                 SetWindowState(sys.video.windowstate_normal);
@@ -1928,9 +2029,9 @@ void update_display(void) {
         }
     } else {        // ************* GO TO PAUSE MODE
         //IsWindowMinimized()
-        if (!sys.pause) {
-            sys.pause = true;
-            flip_frame_buffer(PAUSEDISPLAY, true);
+        if (!(sys.program.state & PROGRAM_OFF_FOCUS)) {
+            BITS_ON(sys.program.state, PROGRAM_OFF_FOCUS);
+            flip_frame_buffer(UNFOCUSEDDISPLAY, true);
             ClearWindowState(sys.video.windowstate_paused ^ sys.video.windowstate_normal);
             SetWindowState(sys.video.windowstate_paused);
             hint_restart_track(true);
@@ -1954,7 +2055,6 @@ void deinit_display(void) {
 // ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
 // ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
 // ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
-
 
 // ********** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** B E G I N
 // ********** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** B E G I N
@@ -2319,6 +2419,34 @@ static void init_scrolltext(int s, int asset_id, int font_id, int palette_id, fl
     ex_scrolltext[s].bg_color = 0;
 }
 
+const int scrolltext_colors[] = {
+        33,   // BROWN
+        41,   // BEIGE
+        58,   // ORANGE
+        30,   // YELLOW
+        210,  // GREEN
+        216,  // LIME
+        82,   // MAGENTA
+        89,   // PINK
+        100,  // PURPLE
+        104,  // VIOLET
+        129,  // BLUE
+        170,  // SKYBLUE
+        49,   // MAROON
+        69,   // RED
+        0,    // BLACK
+        4,    // DARKGRAY
+        8,    // GRAY
+        12,   // LIGHTGRAY
+        15    // WHITE
+};
+
+int scrolltext_color_pick(int id) {
+    int colors = sizeof(scrolltext_colors) / 4;
+    if (id >= colors) id = (colors - 1); else if (id < 0) id = 0;
+    return scrolltext_colors[id];
+}
+
 //S C R O L L T E X T   C O M M A N D S
 #define SCROLL_BKGNDCOLOR   99  // letter c
 #define SCROLL_SHADOWDEPTH  100 // letter d
@@ -2391,13 +2519,13 @@ static void update_scrolltext(int s, float text_scale) {
             break;
         case SCROLL_TEXTCOLOR: // text color table chooser
             i++;
-            ex_scrolltext[s].fg_color = scrolltext_color((sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97);
+            ex_scrolltext[s].fg_color = scrolltext_color_pick((sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97);
             break;
         case SCROLL_BKGNDCOLOR: // background color table chooser
             i++;
             ex_scrolltext[s].bg_color_flag = 1;
             id = (sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97;
-            ex_scrolltext[s].bg_color = scrolltext_color(id);
+            ex_scrolltext[s].bg_color = scrolltext_color_pick(id);
             if (id > 18) ex_scrolltext[s].bg_color_flag = 0;
             break;
         case SCROLL_BKGNDCOLORX: // background color extended chooser 
@@ -2482,40 +2610,15 @@ static void update_scrolltext(int s, float text_scale) {
         ex_scrolltext[s].position.x = sys.video.virtual_res[sys.video.current_virtual].x / text_scale;
         ex_scrolltext[s].pause_found = 0;
     };
-
-}
-
-int scrolltext_color(int id) {
-    switch (id) {
-        case 0:   return 33;   // BROWN
-        case 1:   return 41;   // BEIGE
-        case 2:   return 58;   // ORANGE
-        case 3:   return 30;   // YELLOW
-        case 4:   return 210;  // GREEN
-        case 5:   return 216;  // LIME
-        case 6:   return 82;   // MAGENTA
-        case 7:   return 89;   // PINK
-        case 8:   return 100;  // PURPLE
-        case 9:   return 104;  // VIOLET
-        case 10:  return 129;  // BLUE
-        case 11:  return 170;  // SKYBLUE
-        case 12:  return 49;   // MAROON
-        case 13:  return 69;   // RED
-        case 14:  return 0;    // BLACK
-        case 15:  return 4;    // DARKGRAY
-        case 16:  return 8;    // GRAY
-        case 17:  return 12;   // LIGHTGRAY
-        default:  return 15;   // WHITE
-    };
 }
 
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** E N D
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** E N D
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** E N D
 
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
+// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
+// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
+// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
 
 static const kb_layout[] = {
     KEY_ESCAPE ,0 , 0, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12, 0, KEY_PRINT_SCREEN, KEY_SCROLL_LOCK, KEY_PAUSE, 0, 0, 0, 0, 0, 
@@ -2526,6 +2629,205 @@ static const kb_layout[] = {
     KEY_LEFT_SHIFT, KEY_LEFT_SHIFT, KEY_Z, KEY_X, KEY_C, KEY_V, KEY_B, KEY_N, KEY_M, KEY_COMMA, KEY_PERIOD, KEY_SLASH, KEY_RIGHT_SHIFT, KEY_RIGHT_SHIFT, KEY_RIGHT_SHIFT, 0, 0, KEY_UP, 0, 0, KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_KP_ENTER, 
     KEY_LEFT_CONTROL, KEY_LEFT_SUPER, KEY_LEFT_ALT, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_RIGHT_ALT, KEY_RIGHT_SUPER, KEY_KB_MENU, KEY_RIGHT_CONTROL, 0, KEY_LEFT, KEY_DOWN, KEY_RIGHT, 0, KEY_KP_0, KEY_KP_0, KEY_KP_DECIMAL, KEY_KP_ENTER
 };
+
+#include <time.h>
+
+char *time_stamp(){
+    char *timestamp = (char *)malloc(20);
+    time_t ltime = time(NULL);
+    struct tm *tm;
+    tm = localtime(&ltime);
+    sprintf(timestamp,"%04d/%02d/%02d-%02d:%02d:%02d", tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+    return timestamp;
+}
+
+typedef struct Debug_info {
+    bool audio;
+    bool video;
+    bool game_data;
+    bool controls;
+    bool fps;
+    bool trace;
+} Debug_info;
+
+static Debug_info debug_status; // = Init_debug();
+
+void set_debug_audio(bool s)    {debug_status.audio = s;}
+void set_debug_video(bool s)    {debug_status.video = s;}
+void set_debug_game_data(bool s){debug_status.game_data = s;}
+void set_debug_controls(bool s) {debug_status.controls = s;}
+void set_debug_fps(bool s)      {debug_status.fps = s;}
+void set_debug_trace(bool s)    {debug_status.trace = s;}
+
+void debug_audio_flip()         {debug_status.audio = !debug_status.audio;}
+void debug_video_flip()         {debug_status.video = !debug_status.video;}
+void debug_game_data_flip()     {debug_status.game_data = !debug_status.game_data;}
+void debug_controls_flip()      {debug_status.controls = !debug_status.controls;}
+void debug_fps_flip()           {debug_status.fps = !debug_status.fps;}
+void debug_trace_flip()         {debug_status.trace = !debug_status.trace;}
+
+char *bit_status_text(bool s) {if (s) {return "ON";} else {return "OFF";}}
+
+debug_display_option(bool bit, int x, int y, int size, const char* text) {
+    if (bit) { DrawRectangle(x, y, size * 12, size, RED); } else { DrawRectangle(x, y, size * 12, size, GREEN); }
+    DrawText(TextFormat("%s %s", text, bit_status_text(bit)), x, y, size, WHITE);
+}
+
+void display_keybed(void)  {
+    int row = 24;
+    for (int j = 0; j < 7; j++) {
+        for (int i = 0; i < row; i++) {
+            int letter = (j*row)+i;
+            int key = kb_layout[letter];
+            if (key) {
+                if (IsKeyDown(key)) {
+                    DrawRectangle(i*64, 20+j*64, 64, 64, GREEN);
+                    DrawText(TextFormat("%c", (int)key), i*64, 20+j*64, 64, WHITE);
+                }
+                else {
+                    DrawRectangle(i*64, 20+j*64, 64, 64, DARKGRAY);
+                    DrawText(TextFormat("%c", (int)key), i*64, 20+j*64, 64, GRAY);
+                };
+            };
+        
+        };
+    };
+}
+
+void display_all_res(void) {
+    int count = 0;
+    GLFWvidmode* modes = glfwGetVideoModes(glfwGetPrimaryMonitor(), &count);
+    int size = 40;
+    int x = 10;
+    int y = 0;
+    Vector2 ratio;
+    for (int i = 0; i < count; i++) {
+        ratio = ratio_info((int)modes[i].width, (int)modes[i].height);
+        int bits = modes[i].redBits + modes[i].greenBits + modes[i].blueBits;
+        DrawText( TextFormat("%ix%i - %ibit - %ifps - %i:%i", (int)modes[i].width, (int)modes[i].height, bits, (int)modes[i].refreshRate, (int)ratio.x, (int)ratio.y ),
+        x, y, size, DARKGRAY);
+        y += size; if (y > (sys.video.physical_res[sys.video.current_physical].y - size)) {x+=768; y=0; };
+    };
+}
+
+void update_debug(bool show_options) {
+    int size = 80;
+    int x = 0, y = 0;
+
+    if (debug_status.audio) {
+        sys.video.next_physical_clear = true;
+        if (IsKeyPressed(KEY_ZERO)) change_music_stream(0, 11, true);
+        if (IsKeyPressed(KEY_ONE)) change_music_stream(0, 0, true);
+        if (IsKeyPressed(KEY_TWO)) change_music_stream(0, 1, true);
+        if (IsKeyPressed(KEY_THREE)) change_music_stream(0, 2, true);
+        if (IsKeyPressed(KEY_FOUR)) change_music_stream(0, 3, true);
+        if (IsKeyPressed(KEY_FIVE)) change_music_stream(0, 4, true);
+        if (IsKeyPressed(KEY_SIX)) change_music_stream(0, 5, true);
+        if (IsKeyPressed(KEY_SEVEN)) change_music_stream(0, 6, true);
+        if (IsKeyPressed(KEY_EIGHT)) change_music_stream(0, 7, true);
+        if (IsKeyPressed(KEY_NINE)) change_music_stream(0, 8, true);
+
+        if (IsKeyPressed(KEY_A)) change_music_stream(1, 11, true);
+        if (IsKeyPressed(KEY_B)) change_music_stream(1, 12, true);
+        if (IsKeyPressed(KEY_C)) change_music_stream(1, 13, true);
+        if (IsKeyPressed(KEY_D)) change_music_stream(1, 14, true);
+        if (IsKeyPressed(KEY_E)) change_music_stream(1, 15, true);
+        if (IsKeyPressed(KEY_F)) change_music_stream(1, 16, true);
+        if (IsKeyPressed(KEY_G)) change_music_stream(1, 17, true);
+        if (IsKeyPressed(KEY_H)) change_music_stream(1, 18, true);
+        if (IsKeyPressed(KEY_I)) change_music_stream(1, 29, true);
+        if (IsKeyPressed(KEY_J)) change_music_stream(1, 20, true);
+        if (IsKeyPressed(KEY_K)) change_music_stream(1, 21, true);
+        if (IsKeyPressed(KEY_L)) change_music_stream(1, 22, true);
+        if (IsKeyPressed(KEY_M)) change_music_stream(1, 23, true);
+        if (IsKeyPressed(KEY_N)) change_music_stream(1, 24, true);
+
+/*        if (IsKeyPressed(KEY_LEFT)) change_track_playing(-1);
+        if (IsKeyPressed(KEY_RIGHT)) change_track_playing(1);
+        if (IsKeyPressed(KEY_UP))   change_track_volume(16);
+        if (IsKeyPressed(KEY_DOWN)) change_track_volume(-16);
+        if (IsKeyPressed(KEY_F7))   jar_xm_flip_comp_exp(sys.asset.music[sys.audio.asset_playing].ctxData);
+        if (IsKeyPressed(KEY_F8))   jar_xm_flip_ramping(sys.asset.music[sys.audio.asset_playing].ctxData);
+        if (IsKeyPressed(KEY_F9))   jar_xm_flip_linear_interpolation(sys.asset.music[sys.audio.asset_playing].ctxData);
+*/
+//        jar_xm_debug(sys.asset.music[sys.audio.asset_playing].ctxData);
+        show_options = false;
+	}
+
+    if (debug_status.video) {
+        sys.video.next_physical_clear = true;
+        if (IsKeyPressed(KEY_F10)) debug_fps_flip(&debug_status);
+        if (IsKeyDown(KEY_F8))  display_all_res();
+        //if (IsKeyPressed(KEY_F11)) FlipConfigFlags(FLAG_VSYNC_HINT);
+        show_options = false;
+    }
+
+    if (debug_status.game_data) {
+        sys.video.next_physical_clear = true;
+        if (IsKeyPressed(KEY_KP_1)) {ex_canopy.adjustment.y -= 0.002;};
+        if (IsKeyPressed(KEY_KP_2)) {ex_canopy.adjustment.y += 0.002;};
+        if (IsKeyPressed(KEY_KP_3)) {ex_canopy.pal_idx_cells -= 16; if(ex_canopy.pal_idx_cells < 0) {ex_canopy.pal_idx_cells +=256;};};
+        if (IsKeyPressed(KEY_KP_4)) {ex_canopy.pal_idx_cells += 16; if(ex_canopy.pal_idx_cells > 255) {ex_canopy.pal_idx_cells -=256;};};
+        if (IsKeyPressed(KEY_KP_5)) {ex_canopy.pal_idx_text -= 16; if(ex_canopy.pal_idx_text < 0) {ex_canopy.pal_idx_text +=256;};};
+        if (IsKeyPressed(KEY_KP_6)) {ex_canopy.pal_idx_text += 16; if(ex_canopy.pal_idx_text > 255) {ex_canopy.pal_idx_text -=256;};};
+
+        DrawText(TextFormat("%s", time_stamp()), 1600, 0, 40, DARKGRAY);
+        DrawText(TextFormat("FRAMES=%i", (int)sys.video.frames[sys.video.current_physical]), 0, 0, 20, DARKGRAY);
+        DrawText(TextFormat("prev_time = %f", (float)sys.video.prev_time[sys.video.current_physical]), 0, 0, 40, DARKGRAY);
+        DrawText(TextFormat("monitors = %i, current = %i", (int)GetMonitorCount(), (int)sys.video.current_physical), 0, 60, 20, DARKGRAY);
+        DrawText(GetMonitorName(sys.video.current_physical), 0, 80, 20, DARKGRAY);
+        DrawText(TextFormat("screen is %ix%i at %i fps", (int)sys.video.physical_res[sys.video.current_physical].x, (int)sys.video.physical_res[sys.video.current_physical].y, (int)sys.video.refresh_rate[sys.video.current_physical]), 0, 100, 20, DARKGRAY);
+        DrawText(TextFormat("screen is %ix%i mm", (int)GetMonitorPhysicalWidth(sys.video.current_physical), (int)GetMonitorPhysicalHeight(sys.video.current_physical)), 0, 120, 20, DARKGRAY);
+        DrawText(TextFormat("ex_canopy.adjustment.y = %f", (float)ex_canopy.adjustment.y), 0, 140, 20, DARKGRAY);
+        DrawText(TextFormat("ftime = %f and sys.video.frame_time_inc = %f",  (float)sys.video.elapsed_time[sys.video.current_physical], (float)sys.video.frame_time_inc[sys.video.current_physical]), 0, 160, 20, DARKGRAY);
+//        DrawText(TextFormat("text_pause = %i, text_color_flag = %i, text_wave_flag = %i", (int)text_pause, (int)text_color_flag, (int)text_wave_flag), 0, 180, 20, DARKGRAY);
+        DrawText(TextFormat("value_anim %i", (float)sys.video.value_anim[sys.video.current_physical]), 0, 200, 20, DARKGRAY);
+        DrawText(TextFormat("fast_sin = %f", fast_sin(sys.video.frame_time_inc[sys.video.current_physical])), 0, 220, 20, DARKGRAY);
+        DrawText(TextFormat("     sin = %f", sin(sys.video.frame_time_inc[sys.video.current_physical])), 0, 240, 20, DARKGRAY);
+        DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.frame_time_inc[sys.video.current_physical])), 0, 260, 20, DARKGRAY);
+        DrawText(TextFormat("     cos = %f", cos(sys.video.frame_time_inc[sys.video.current_physical])), 0, 280, 20, DARKGRAY);
+        show_options = false;
+    }
+
+    if (debug_status.controls) {
+        sys.video.next_physical_clear = true;
+        display_keybed();
+        show_options = false;
+    }
+
+    if (debug_status.fps) {
+        sys.video.next_physical_clear = true;
+        DrawFPS(GetMonitorWidth(sys.video.current_physical) - 100, 10);
+    }
+
+    if (IsKeyDown(KEY_LEFT_CONTROL)) {
+        x = (GetMonitorWidth(sys.video.current_physical) - 12 * size) * 0.5;
+        y = (GetMonitorHeight(sys.video.current_physical) - 6 * size) * 0.5;
+        if (show_options || debug_status.audio)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.audio, x, y, size, "F1 -> AUDIO");};
+        if (show_options || debug_status.video)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.video, x, y, size, "F2 -> VIDEO");};
+        if (show_options || debug_status.game_data) { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.game_data, x, y, size, "F3 -> DATA");};
+        if (show_options || debug_status.controls)  { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.controls, x, y, size, "F4 -> CONTROLS");};
+        if (show_options || debug_status.trace)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.trace, x, y, size, "F5 -> TRACE");};
+        if (IsKeyPressed(KEY_F1)) debug_audio_flip();
+        if (IsKeyPressed(KEY_F2)) debug_video_flip();
+        if (IsKeyPressed(KEY_F3)) debug_game_data_flip();
+        if (IsKeyPressed(KEY_F4)) debug_controls_flip();
+        if (IsKeyPressed(KEY_F5)) debug_trace_flip();
+    }
+}
+
+
+void debug_console_out(const char* message) {
+    if (debug_status.trace) TRACELOG(LOG_INFO, "%s | %s >>>>>%s", SOFTWARE, time_stamp(), message);
+}
+
+// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
+// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
+// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
+
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
 
 // TERMINALDISPLAY (ie. 4)
 
@@ -2551,20 +2853,142 @@ void update_terminal(void) {
 
 }
 
+void show_terminal(void) {
+    // aimed at displaying the terminal page only
+}
+
+
 // ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
 // ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
 // ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
 
+// ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
+// ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
+// ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
+
+void game_init_assets(void) {
+    int id;
+	id = load_asset(ASSET_TEXTURE, TITLE_FILENAME, TITLE_FILEEXT, TITLE_DATA, TITLE_FILESIZE, TITLE_PAK);
+
+	id = load_tileset((Vector2){32,32}, TL1_FILENAME, TL1_FILEEXT, TL1_DATA, TL1_FILESIZE, TL1_PAK, 0);
+	id = load_tileset((Vector2){16,16}, TL2_FILENAME, TL2_FILEEXT, TL2_DATA, TL2_FILESIZE, TL2_PAK, 0);
+	id = load_tileset((Vector2){64,64}, TL5_FILENAME, TL5_FILEEXT, TL5_DATA, TL5_FILESIZE, TL5_PAK, 0);
+	id = load_tileset((Vector2){64,64}, TL8_FILENAME, TL8_FILEEXT, TL8_DATA, TL8_FILESIZE, TL8_PAK, 0);
+	id = load_tileset((Vector2){32,32}, TL9_FILENAME, TL9_FILEEXT, TL9_DATA, TL9_FILESIZE, TL9_PAK, 0);
+
+	id = load_asset(ASSET_TEXTURE, BALL1_FILENAME, BALL1_FILEEXT, BALL1_DATA, BALL1_FILESIZE, BALL1_PAK);
+	id = load_asset(ASSET_TEXTURE, BALL2_FILENAME, BALL2_FILEEXT, BALL2_DATA, BALL2_FILESIZE, BALL2_PAK);
+	id = load_asset(ASSET_TEXTURE, BALL3_FILENAME, BALL3_FILEEXT, BALL3_DATA, BALL3_FILESIZE, BALL3_PAK);
+
+	id = load_asset(ASSET_TEXT, NULL, NULL, text_flag1, strlen(text_flag1), 0);
+	id = load_asset(ASSET_TEXT, NULL, NULL, text_scroll1, strlen(text_scroll1), 0);
+	id = load_asset(ASSET_TEXT, NULL, NULL, text_scroll2, strlen(text_scroll2), 0);
+	id = load_asset(ASSET_TEXT, NULL, NULL, text_16hues, strlen(text_16hues), 0);
+	id = load_asset(ASSET_TEXT, NULL, NULL, text_yo1, strlen(text_yo1), 0);
+	id = load_asset(ASSET_TEXT, NULL, NULL, text_yo2, strlen(text_yo2), 0);
+	id = load_asset(ASSET_TEXT, NULL, NULL, text_yo3, strlen(text_yo3), 0);
+
+    int orderlist[] = {0, 4, 5, 13, 35, 60, 62, 64, 69, 72, 80, 84, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249};
+    id = add_track(PRIMARYDISPLAY, 0,                        MUSIC_ALL1_FILENAME, MUSIC_ALL1_FILEEXT, MUSIC_ALL1_DATA, MUSIC_ALL1_FILESIZE, MUSIC_ALL1_PAK, 25, orderlist);
+    id = add_track(PRIMARYDISPLAY,   TRACK_SWITCH_IMMEDIATE, MUSIC_ALL1_FILENAME, MUSIC_ALL1_FILEEXT, MUSIC_ALL1_DATA, MUSIC_ALL1_FILESIZE, MUSIC_ALL1_PAK, 25, orderlist);
+    id = add_track(UNFOCUSEDDISPLAY, TRACK_RESTART_ON_FOCUS, MUSIC_ALL1_FILENAME, MUSIC_ALL1_FILEEXT, MUSIC_ALL1_DATA, MUSIC_ALL1_FILESIZE, MUSIC_ALL1_PAK, 25, orderlist);
+}
+
+particle bubbles[8];
+
+void game_init_title(void) {
+	bubbles[0] = init_particle(sys.asset.tex[20], (Vector2) {-32,-32}, (Vector2){1.0,2.0});
+	bubbles[1] = init_particle(sys.asset.tex[20], (Vector2) {-32,-32}, (Vector2){1.2,1.5});
+	bubbles[2] = init_particle(sys.asset.tex[20], (Vector2) {-32,-32}, (Vector2){1.2,1.2});
+	bubbles[3] = init_particle(sys.asset.tex[21], (Vector2) {-32,-32}, (Vector2){1.0,1.0});
+	bubbles[4] = init_particle(sys.asset.tex[21], (Vector2) {-32,-32}, (Vector2){0.8,0.8});
+	bubbles[5] = init_particle(sys.asset.tex[22], (Vector2) {-32,-32}, (Vector2){0.6,0.5});
+	bubbles[6] = init_particle(sys.asset.tex[22], (Vector2) {-32,-32}, (Vector2){0.4,0.3});
+	bubbles[7] = init_particle(sys.asset.tex[22], (Vector2) {-32,-32}, (Vector2){0.3,0.2});
+
+    init_scrolltext(0, 25, 11, 5, 2.0, (Vector2){32,10}, (Vector2){0,0}, 255);
+    init_scrolltext(1, 24, 11, 5, 3.0, (Vector2){16,6}, (Vector2){32,0}, 255);
+    init_scrolltext(2, 27, 11, 5, 2.9, (Vector2){16,5}, (Vector2){32,0}, 32);
+    init_scrolltext(3, 28, 11, 5, 2.8, (Vector2){16,4}, (Vector2){32,0}, 64);
+    init_scrolltext(4, 29, 11, 5, 2.7, (Vector2){16,3}, (Vector2){32,0}, 96);
+    init_scrolltext(5, 27, 11, 5, 2.6, (Vector2){16,2}, (Vector2){32,0}, 96);
+    init_scrolltext(6, 28, 11, 5, 2.5, (Vector2){16,1}, (Vector2){32,0}, 64);
+    init_scrolltext(7, 27, 11, 5, 2.4, (Vector2){16,0}, (Vector2){32,0}, 32);
+    init_scrolltext(8, 26, 11, 5, 0.0, (Vector2){0,6}, (Vector2){32,0}, 255);
+
+    init_canopy(11, 5, (Vector2){36, 12}, (Vector2){8.0f, 8.0f}, 0.0f, 0.0f, (Vector2){0, 0.166}, 41, 57);
+
+    play_track(0, 9, true);
+    play_track(1, 11, true);
+    play_track(2, 6, true);
+
+	sys.video.frame_time_inc[UNFOCUSEDDISPLAY] = 17.0;
+	sys.video.frame_time_inc[PRIMARYDISPLAY] = 102.0;
+
+}
+
+void game_update_title(void) {
+    copper_animation(-1, 7, 128, 16, 32, 0.07, (Vector2){0,0}, (Vector3){.4, 1.25, .5},2);
+    update_scrolltext(8,32);
+    update_scrolltext(2,32);
+    update_scrolltext(3,32);
+    update_scrolltext(4,32);
+    update_scrolltext(5,32);
+    update_scrolltext(6,32);
+    update_scrolltext(7,32);
+
+    update_particle(&bubbles[7], (Vector2){0.0,-1});
+    update_particle(&bubbles[6], (Vector2){0.0,-1});
+    update_particle(&bubbles[5], (Vector2){0.0,-1});
+    update_particle(&bubbles[4], (Vector2){0.0,-1});
+    update_particle(&bubbles[3], (Vector2){0.0,-1});
+    copper_animation(1, 7, 128, 16, 32, 0.07, (Vector2){0,0}, (Vector3){.4, 1.25, .5},2);
+    update_particle(&bubbles[2], (Vector2){0.0,-1});
+    update_marquee_animation(14, 5,(Vector2){330,42}, ex_canopy.transparency, (Vector2){0, (255.0f - ex_canopy.transparency) * 0.5f}, 20, .333);
+    update_particle(&bubbles[1], (Vector2){0.0,-1});
+    update_canopy(23);
+
+    update_scrolltext(1,32);
+    update_scrolltext(0,16);
+    update_particle(&bubbles[0], (Vector2){0.0,-1});
+}
+
+void game_off_focus_scene(void) {
+    draw_colorbar();
+    copper_animation(-1, 7, 256, 2, 32, 0.5, (Vector2){0,56}, (Vector3){2, 20, 5},.25);
+    update_marquee_animation(14, 5,(Vector2){330,42}, 255.0f, (Vector2){0, 90}, -50, .333);
+    copper_animation(1, 7, 256, 2, 32, 0.5, (Vector2){0,56}, (Vector3){2, 20, 5},.25);
+}
+
+// ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** E N D
+// ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** E N D
+// ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** E N D
+
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
+
+void commute_to(unsigned int state) {
+    BITS_OFF(sys.program.previous_state, PROGRAM_SWITCHBOARD);
+    BITS_ON(sys.program.previous_state, sys.program.state & PROGRAM_SWITCHBOARD);
+    BITS_OFF(sys.program.state, PROGRAM_SWITCHBOARD);
+    BITS_ON(sys.program.state, state);
+};
+
+void add_service(unsigned int state) {
+    BITS_ON(sys.program.state, state);
+}
+
+void remove_service(unsigned int state) {
+    BITS_OFF(sys.program.state, state);
+}
 
 int init_default_assets() {
     sys.asset.total_assets = 0;
 
     int id; // when read, id returns -1 from total_assets
     id = init_frame_buffer(TERMINALDISPLAY, (Vector2) {512, 224});
-    id = init_frame_buffer(PAUSEDISPLAY, (Vector2) {512, 224});
+    id = init_frame_buffer(UNFOCUSEDDISPLAY, (Vector2) {512, 224});
     id = init_frame_buffer(MENUDISPLAY, (Vector2) {284, 192});
     id = init_frame_buffer(PRIMARYDISPLAY, (Vector2) {512, 224});
 
@@ -2583,19 +3007,21 @@ int init_default_assets() {
 
 // establish scripting mechanism.  A script is an asset.  Bootstrap is from a script asset(0) ("rom" program)
 
-
 //RLAPI void SetExitKey(false);
 
-int init_system(const char* title) {
+int init_system(void) {
     int status = false;
 
-
-    bool display_status = init_display_properties(true, title);
+    bool display_status = init_display_properties(true);
+    add_service(PROGRAM_VIDEO_INITIALIZED);
     bool assets_status = init_default_assets();
+    add_service(PROGRAM_ASSETS_INITIALIZED);
     bool terminal_status = init_terminal(8);
+    add_service(PROGRAM_TERMINAL_INITIALIZED);
     bool audio_status = init_audio_properties();
+    add_service(PROGRAM_AUDIO_INITIALIZED);
 
-    // init bootstrap script - TO DO
+    // TODO: init bootstrap script
 
     return status;
 }
@@ -2603,27 +3029,141 @@ int init_system(const char* title) {
 static int update_system(void) {
     int status = false;
     
-    update_terminal();
-    update_assets();
-    update_audio();
-    update_display();
-
+    
+    if (sys.program.state &  PROGRAM_ASSETS_INITIALIZED) {
+        update_assets();
+    }
+    if (sys.program.state &  PROGRAM_TERMINAL_INITIALIZED) {
+        update_terminal();
+        if (sys.program.state & PROGRAM_SHOW_TERMINAL) {
+            show_terminal();
+        }
+    }
+    if (sys.program.state &  PROGRAM_VIDEO_INITIALIZED) {
+        update_display();
+    }
+    if (sys.program.state &  PROGRAM_AUDIO_INITIALIZED) {
+        update_audio();
+    }
     return status;
 }
 
-static int exit_system(void) {
+static int deinit_system(void) {
     int status = false;
     unload_all_assets();
-// unload pages layers and cells
+    remove_service(PROGRAM_ASSETS_INITIALIZED);
+// implement unload pages layers and cells
     deinit_display();
+    remove_service(PROGRAM_VIDEO_INITIALIZED);
     return status;
 }
 
-int process_system(void) {
-    //  stage following;
-    //  - Initialisation process
-    //  - updating process
-    //  - exit process
+void display_initialize_splash(void) {
+//    if (sys.program.state & PROGRAM_INITIALIZE) display_initialize_splash();
+
+    update_system();
+}
+
+void manage_program() {
+    debug_console_out( debug_program_state(sys.program.state & PROGRAM_SWITCHBOARD) );
+
+    if (sys.program.state & PROGRAM_OFF_FOCUS)
+        game_off_focus_scene();
+    else {
+        unsigned int switchboard_state = (sys.program.state & PROGRAM_SWITCHBOARD);
+        switch(switchboard_state) {
+            case PROGRAM_OFF_FOCUS:
+                game_off_focus_scene();
+            case PROGRAM_INITIALIZE:
+                add_service(PROGRAM_SHOW_TERMINAL);
+                init_system();
+                commute_to(PROGRAM_INIT_TITLE);
+                game_init_assets();
+                break;
+            case PROGRAM_DEINIT:
+                deinit_system();
+                commute_to(PROGRAM_EXIT);
+                break;
+            case PROGRAM_INIT_TITLE:
+                game_init_title();
+                commute_to(PROGRAM_IN_TITLE);
+                break;
+            case PROGRAM_IN_TITLE:
+                game_update_title();
+                break;
+            case PROGRAM_INIT_MENU1:
+                break;
+            case PROGRAM_IN_MENU1:
+                break;
+            case PROGRAM_INIT_MENU2:
+                break;
+            case PROGRAM_IN_MENU2:
+                break;
+            case PROGRAM_INIT_MENU3:
+                break;
+            case PROGRAM_IN_MENU3:
+                break;
+            case PROGRAM_INIT_MENU4:
+                break;
+            case PROGRAM_IN_MENU4:
+                break;
+            case PROGRAM_INIT_GAME:
+                break;
+            case PROGRAM_GAME_PLAY:
+                break;
+            case PROGRAM_GAME_NEXT:
+                break;
+            case PROGRAM_GAME_RESUME:
+                break;
+            case PROGRAM_GAMEOVER:
+                break;
+            case PROGRAM_GAME_DEATH:
+                break;
+            default: // nowhere?... only happens on program start
+                add_service(PROGRAM_RUNNING);
+                commute_to(PROGRAM_INITIALIZE);
+                break;
+        }
+    }
+}
+
+////////////// ENTRY POINT FROM RUNTIME //////////////
+// Once runtime heads here --> stuck till PROGRAM_END
+int process_system(bool debug, const char* name) {
+    SetExitKey(false); // Disables the ESCAPE key from the RayLib core
+
+    if (name > NULL) strcpy(sys.program.name, name); else strcpy(sys.program.name, "_o/");
+    set_debug_trace(debug);
+    debug_console_out(">>>~~~>>> START <<<~~~<<<");
+
+    commute_to(PROGRAM_INITIALIZE);
+//    add_service(PROGRAM_RUNNING);
+    while (!(sys.program.state & PROGRAM_EXIT)) {
+        debug_console_out("_______MAIN LOOP_______BEGIN");
+        if (sys.program.state & PROGRAM_VIDEO_INITIALIZED) {
+            BeginTextureMode(sys.asset.framebuffer[sys.video.virtual_asset[sys.video.current_virtual]]);
+            ClearBackground(BLACK);
+            rlDisableDepthMask();            // Disable depth writes
+            rlDisableDepthTest();            // Disable depth test for speed
+        }
+        manage_program();
+        if (sys.program.state & PROGRAM_VIDEO_INITIALIZED) {
+            if (sys.program.state & PROGRAM_IN_GAME)  {
+                // possibly health information, lives left, score etc... (HUD)
+            }
+            if (sys.program.state & PROGRAM_GAME_PAUSED) {
+            // something special happening while game is paused
+            // DISPLAY PAUSE MESSAGE
+            }
+            rlEnableDepthMask();
+            rlEnableDepthTest();
+            EndTextureMode();
+            update_system();
+        }
+        debug_console_out("_______MAIN LOOP_______END");
+        if (IsKeyPressed(KEY_ESCAPE)) commute_to(PROGRAM_DEINIT);
+    }
+    return sys.program.status;
 }
 
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** E N D
