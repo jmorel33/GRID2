@@ -42,6 +42,380 @@
 #include <font_OSD.h>
 #include <lines.h>
 
+#ifdef __cplusplus // Calling C code from C++
+extern "C" { 
+#endif
+
+// **************************************************************************************** U T I L I T Y   M A C R O S   &   F U N C T I O N S
+
+#define BITS_ON(a,b)    (a |= (b))
+#define BITS_OFF(a,b)   (a &= ~(b))
+#define BITS_INIT(a, b)      (a = (b))
+#define BITS_FLIP(a, b) (a ^= (b))
+#define BITS_TEST(a, b)    (a & (b))
+
+#define max(a, b) ((a) > (b) ? (a) : (b))
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#define is_digit(c) ('0' <= (c) && (c) <= '9')
+
+
+/* --- PRINTF_BYTE_TO_BINARY macro's --- */
+#define PRINTF_BINARY_PATTERN_INT8 "%c%c%c%c%c%c%c%c"
+#define PRINTF_BYTE_TO_BINARY_INT8(i)    \
+    (((i) & 0x80ll) ? '1' : '0'), (((i) & 0x40ll) ? '1' : '0'), (((i) & 0x20ll) ? '1' : '0'), (((i) & 0x10ll) ? '1' : '0'), \
+    (((i) & 0x08ll) ? '1' : '0'), (((i) & 0x04ll) ? '1' : '0'), (((i) & 0x02ll) ? '1' : '0'), (((i) & 0x01ll) ? '1' : '0')
+
+#define PRINTF_BINARY_PATTERN_INT16    PRINTF_BINARY_PATTERN_INT8              PRINTF_BINARY_PATTERN_INT8
+#define PRINTF_BYTE_TO_BINARY_INT16(i) PRINTF_BYTE_TO_BINARY_INT8((i) >> 8),   PRINTF_BYTE_TO_BINARY_INT8(i)
+#define PRINTF_BINARY_PATTERN_INT32    PRINTF_BINARY_PATTERN_INT16             PRINTF_BINARY_PATTERN_INT16
+#define PRINTF_BYTE_TO_BINARY_INT32(i) PRINTF_BYTE_TO_BINARY_INT16((i) >> 16), PRINTF_BYTE_TO_BINARY_INT16(i)
+#define PRINTF_BINARY_PATTERN_INT64    PRINTF_BINARY_PATTERN_INT32             PRINTF_BINARY_PATTERN_INT32
+#define PRINTF_BYTE_TO_BINARY_INT64(i) PRINTF_BYTE_TO_BINARY_INT32((i) >> 32), PRINTF_BYTE_TO_BINARY_INT32(i)
+// EXAMPLE USE CASE:     printf("mystate = "PRINTF_BINARY_PATTERN_INT32"\n", PRINTF_BYTE_TO_BINARY_INT32(mystate));
+/* --- end macros --- */
+
+//* Bound reader macros.
+//* If we attempt to read the buffer out-of-bounds, pretend that the buffer is infinitely padded with zeroes.
+#define READ_U8(offset) (((offset) < griddata_length) ? (*(uint8_t*)(griddata + (offset))) : 0)
+#define READ_U16(offset) ((uint16_t)READ_U8(offset) | ((uint16_t)READ_U8((offset) + 1) << 8))
+#define READ_U32(offset) ((uint32_t)READ_U16(offset) | ((uint32_t)READ_U16((offset) + 2) << 16))
+#define READ_MEMCPY(ptr, offset, length) memcpy_pad(ptr, length, griddata, griddata_length, offset)
+#define sizeof_member(type, member) sizeof(((type *)0)->member)
+#define sizeof_member_dim(type, member) sizeof(((type*)0)->member) / sizeof(((type*)0)->member[0])
+
+/*
+#define STDIO_BUFFER_SIZE 4000
+static char stdio_buffer[STDIO_BUFFER_SIZE + 1] = {0};
+static int stdio_pipe[2];
+*/
+
+//void prepare_stdio(void) {
+//    long flags = fcntl(stdio_pipe[0], F_GETFL);
+//    flags |= O_NONBLOCK;
+//    fcntl(stdio_pipe[0], F_SETFL, flags);
+//};
+
+//prepare_stdio(); 
+
+//    enum { STATE_WAITING, STATE_LOADING, STATE_FINISHED } state = STATE_WAITING;
+
+// C11: Sets the first n bytes starting at dest to the specified value, but maximal dmax bytes.
+//#define EX_MEMSET(void *dest, rsize_t dmax, int value, rsize_t n)   memset_s(void *dest, rsize_t dmax, int value, rsize_t n)
+
+// C11: This function copies at most smax bytes from src to dest, up to dmax.
+//#define EX_MEMCPY(void *restrict dest, rsize_t dmax, const void *restrict src, rsize_t smax) memcpy_s(void *restrict dest, rsize_t dmax, const void *restrict src, rsize_t smax)
+
+static void memcpy_pad(void *dst, size_t dst_len, const void *src, size_t src_len, size_t offset) {
+    uint8_t *dst_c = dst;
+    const uint8_t *src_c = src;
+
+    /* how many bytes can be copied without overrunning `src` */
+    size_t copy_bytes = (src_len >= offset) ? (src_len - offset) : 0;
+    copy_bytes = copy_bytes > dst_len ? dst_len : copy_bytes;
+
+    memcpy(dst_c, src_c + offset, copy_bytes);
+    /* padded bytes */
+    memset(dst_c + copy_bytes, 0, dst_len - copy_bytes);
+}
+
+
+uint8_t fifo_data[256];
+uint32_t fifo_entries;
+uint32_t fifo_lock;
+
+void fifo_putc(uint8_t data) {
+	while(fifo_lock);
+	fifo_lock = 1;
+	while(fifo_entries >= (sizeof(fifo_data)));
+	fifo_entries++;
+	fifo_data[fifo_entries-1] = data;
+	fifo_lock = 0;
+}
+
+uint8_t fifo_getc() {
+	uint8_t ret;
+	uint32_t i;
+	if (fifo_entries == 0) return 0;
+	while(fifo_lock);
+	fifo_lock = 1;
+	ret = fifo_data[0];
+	for(i = 0; i < fifo_entries; i++) {
+		fifo_data[i] = fifo_data[i+1];
+	}
+	fifo_entries--;
+	fifo_lock = 0;
+	return ret;
+}
+
+/* EXAMPLE USE
+	fifo_entries = 0, fifo_lock = 0;
+	fifo_putc('A');	fifo_putc('B');	fifo_putc('C');	fifo_putc('D');	fifo_putc('E');	fifo_putc('\0');
+	printf("'%s'\n", fifo_data);	printf("'%c'\n",
+    fifo_getc());	printf("'%s'\n", fifo_data);	fifo_entries--;
+	fifo_putc('f');	fifo_putc('\0');
+	printf("'%s'\n", fifo_data);    
+*/
+
+static inline float Rand(float a) {
+	return (float)rand()/(float)(RAND_MAX/a);
+}
+//#define PI         3.14159265358979323846f // raymath.h
+#define HALF_PI    1.57079632679489661923f
+#define QUARTER_PI 0.78539816339744830961f
+#define DIVIDEH_PI 0.159154943091895335768f
+
+static inline float fast_sin(double x) {
+    x *= DIVIDEH_PI;
+    x -= (int) x;
+    if (x <= 0.5) {
+        double t = 2 * x * (2 * x - 1);
+        return (PI * t) / ((PI - 4) * t - 1);
+    } else {
+        double t = 2 * (1 - x) * (1 - 2 * x);
+        return -(PI * t) / ((PI - 4) * t - 1);
+    }
+}
+
+static inline float fast_cos(double x) {
+    return fast_sin(x + HALF_PI);
+}
+
+static inline double dfast_sin(double x) {
+    x *= DIVIDEH_PI;
+    x -= (int) x;
+    if (x <= 0.5) {
+        double t = 2 * x * (2 * x - 1);
+        return (PI * t) / ((PI - 4) * t - 1);
+    } else {
+        double t = 2 * (1 - x) * (1 - 2 * x);
+        return -(PI * t) / ((PI - 4) * t - 1);
+    }
+}
+
+static inline double dfast_cos(double x) {
+    return fast_sin(x + HALF_PI);
+}
+
+// use type punning instead of pointer arithmatics, to require proper alignment
+static inline float absf(float f) {
+  // optimizer will optimize away the `if` statement and the library call
+  if (sizeof(float) == sizeof(uint32_t)) {
+    union {
+      float f;
+      uint32_t i;
+    } u;
+    u.f = f;
+    u.i &= 0x7fffffff;
+    return u.f;
+  }
+  return fabsf(f);
+}
+
+static long gcdl(long a, long b)
+{
+    if (a == 0)
+        return b;
+    else if (b == 0)
+        return a;
+
+    if (a < b)
+        return gcd_l(a, b % a);
+    else
+        return gcd_l(b, a % b);
+}
+
+static int gcdi(int a, int b) {
+    int res = a%b;
+    while (res > 0) {
+        a = b;
+        b = res;
+        res = a % b;
+    }
+    return b;
+}
+
+//	Phase Shift 26.2 (These table values were sourced from the MAME project's TIA emulation for the palette management)
+	/*static constexpr float color[16][2] =	{
+		{  0.000,  0.000 }, {  0.192, -0.127 },	{  0.241, -0.048 },	{  0.240,  0.040 },	{  0.191,  0.121 },	{  0.103,  0.175 },	{ -0.008,  0.196 },	{ -0.116,  0.174 },
+        { -0.199,  0.118 },	{ -0.243,  0.037 },	{ -0.237, -0.052 },	{ -0.180, -0.129 },	{ -0.087, -0.181 },	{  0.021, -0.196 },	{  0.130, -0.169 },	{  0.210, -0.107 }
+	};*/
+// YIQ formula for Atari 8bit GTIA colors (0-255) index
+// https://atariage.com/forums/topic/107853-need-the-256-colors/page/2/#comments
+// The following routine is currently dead code as I personally do not like the resulting colors...  Something is wrong in the translation from YIQ
+Color gtia_ntsc_to_rgb(int val) {
+    int chroma = (val >> 4) & 15;
+    int luminence = val & 15;
+    int crlv = chroma ? 50 : 0;
+ 
+    float phase = ((chroma - 1.) * 25. - 58.) * (2. * PI / 360.);
+
+    float y = 255 * (luminence + 1.) / 16.;
+    float i = crlv * cos(phase);
+    float q = crlv * sin(phase);
+
+    float r = y + 0.9563 * i + 0.621 * q;
+    float g = y - 0.2721 * i - 0.6474 * q;
+    float b = y - 1.107 * i + 1.7046 * q;
+
+	if (r < 0) r = 0;
+	if (g < 0) g = 0;
+	if (b < 0) b = 0;
+
+    r = pow(r, 0.9);
+    g = pow(g, 0.9);
+	b = pow(b, 0.9);
+
+	//if (r > 1) r = 1;
+	//if (g > 1) g = 1;
+	//if (b > 1) b = 1;
+
+    Color col={r + 0.5, g + 0.5, b + 0.5, 255};
+    return col;
+}
+
+// **************************************************************************************** R A Y L I B   E X T E N S I O N S
+
+void DrawTextImage(Texture texture, char* txt, Vector2 position) {
+	DrawTexturePro(texture,
+    (Rectangle) { (txt[0] - 32) * 24, 0, 24, 24 } ,
+    (Rectangle) { position.x , position.y, 64, 64 },
+    (Vector2) {0},0,WHITE);
+}
+
+// draw Textured Quad
+void DrawQuadSprite ( Texture texture , Vector2 position, Vector2 scale, Color color) {
+	DrawTexturePro ( texture ,
+    (Rectangle) { 0, 0, texture.width * scale.x, texture.height * scale.y },
+    (Rectangle) { position.x, position.y, texture.width * scale.x, texture.height * scale.y },
+    (Vector2) { 0,0 } , 0 , color );
+}
+
+// Draw a color-filled rectangle with pro parameters
+void DrawRectangleProSK(Rectangle rec, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
+    rlCheckRenderBatchLimit(4);
+
+    const static inline Texture   texShapes = { 1, 1, 1, 1, 7 };
+    const static inline Rectangle texShapesRec = { 0, 0, 1, 1 };
+
+    Vector2 topLeft = { 0 }, topRight = { 0 }, bottomLeft = { 0 }, bottomRight = { 0 };
+
+    if (rotation == 0.0f) {
+        float x = rec.x - origin.x;
+        float y = rec.y - origin.y;
+        topLeft = (Vector2){ x, y };
+        topRight = (Vector2){ x + rec.width, y };
+        bottomLeft = (Vector2){ x, y + rec.height };
+        bottomRight = (Vector2){ x + rec.width, y + rec.height };
+    } else {
+        float sinRotation = sinf(rotation*DEG2RAD);
+        float cosRotation = cosf(rotation*DEG2RAD);
+        float x = rec.x;
+        float y = rec.y;
+        float dx = -origin.x;
+        float dy = -origin.y;
+        topLeft.x = x + dx*cosRotation - dy*sinRotation;
+        topLeft.y = y + dx*sinRotation + dy*cosRotation;
+        topRight.x = x + (dx + rec.width)*cosRotation - dy*sinRotation;
+        topRight.y = y + (dx + rec.width)*sinRotation + dy*cosRotation;
+        bottomLeft.x = x + dx*cosRotation - (dy + rec.height)*sinRotation;
+        bottomLeft.y = y + dx*sinRotation + (dy + rec.height)*cosRotation;
+        bottomRight.x = x + (dx + rec.width)*cosRotation - (dy + rec.height)*sinRotation;
+        bottomRight.y = y + (dx + rec.width)*sinRotation + (dy + rec.height)*cosRotation;
+    }
+
+    rlSetTexture(texShapes.id);
+    rlBegin(RL_QUADS);
+        rlNormal3f(0.0f, 0.0f, 1.0f);
+         // Bottom-left corner for texture and quad
+        rlColor4ub(color[0].r, color[0].g, color[0].b, color[0].a);
+        rlTexCoord2f(texShapesRec.x/texShapes.width, texShapesRec.y/texShapes.height);
+        rlVertex2f(topLeft.x + skew.x, topLeft.y);
+        // Bottom-right corner for texture and quad
+        rlColor4ub(color[1].r, color[1].g, color[1].b, color[1].a);
+        rlTexCoord2f(texShapesRec.x/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
+        rlVertex2f(bottomLeft.x, bottomLeft.y);
+        // Top-right corner for texture and quad
+        rlColor4ub(color[2].r, color[2].g, color[2].b, color[2].a);
+        rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
+        rlVertex2f(bottomRight.x, bottomRight.y + skew.y);
+        // Top-left corner for texture and quad
+        rlColor4ub(color[3].r, color[3].g, color[3].b, color[3].a);
+        rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, texShapesRec.y/texShapes.height);
+        rlVertex2f(topRight.x + skew.x, topRight.y + skew.y);
+    rlEnd();
+}
+
+// Draw a part of a texture (defined by a rectangle) with 'pro' parameters
+// NOTE: origin is relative to destination rectangle size
+void DrawTextureProSK (Texture texture, Rectangle source, Rectangle dest, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
+    if (texture.id > 0) {
+        float width = (float)texture.width;
+        float height = (float)texture.height;
+        bool flipX = false;
+        if (source.width < 0) { flipX = true; source.width *= -1; }
+        if (source.height < 0) source.y -= source.height;
+        Vector2 topLeft = { 0 };        Vector2 topRight = { 0 };        Vector2 bottomLeft = { 0 };        Vector2 bottomRight = { 0 };
+
+        if (rotation == 0.0f) { // do not calculate rotation
+            float x = dest.x - origin.x;
+            float y = dest.y - origin.y;
+            topLeft = (Vector2){ x, y };
+            topRight = (Vector2){ x + dest.width, y };
+            bottomLeft = (Vector2){ x, y + dest.height };
+            bottomRight = (Vector2){ x + dest.width, y + dest.height };
+        } else {  // calculate rotation
+            float sinRotation = sinf(rotation*DEG2RAD);
+            float cosRotation = cosf(rotation*DEG2RAD);
+            float x = dest.x;
+            float y = dest.y;
+            float dx = -origin.x;
+            float dy = -origin.y;
+            topLeft.x = x + dx*cosRotation - dy*sinRotation;
+            topLeft.y = y + dx*sinRotation + dy*cosRotation;
+            topRight.x = x + (dx + dest.width)*cosRotation - dy*sinRotation;
+            topRight.y = y + (dx + dest.width)*sinRotation + dy*cosRotation;
+            bottomLeft.x = x + dx*cosRotation - (dy + dest.height)*sinRotation;
+            bottomLeft.y = y + dx*sinRotation + (dy + dest.height)*cosRotation;
+            bottomRight.x = x + (dx + dest.width)*cosRotation - (dy + dest.height)*sinRotation;
+            bottomRight.y = y + (dx + dest.width)*sinRotation + (dy + dest.height)*cosRotation;
+        }
+
+        rlCheckRenderBatchLimit(4);     // Make sure there is enough free space on the batch buffer
+        rlSetTexture(texture.id);
+        rlBegin(RL_QUADS);
+            rlNormal3f(0.0f, 0.0f, 1.0f);                          // Normal vector pointing towards viewer
+            // Bottom-left corner for texture and quad
+            rlColor4ub(color[0].r, color[0].g, color[0].b, color[0].a);
+            if (flipX) rlTexCoord2f((source.x + source.width)/width, source.y/height); else rlTexCoord2f(source.x/width, source.y/height);
+            rlVertex2f(topLeft.x + skew.x, topLeft.y);
+            // Bottom-right corner for texture and quad
+            rlColor4ub(color[1].r, color[1].g, color[1].b, color[1].a);
+            if (flipX) rlTexCoord2f((source.x + source.width)/width, (source.y + source.height)/height); else rlTexCoord2f(source.x/width, (source.y + source.height)/height);
+            rlVertex2f(bottomLeft.x, bottomLeft.y);
+            // Top-right corner for texture and quad
+            rlColor4ub(color[2].r, color[2].g, color[2].b, color[2].a);
+            if (flipX) rlTexCoord2f(source.x/width, (source.y + source.height)/height); else rlTexCoord2f((source.x + source.width)/width, (source.y + source.height)/height);
+            rlVertex2f(bottomRight.x, bottomRight.y + skew.y);
+            // Top-left corner for texture and quad
+            rlColor4ub(color[3].r, color[3].g, color[3].b, color[3].a);
+            if (flipX) rlTexCoord2f(source.x/width, source.y/height); else rlTexCoord2f((source.x + source.width)/width, (source.y)/height);
+            rlVertex2f(topRight.x + skew.x, topRight.y + skew.y);
+        rlEnd();
+    }
+}
+
+Color get_pixel_color(Image *image, Vector2 position) {
+    unsigned int offset = (position.y * image->width + position.x) * 4;
+    Color *data = &image->data;
+    return data[offset];
+//    unsigned char r = data[offset];
+//    unsigned char g = data[offset + 1];
+//    unsigned char b = data[offset + 2];
+//    unsigned char a = data[offset + 3];
+//    return (Color){r, g, b, a};
+}
+
+
 // **************************************************************************************** L O O S E   S T R U C T U R E S
 
 
@@ -168,7 +542,6 @@ typedef struct EX_audio {
     EX_track track[MAXAUDIOTRACKS];
 } EX_audio;
 
-
 // **************************************************************************************** V I D E O   S T R U C T U R E S
 
 #define MAXDISPLAYS 5
@@ -207,6 +580,7 @@ typedef struct EX_video {
     bool window_focus;                          // last state of window focus
 } EX_video;
 
+
 // **************************************************************************************** T E R M I N A L   S T R U C T U R E S
 
 typedef struct EX_terminal {
@@ -229,100 +603,126 @@ typedef struct EX_game {
 } EX_game;
 
 typedef enum {
-    PROGRAM_DEINIT              = 0b10000000000000000000000000000000,
-    PROGRAM_INITIALIZE          = 0b01000000000000000000000000000000,
-    PROGRAM_INIT_TITLE          = 0b00100000000000000000000000000000,
-    PROGRAM_IN_TITLE            = 0b00010000000000000000000000000000,
-    PROGRAM_RESERVED1           = 0b00001000000000000000000000000000, // *********
-    PROGRAM_INIT_MENU1          = 0b00000100000000000000000000000000,
-    PROGRAM_IN_MENU1            = 0b00000010000000000000000000000000,
-    PROGRAM_INIT_MENU2          = 0b00000001000000000000000000000000,
-    PROGRAM_IN_MENU2            = 0b00000000100000000000000000000000,
-    PROGRAM_INIT_MENU3          = 0b00000000010000000000000000000000,
-    PROGRAM_IN_MENU3            = 0b00000000001000000000000000000000,
-    PROGRAM_INIT_MENU4          = 0b00000000000100000000000000000000,
-    PROGRAM_IN_MENU4            = 0b00000000000010000000000000000000,
-    PROGRAM_GAME_RESUME         = 0b00000000000001000000000000000000,
-    PROGRAM_GAME_PLAY           = 0b00000000000000100000000000000000,
-    PROGRAM_INIT_GAME           = 0b00000000000000010000000000000000,
-    PROGRAM_GAME_NEXT           = 0b00000000000000001000000000000000,
-    PROGRAM_GAMEOVER            = 0b00000000000000000100000000000000,
-    PROGRAM_GAME_DEATH          = 0b00000000000000000010000000000000,
-    PROGRAM_OFF_FOCUS           = 0b00000000000000000001000000000000,
-    PROGRAM_SWITCHBOARD         = 0b11111111111111111111000000000000, // to filter out base states
-    PROGRAM_EXIT                = 0b10000000000000000000100000000000,
-    PROGRAM_DEBUG               = 0b00000000000000000000010000000000,
-    PROGRAM_SHOW_TERMINAL       = 0b00000000000000000000001000000000,
-    PROGRAM_GAME_PAUSED         = 0b00000000000000000000000100000000,
-    PROGRAM_IN_GAME             = 0b00000000000000000000000001000000,
-    PROGRAM_RUNNING             = 0b00000000000000000000000000100000,
-    PROGRAM_AUDIO_INITIALIZED   = 0b00000000000000000000000000001000,
-    PROGRAM_TERMINAL_INITIALIZED= 0b00000000000000000000000000000100,
-    PROGRAM_ASSETS_INITIALIZED  = 0b00000000000000000000000000000010,
-    PROGRAM_VIDEO_INITIALIZED   = 0b00000000000000000000000000000001,
-    PROGRAM_SERVICES            = 0b00000000000000000000111111111111, // to filter out switchboard states
-    PROGRAM_NULL                = 0b00000000000000000000000000000000  // in case that happens... (should never)
-} program_state;
+    CTRL_DEINIT              = 0b10000000000000000000000000000000,
+    CTRL_INITIALIZE          = 0b01000000000000000000000000000000,
+    CTRL_INIT_TITLE          = 0b00100000000000000000000000000000,
+    CTRL_IN_TITLE            = 0b00010000000000000000000000000000,
+    CTRL_RESERVED1           = 0b00001000000000000000000000000000, // *********
+    CTRL_INIT_MENU1          = 0b00000100000000000000000000000000,
+    CTRL_IN_MENU1            = 0b00000010000000000000000000000000,
+    CTRL_INIT_MENU2          = 0b00000001000000000000000000000000,
+    CTRL_IN_MENU2            = 0b00000000100000000000000000000000,
+    CTRL_INIT_MENU3          = 0b00000000010000000000000000000000,
+    CTRL_IN_MENU3            = 0b00000000001000000000000000000000,
+    CTRL_INIT_MENU4          = 0b00000000000100000000000000000000,
+    CTRL_IN_MENU4            = 0b00000000000010000000000000000000,
+    CTRL_GAME_RESUME         = 0b00000000000001000000000000000000,
+    CTRL_GAME_PLAY           = 0b00000000000000100000000000000000,
+    CTRL_INIT_GAME           = 0b00000000000000010000000000000000,
+    CTRL_GAME_NEXT           = 0b00000000000000001000000000000000,
+    CTRL_GAMEOVER            = 0b00000000000000000100000000000000,
+    CTRL_GAME_DEATH          = 0b00000000000000000010000000000000,
+    CTRL_OFF_FOCUS           = 0b00000000000000000001000000000000,
+    CTRL_SWITCHBOARD         = 0b11111111111111111111000000000000, // to filter out base states
+    CTRL_EXIT                = 0b10000000000000000000100000000000,
+    CTRL_DEBUG               = 0b00000000000000000000010000000000,
+    CTRL_SHOW_TERMINAL       = 0b00000000000000000000001000000000,
+    CTRL_GAME_PAUSED         = 0b00000000000000000000000100000000,
+    CTRL_IN_GAME             = 0b00000000000000000000000001000000,
+    CTRL_RUNNING             = 0b00000000000000000000000000100000,
+    CTRL_AUDIO_INITIALIZED   = 0b00000000000000000000000000001000,
+    CTRL_TERMINAL_INITIALIZED= 0b00000000000000000000000000000100,
+    CTRL_ASSETS_INITIALIZED  = 0b00000000000000000000000000000010,
+    CTRL_VIDEO_INITIALIZED   = 0b00000000000000000000000000000001,
+    CTRL_SERVICES            = 0b00000000000000000000111111111111, // to filter out switchboard states
+    CTRL_NULL                = 0b00000000000000000000000000000000  // in case that happens... (should never)
+} control_state;
 
-const char* debug_program_state(unsigned int state) {
+const char* control_state_literal(unsigned int state) {
     switch (state) {
-    case PROGRAM_DEINIT:              return "SWITCHBOARD: PROGRAM_DEINIT";
-    case PROGRAM_INITIALIZE:          return "SWITCHBOARD: PROGRAM_INITIALIZE";
-    case PROGRAM_INIT_TITLE:          return "SWITCHBOARD: PROGRAM_INIT_TITLE";
-    case PROGRAM_IN_TITLE:            return "SWITCHBOARD: PROGRAM_IN_TITLE";
-    case PROGRAM_INIT_MENU1:          return "SWITCHBOARD: PROGRAM_INIT_MENU1";
-    case PROGRAM_IN_MENU1:            return "SWITCHBOARD: PROGRAM_IN_MENU1";
-    case PROGRAM_INIT_MENU2:          return "SWITCHBOARD: PROGRAM_INIT_MENU2";
-    case PROGRAM_IN_MENU2:            return "SWITCHBOARD: PROGRAM_IN_MENU2";
-    case PROGRAM_INIT_MENU3:          return "SWITCHBOARD: PROGRAM_INIT_MENU3";
-    case PROGRAM_IN_MENU3:            return "SWITCHBOARD: PROGRAM_IN_MENU3";
-    case PROGRAM_INIT_MENU4:          return "SWITCHBOARD: PROGRAM_INIT_MENU4";
-    case PROGRAM_IN_MENU4:            return "SWITCHBOARD: PROGRAM_IN_MENU4";
-    case PROGRAM_GAME_RESUME:         return "SWITCHBOARD: PROGRAM_GAME_RESUME";
-    case PROGRAM_GAME_PLAY:           return "SWITCHBOARD: PROGRAM_GAME_PLAY";
-    case PROGRAM_INIT_GAME:           return "SWITCHBOARD: PROGRAM_INIT_GAME";
-    case PROGRAM_GAME_NEXT:           return "SWITCHBOARD: PROGRAM_GAME_NEXT";
-    case PROGRAM_GAMEOVER:            return "SWITCHBOARD: PROGRAM_GAMEOVER";
-    case PROGRAM_GAME_DEATH:          return "SWITCHBOARD: PROGRAM_GAME_DEATH";
-    case PROGRAM_EXIT:                return "BASE STATES: PROGRAM_EXIT";
-    case PROGRAM_DEBUG:               return "BASE STATES: PROGRAM_DEBUG";
-    case PROGRAM_SHOW_TERMINAL:       return "BASE STATES: PROGRAM_SHOW_TERMINAL";
-    case PROGRAM_GAME_PAUSED:         return "BASE STATES: PROGRAM_GAME_PAUSED";
-    case PROGRAM_IN_GAME:             return "BASE STATES: PROGRAM_IN_GAME";
-    case PROGRAM_RUNNING:             return "BASE STATES: PROGRAM_RUNNING";
-    case PROGRAM_OFF_FOCUS:           return "BASE STATES: PROGRAM_OFF_FOCUS";
-    case PROGRAM_AUDIO_INITIALIZED:   return "BASE STATES: PROGRAM_AUDIO_INITIALIZED";
-    case PROGRAM_TERMINAL_INITIALIZED:return "BASE STATES: PROGRAM_TERMINAL_INITIALIZED";
-    case PROGRAM_ASSETS_INITIALIZED:  return "BASE STATES: PROGRAM_ASSETS_INITIALIZED";
-    case PROGRAM_VIDEO_INITIALIZED:   return "BASE STATES: PROGRAM_VIDEO_INITIALIZED";
-    case PROGRAM_NULL:                return "BASE STATES: PROGRAM_NULL";
+    case CTRL_DEINIT:              return "SWITCHBOARD: CTRL_DEINIT";
+    case CTRL_INITIALIZE:          return "SWITCHBOARD: CTRL_INITIALIZE";
+    case CTRL_INIT_TITLE:          return "SWITCHBOARD: CTRL_INIT_TITLE";
+    case CTRL_IN_TITLE:            return "SWITCHBOARD: CTRL_IN_TITLE";
+    case CTRL_INIT_MENU1:          return "SWITCHBOARD: CTRL_INIT_MENU1";
+    case CTRL_IN_MENU1:            return "SWITCHBOARD: CTRL_IN_MENU1";
+    case CTRL_INIT_MENU2:          return "SWITCHBOARD: CTRL_INIT_MENU2";
+    case CTRL_IN_MENU2:            return "SWITCHBOARD: CTRL_IN_MENU2";
+    case CTRL_INIT_MENU3:          return "SWITCHBOARD: CTRL_INIT_MENU3";
+    case CTRL_IN_MENU3:            return "SWITCHBOARD: CTRL_IN_MENU3";
+    case CTRL_INIT_MENU4:          return "SWITCHBOARD: CTRL_INIT_MENU4";
+    case CTRL_IN_MENU4:            return "SWITCHBOARD: CTRL_IN_MENU4";
+    case CTRL_GAME_RESUME:         return "SWITCHBOARD: CTRL_GAME_RESUME";
+    case CTRL_GAME_PLAY:           return "SWITCHBOARD: CTRL_GAME_PLAY";
+    case CTRL_INIT_GAME:           return "SWITCHBOARD: CTRL_INIT_GAME";
+    case CTRL_GAME_NEXT:           return "SWITCHBOARD: CTRL_GAME_NEXT";
+    case CTRL_GAMEOVER:            return "SWITCHBOARD: CTRL_GAMEOVER";
+    case CTRL_GAME_DEATH:          return "SWITCHBOARD: CTRL_GAME_DEATH";
+    case CTRL_EXIT:                return "BASE STATES: CTRL_EXIT";
+    case CTRL_DEBUG:               return "BASE STATES: CTRL_DEBUG";
+    case CTRL_SHOW_TERMINAL:       return "BASE STATES: CTRL_SHOW_TERMINAL";
+    case CTRL_GAME_PAUSED:         return "BASE STATES: CTRL_GAME_PAUSED";
+    case CTRL_IN_GAME:             return "BASE STATES: CTRL_IN_GAME";
+    case CTRL_RUNNING:             return "BASE STATES: CTRL_RUNNING";
+    case CTRL_OFF_FOCUS:           return "BASE STATES: CTRL_OFF_FOCUS";
+    case CTRL_AUDIO_INITIALIZED:   return "BASE STATES: CTRL_AUDIO_INITIALIZED";
+    case CTRL_TERMINAL_INITIALIZED:return "BASE STATES: CTRL_TERMINAL_INITIALIZED";
+    case CTRL_ASSETS_INITIALIZED:  return "BASE STATES: CTRL_ASSETS_INITIALIZED";
+    case CTRL_VIDEO_INITIALIZED:   return "BASE STATES: CTRL_VIDEO_INITIALIZED";
+    case CTRL_NULL:                return "BASE STATES: CTRL_NULL";
+    default: return NULL;
     }
 }
 
 typedef enum {
-    CHEAT_INFINITE_LIVES        = 0b10000000000000000000000000000000,
-    CHEAT_INFINITE_POWER        = 0b01000000000000000000000000000000,
-    CHEAT_INFINITE_TIME         = 0b00100000000000000000000000000000,
-    CHEAT_NO_COLLISION          = 0b00010000000000000000000000000000,
-    CHEAT_POWERUPS              = 0b00001000000000000000000000000000,
-    CHEAT_NAVIGATE_LEVELS       = 0b00000100000000000000000000000000,
-    CHEAT_DEATH                 = 0b00000010000000000000000000000000,
-    CHEAT_SUMMON                = 0b00000001000000000000000000000000,
-    CHEAT_END_GAME              = 0b00000000100000000000000000000000,
-    CHEAT_EDITOR_ADVANCED       = 0b00000000000000000000000000100000,
-    CHEAT_EDITOR_BASIC          = 0b00000000000000000000000000010000,
-    CHEAT_TERMINAL_ADVANCED     = 0b00000000000000000000000000001000,
-    CHEAT_TERMINAL_BASIC        = 0b00000000000000000000000000000100,
-    CHEAT_DEBUG_ADVANCED        = 0b00000000000000000000000000000010,
-    CHEAT_DEBUG_BASIC           = 0b00000000000000000000000000000001,
-    CHEAT_OFF                   = 0b00000000000000000000000000000000,
-    CHEAT_GODMODE               = 0b11111111111111111111111111111111
-} program_cheats;
+    PMSN_INFINITE_LIVES      = 0b10000000000000000000000000000000,
+    PMSN_INFINITE_POWER      = 0b01000000000000000000000000000000,
+    PMSN_INFINITE_TIME       = 0b00100000000000000000000000000000,
+    PMSN_NO_COLLISION        = 0b00010000000000000000000000000000,
+    PMSN_POWERUPS            = 0b00001000000000000000000000000000,
+    PMSN_NAVIGATE_LEVELS     = 0b00000100000000000000000000000000,
+    PMSN_DEATH               = 0b00000010000000000000000000000000,
+    PMSN_SUMMON              = 0b00000001000000000000000000000000,
+    PMSN_END_GAME            = 0b00000000100000000000000000000000,
+    PMSN_TRACE               = 0b00000000000001000000000000000000,
+    PMSN_EDITOR_ADVANCED     = 0b00000000000000000000000000100000,
+    PMSN_EDITOR_BASIC        = 0b00000000000000000000000000010000,
+    PMSN_TERMINAL_ADVANCED   = 0b00000000000000000000000000001000,
+    PMSN_TERMINAL_BASIC      = 0b00000000000000000000000000000100,
+    PMSN_DEBUG_ADVANCED      = 0b00000000000000000000000000000010,
+    PMSN_DEBUG_BASIC         = 0b00000000000000000000000000000001,
+    PMSN_OFF                 = 0b00000000000000000000000000000000,
+    PMSN_GODMODE             = 0b11111111111111111111111111111111
+} permission_state;
+
+const char* permission_state_literal(unsigned int state) {
+    switch (state) {
+    case PMSN_INFINITE_LIVES:   return "PMSN_INFINITE_LIVES";
+    case PMSN_INFINITE_POWER:   return "PMSN_INFINITE_POWER";
+    case PMSN_INFINITE_TIME:    return "PMSN_INFINITE_TIME";
+    case PMSN_NO_COLLISION:     return "PMSN_NO_COLLISION";
+    case PMSN_POWERUPS:         return "PMSN_POWERUPS";
+    case PMSN_NAVIGATE_LEVELS:  return "PMSN_NAVIGATE_LEVELS";
+    case PMSN_DEATH:            return "PMSN_DEATH";
+    case PMSN_SUMMON:           return "PMSN_SUMMON";
+    case PMSN_END_GAME:         return "PMSN_END_GAME";
+    case PMSN_TRACE:            return "PMSN_TRACE";
+    case PMSN_EDITOR_ADVANCED:  return "PMSN_EDITOR_ADVANCED";
+    case PMSN_EDITOR_BASIC:     return "PMSN_EDITOR_BASIC";
+    case PMSN_TERMINAL_ADVANCED:return "PMSN_TERMINAL_ADVANCED";
+    case PMSN_TERMINAL_BASIC:   return "PMSN_TERMINAL_BASIC";
+    case PMSN_DEBUG_ADVANCED:   return "PMSN_DEBUG_ADVANCED";
+    case PMSN_DEBUG_BASIC:      return "PMSN_DEBUG_BASIC";
+    case PMSN_OFF:              return "PMSN_OFF";
+    case PMSN_GODMODE:          return "PMSN_GODMODE";
+    default: return NULL;
+    }
+}
 
 typedef struct EX_program {
-        unsigned int state;
-        unsigned int previous_state;
-        unsigned int cheats;
+        unsigned int ctrlstate;
+        unsigned int ctrlstate_prev;
+        unsigned int pmsnstate;
         char name[NAMELENGTH_MAX + 1];
         unsigned int status;
 } EX_program;
@@ -340,364 +740,14 @@ typedef struct EX_system {
 
 EX_system sys;
 
-// **************************************************************************************** U T I L I T Y   F U N C T I O N S   &   M A C R O S
+void set_permission(unsigned int state)     {BITS_ON(sys.program.pmsnstate, state);}
+void unset_permission(unsigned int state)   {BITS_OFF(sys.program.pmsnstate, state);}
+void flip_permission(unsigned int state)    {BITS_FLIP(sys.program.pmsnstate, state);}
+bool permission_valid(unsigned int state)   {return BITS_TEST(sys.program.pmsnstate, state);}
 
-/*
-#define STDIO_BUFFER_SIZE 4000
-static char stdio_buffer[STDIO_BUFFER_SIZE + 1] = {0};
-static int stdio_pipe[2];
-*/
-
-//void prepare_stdio(void) {
-//    long flags = fcntl(stdio_pipe[0], F_GETFL);
-//    flags |= O_NONBLOCK;
-//    fcntl(stdio_pipe[0], F_SETFL, flags);
-//};
-
-//prepare_stdio(); 
-
-//    enum { STATE_WAITING, STATE_LOADING, STATE_FINISHED } state = STATE_WAITING;
-
-// C11: Sets the first n bytes starting at dest to the specified value, but maximal dmax bytes.
-//#define EX_MEMSET(void *dest, rsize_t dmax, int value, rsize_t n)   memset_s(void *dest, rsize_t dmax, int value, rsize_t n)
-
-// C11: This function copies at most smax bytes from src to dest, up to dmax.
-//#define EX_MEMCPY(void *restrict dest, rsize_t dmax, const void *restrict src, rsize_t smax) memcpy_s(void *restrict dest, rsize_t dmax, const void *restrict src, rsize_t smax)
-
-#ifdef __cplusplus // Calling C code from C++
-extern "C" { 
-#endif
-
-/* --- PRINTF_BYTE_TO_BINARY macro's --- */
-#define PRINTF_BINARY_PATTERN_INT8 "%c%c%c%c%c%c%c%c"
-#define PRINTF_BYTE_TO_BINARY_INT8(i)    \
-    (((i) & 0x80ll) ? '1' : '0'), (((i) & 0x40ll) ? '1' : '0'), (((i) & 0x20ll) ? '1' : '0'), (((i) & 0x10ll) ? '1' : '0'), \
-    (((i) & 0x08ll) ? '1' : '0'), (((i) & 0x04ll) ? '1' : '0'), (((i) & 0x02ll) ? '1' : '0'), (((i) & 0x01ll) ? '1' : '0')
-
-#define PRINTF_BINARY_PATTERN_INT16    PRINTF_BINARY_PATTERN_INT8              PRINTF_BINARY_PATTERN_INT8
-#define PRINTF_BYTE_TO_BINARY_INT16(i) PRINTF_BYTE_TO_BINARY_INT8((i) >> 8),   PRINTF_BYTE_TO_BINARY_INT8(i)
-#define PRINTF_BINARY_PATTERN_INT32    PRINTF_BINARY_PATTERN_INT16             PRINTF_BINARY_PATTERN_INT16
-#define PRINTF_BYTE_TO_BINARY_INT32(i) PRINTF_BYTE_TO_BINARY_INT16((i) >> 16), PRINTF_BYTE_TO_BINARY_INT16(i)
-#define PRINTF_BINARY_PATTERN_INT64    PRINTF_BINARY_PATTERN_INT32             PRINTF_BINARY_PATTERN_INT32
-#define PRINTF_BYTE_TO_BINARY_INT64(i) PRINTF_BYTE_TO_BINARY_INT32((i) >> 32), PRINTF_BYTE_TO_BINARY_INT32(i)
-// EXAMPLE USE CASE:     printf("mystate = "PRINTF_BINARY_PATTERN_INT32"\n", PRINTF_BYTE_TO_BINARY_INT32(mystate));
-/* --- end macros --- */
-
-//* Bound reader macros.
-//* If we attempt to read the buffer out-of-bounds, pretend that the buffer is infinitely padded with zeroes.
-#define READ_U8(offset) (((offset) < griddata_length) ? (*(uint8_t*)(griddata + (offset))) : 0)
-#define READ_U16(offset) ((uint16_t)READ_U8(offset) | ((uint16_t)READ_U8((offset) + 1) << 8))
-#define READ_U32(offset) ((uint32_t)READ_U16(offset) | ((uint32_t)READ_U16((offset) + 2) << 16))
-#define READ_MEMCPY(ptr, offset, length) memcpy_pad(ptr, length, griddata, griddata_length, offset)
-#define sizeof_member(type, member) sizeof(((type *)0)->member)
-#define sizeof_member_dim(type, member) sizeof(((type*)0)->member) / sizeof(((type*)0)->member[0])
-
-static void memcpy_pad(void *dst, size_t dst_len, const void *src, size_t src_len, size_t offset) {
-    uint8_t *dst_c = dst;
-    const uint8_t *src_c = src;
-
-    /* how many bytes can be copied without overrunning `src` */
-    size_t copy_bytes = (src_len >= offset) ? (src_len - offset) : 0;
-    copy_bytes = copy_bytes > dst_len ? dst_len : copy_bytes;
-
-    memcpy(dst_c, src_c + offset, copy_bytes);
-    /* padded bytes */
-    memset(dst_c + copy_bytes, 0, dst_len - copy_bytes);
-}
-
-
-uint8_t fifo_data[256];
-uint32_t fifo_entries;
-uint32_t fifo_lock;
-
-void fifo_putc(uint8_t data) {
-	while(fifo_lock);
-	fifo_lock = 1;
-	while(fifo_entries >= (sizeof(fifo_data)));
-	fifo_entries++;
-	fifo_data[fifo_entries-1] = data;
-	fifo_lock = 0;
-}
-
-uint8_t fifo_getc() {
-	uint8_t ret;
-	uint32_t i;
-	if (fifo_entries == 0) return 0;
-	while(fifo_lock);
-	fifo_lock = 1;
-	ret = fifo_data[0];
-	for(i = 0; i < fifo_entries; i++) {
-		fifo_data[i] = fifo_data[i+1];
-	}
-	fifo_entries--;
-	fifo_lock = 0;
-	return ret;
-}
-
-/* EXAMPLE USE
-	fifo_entries = 0, fifo_lock = 0;
-	fifo_putc('A');	fifo_putc('B');	fifo_putc('C');	fifo_putc('D');	fifo_putc('E');	fifo_putc('\0');
-	printf("'%s'\n", fifo_data);	printf("'%c'\n",
-    fifo_getc());	printf("'%s'\n", fifo_data);	fifo_entries--;
-	fifo_putc('f');	fifo_putc('\0');
-	printf("'%s'\n", fifo_data);    
-*/
-
-#define BITS_ON(a,b)  (a |= (b))
-#define BITS_OFF(a,b) (a &= ~(b))
-#define INIT(a, b)    (a = (b))
-
-#define max(a, b) ((a) > (b) ? (a) : (b))
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#define is_digit(c) ('0' <= (c) && (c) <= '9')
-
-static inline float Rand(float a) {
-	return (float)rand()/(float)(RAND_MAX/a);
-}
-//#define PI         3.14159265358979323846f // raymath.h
-#define HALF_PI    1.57079632679489661923f
-#define QUARTER_PI 0.78539816339744830961f
-#define DIVIDEH_PI 0.159154943091895335768f
-
-static inline float fast_sin(double x) {
-    x *= DIVIDEH_PI;
-    x -= (int) x;
-    if (x <= 0.5) {
-        double t = 2 * x * (2 * x - 1);
-        return (PI * t) / ((PI - 4) * t - 1);
-    } else {
-        double t = 2 * (1 - x) * (1 - 2 * x);
-        return -(PI * t) / ((PI - 4) * t - 1);
-    }
-}
-
-static inline float fast_cos(double x) {
-    return fast_sin(x + HALF_PI);
-}
-
-static inline double dfast_sin(double x) {
-    x *= DIVIDEH_PI;
-    x -= (int) x;
-    if (x <= 0.5) {
-        double t = 2 * x * (2 * x - 1);
-        return (PI * t) / ((PI - 4) * t - 1);
-    } else {
-        double t = 2 * (1 - x) * (1 - 2 * x);
-        return -(PI * t) / ((PI - 4) * t - 1);
-    }
-}
-
-static inline double dfast_cos(double x) {
-    return fast_sin(x + HALF_PI);
-}
-
-// use type punning instead of pointer arithmatics, to require proper alignment
-static inline float absf(float f) {
-  // optimizer will optimize away the `if` statement and the library call
-  if (sizeof(float) == sizeof(uint32_t)) {
-    union {
-      float f;
-      uint32_t i;
-    } u;
-    u.f = f;
-    u.i &= 0x7fffffff;
-    return u.f;
-  }
-  return fabsf(f);
-}
-
-static long gcdl(long a, long b)
-{
-    if (a == 0)
-        return b;
-    else if (b == 0)
-        return a;
-
-    if (a < b)
-        return gcd_l(a, b % a);
-    else
-        return gcd_l(b, a % b);
-}
-
-static int gcdi(int a, int b) {
-    int res = a%b;
-    while (res > 0) {
-        a = b;
-        b = res;
-        res = a % b;
-    }
-    return b;
-}
-
-void DrawTextImage(Texture texture, char* txt, Vector2 position) {
-	DrawTexturePro(texture,
-    (Rectangle) { (txt[0] - 32) * 24, 0, 24, 24 } ,
-    (Rectangle) { position.x , position.y, 64, 64 },
-    (Vector2) {0},0,WHITE);
-}
-
-
-// draw Textured Quad
-void DrawQuadSprite ( Texture texture , Vector2 position, Vector2 scale, Color color) {
-	DrawTexturePro ( texture ,
-    (Rectangle) { 0, 0, texture.width * scale.x, texture.height * scale.y },
-    (Rectangle) { position.x, position.y, texture.width * scale.x, texture.height * scale.y },
-    (Vector2) { 0,0 } , 0 , color );
-}
-
-// Draw a color-filled rectangle with pro parameters
-void DrawRectangleProSK(Rectangle rec, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
-    rlCheckRenderBatchLimit(4);
-
-    const static inline Texture   texShapes = { 1, 1, 1, 1, 7 };
-    const static inline Rectangle texShapesRec = { 0, 0, 1, 1 };
-
-    Vector2 topLeft = { 0 }, topRight = { 0 }, bottomLeft = { 0 }, bottomRight = { 0 };
-
-    if (rotation == 0.0f) {
-        float x = rec.x - origin.x;
-        float y = rec.y - origin.y;
-        topLeft = (Vector2){ x, y };
-        topRight = (Vector2){ x + rec.width, y };
-        bottomLeft = (Vector2){ x, y + rec.height };
-        bottomRight = (Vector2){ x + rec.width, y + rec.height };
-    } else {
-        float sinRotation = sinf(rotation*DEG2RAD);
-        float cosRotation = cosf(rotation*DEG2RAD);
-        float x = rec.x;
-        float y = rec.y;
-        float dx = -origin.x;
-        float dy = -origin.y;
-        topLeft.x = x + dx*cosRotation - dy*sinRotation;
-        topLeft.y = y + dx*sinRotation + dy*cosRotation;
-        topRight.x = x + (dx + rec.width)*cosRotation - dy*sinRotation;
-        topRight.y = y + (dx + rec.width)*sinRotation + dy*cosRotation;
-        bottomLeft.x = x + dx*cosRotation - (dy + rec.height)*sinRotation;
-        bottomLeft.y = y + dx*sinRotation + (dy + rec.height)*cosRotation;
-        bottomRight.x = x + (dx + rec.width)*cosRotation - (dy + rec.height)*sinRotation;
-        bottomRight.y = y + (dx + rec.width)*sinRotation + (dy + rec.height)*cosRotation;
-    }
-
-    rlSetTexture(texShapes.id);
-    rlBegin(RL_QUADS);
-        rlNormal3f(0.0f, 0.0f, 1.0f);
-         // Bottom-left corner for texture and quad
-        rlColor4ub(color[0].r, color[0].g, color[0].b, color[0].a);
-        rlTexCoord2f(texShapesRec.x/texShapes.width, texShapesRec.y/texShapes.height);
-        rlVertex2f(topLeft.x + skew.x, topLeft.y);
-        // Bottom-right corner for texture and quad
-        rlColor4ub(color[1].r, color[1].g, color[1].b, color[1].a);
-        rlTexCoord2f(texShapesRec.x/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
-        rlVertex2f(bottomLeft.x, bottomLeft.y);
-        // Top-right corner for texture and quad
-        rlColor4ub(color[2].r, color[2].g, color[2].b, color[2].a);
-        rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, (texShapesRec.y + texShapesRec.height)/texShapes.height);
-        rlVertex2f(bottomRight.x, bottomRight.y + skew.y);
-        // Top-left corner for texture and quad
-        rlColor4ub(color[3].r, color[3].g, color[3].b, color[3].a);
-        rlTexCoord2f((texShapesRec.x + texShapesRec.width)/texShapes.width, texShapesRec.y/texShapes.height);
-        rlVertex2f(topRight.x + skew.x, topRight.y + skew.y);
-    rlEnd();
-}
-
-// Draw a part of a texture (defined by a rectangle) with 'pro' parameters
-// NOTE: origin is relative to destination rectangle size
-void DrawTextureProSK (Texture texture, Rectangle source, Rectangle dest, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
-    if (texture.id > 0) {
-        float width = (float)texture.width;
-        float height = (float)texture.height;
-        bool flipX = false;
-        if (source.width < 0) { flipX = true; source.width *= -1; }
-        if (source.height < 0) source.y -= source.height;
-        Vector2 topLeft = { 0 };        Vector2 topRight = { 0 };        Vector2 bottomLeft = { 0 };        Vector2 bottomRight = { 0 };
-
-        if (rotation == 0.0f) { // do not calculate rotation
-            float x = dest.x - origin.x;
-            float y = dest.y - origin.y;
-            topLeft = (Vector2){ x, y };
-            topRight = (Vector2){ x + dest.width, y };
-            bottomLeft = (Vector2){ x, y + dest.height };
-            bottomRight = (Vector2){ x + dest.width, y + dest.height };
-        } else {  // calculate rotation
-            float sinRotation = sinf(rotation*DEG2RAD);
-            float cosRotation = cosf(rotation*DEG2RAD);
-            float x = dest.x;
-            float y = dest.y;
-            float dx = -origin.x;
-            float dy = -origin.y;
-            topLeft.x = x + dx*cosRotation - dy*sinRotation;
-            topLeft.y = y + dx*sinRotation + dy*cosRotation;
-            topRight.x = x + (dx + dest.width)*cosRotation - dy*sinRotation;
-            topRight.y = y + (dx + dest.width)*sinRotation + dy*cosRotation;
-            bottomLeft.x = x + dx*cosRotation - (dy + dest.height)*sinRotation;
-            bottomLeft.y = y + dx*sinRotation + (dy + dest.height)*cosRotation;
-            bottomRight.x = x + (dx + dest.width)*cosRotation - (dy + dest.height)*sinRotation;
-            bottomRight.y = y + (dx + dest.width)*sinRotation + (dy + dest.height)*cosRotation;
-        }
-
-        rlCheckRenderBatchLimit(4);     // Make sure there is enough free space on the batch buffer
-        rlSetTexture(texture.id);
-        rlBegin(RL_QUADS);
-            rlNormal3f(0.0f, 0.0f, 1.0f);                          // Normal vector pointing towards viewer
-            // Bottom-left corner for texture and quad
-            rlColor4ub(color[0].r, color[0].g, color[0].b, color[0].a);
-            if (flipX) rlTexCoord2f((source.x + source.width)/width, source.y/height); else rlTexCoord2f(source.x/width, source.y/height);
-            rlVertex2f(topLeft.x + skew.x, topLeft.y);
-            // Bottom-right corner for texture and quad
-            rlColor4ub(color[1].r, color[1].g, color[1].b, color[1].a);
-            if (flipX) rlTexCoord2f((source.x + source.width)/width, (source.y + source.height)/height); else rlTexCoord2f(source.x/width, (source.y + source.height)/height);
-            rlVertex2f(bottomLeft.x, bottomLeft.y);
-            // Top-right corner for texture and quad
-            rlColor4ub(color[2].r, color[2].g, color[2].b, color[2].a);
-            if (flipX) rlTexCoord2f(source.x/width, (source.y + source.height)/height); else rlTexCoord2f((source.x + source.width)/width, (source.y + source.height)/height);
-            rlVertex2f(bottomRight.x, bottomRight.y + skew.y);
-            // Top-left corner for texture and quad
-            rlColor4ub(color[3].r, color[3].g, color[3].b, color[3].a);
-            if (flipX) rlTexCoord2f(source.x/width, source.y/height); else rlTexCoord2f((source.x + source.width)/width, (source.y)/height);
-            rlVertex2f(topRight.x + skew.x, topRight.y + skew.y);
-        rlEnd();
-    }
-}
-
-//	Phase Shift 26.2 (These table values were sourced from the MAME project's TIA emulation for the palette management)
-	/*static constexpr float color[16][2] =	{
-		{  0.000,  0.000 }, {  0.192, -0.127 },	{  0.241, -0.048 },	{  0.240,  0.040 },	{  0.191,  0.121 },	{  0.103,  0.175 },	{ -0.008,  0.196 },	{ -0.116,  0.174 },
-        { -0.199,  0.118 },	{ -0.243,  0.037 },	{ -0.237, -0.052 },	{ -0.180, -0.129 },	{ -0.087, -0.181 },	{  0.021, -0.196 },	{  0.130, -0.169 },	{  0.210, -0.107 }
-	};*/
-// YIQ formula for Atari 8bit GTIA colors (0-255) index
-// https://atariage.com/forums/topic/107853-need-the-256-colors/page/2/#comments
-// The following routine is currently dead code as I personally do not like the resulting colors...  Something is wrong in the translation from YIQ
-Color gtia_ntsc_to_rgb(int val) {
-    int chroma = (val >> 4) & 15;
-    int luminence = val & 15;
-    int crlv = chroma ? 50 : 0;
- 
-    float phase = ((chroma - 1.) * 25. - 58.) * (2. * PI / 360.);
-
-    float y = 255 * (luminence + 1.) / 16.;
-    float i = crlv * cos(phase);
-    float q = crlv * sin(phase);
-
-    float r = y + 0.9563 * i + 0.621 * q;
-    float g = y - 0.2721 * i - 0.6474 * q;
-    float b = y - 1.107 * i + 1.7046 * q;
-
-	if (r < 0) r = 0;
-	if (g < 0) g = 0;
-	if (b < 0) b = 0;
-
-    r = pow(r, 0.9);
-    g = pow(g, 0.9);
-	b = pow(b, 0.9);
-
-	//if (r > 1) r = 1;
-	//if (g > 1) g = 1;
-	//if (b > 1) b = 1;
-
-    Color col={r + 0.5, g + 0.5, b + 0.5, 255};
-    return col;
-}
-
+void add_service(unsigned int state)        {BITS_ON(sys.program.ctrlstate, state);}
+void remove_service(unsigned int state)     {BITS_OFF(sys.program.ctrlstate, state);}
+bool service_active(unsigned int state)     {return BITS_TEST(sys.program.ctrlstate, state);}
 
 Color get_palette_color(int palette_id, unsigned short id) {
     Color *color = sys.asset.palette[palette_id];
@@ -707,17 +757,6 @@ Color get_palette_color(int palette_id, unsigned short id) {
 Color get_palette_color_pro(int palette_id, unsigned short id, float alpha) {
     Color *color = sys.asset.palette[palette_id];
     return (Color){color[id].r, color[id].g, color[id].b, alpha};
-}
-
-Color get_pixel_color(Image *image, Vector2 position) {
-    unsigned int offset = (position.y * image->width + position.x) * 4;
-    Color *data = &image->data;
-    return data[offset];
-//    unsigned char r = data[offset];
-//    unsigned char g = data[offset + 1];
-//    unsigned char b = data[offset + 2];
-//    unsigned char a = data[offset + 3];
-//    return (Color){r, g, b, a};
 }
 
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
@@ -1118,29 +1157,29 @@ void plot_big_characters(int page_id, int layer_id, Vector2 target, unsigned int
 }
 
 typedef enum {
-    GRIDFIELD_RESERVED             = 0b10000000000000000000000000000000,
-    GRIDFIELD_STATE                = 0b01000000000000000000000000000000,   // all flags for cell
-    GRIDFIELD_VALUE                = 0b00010000000000000000000000000000,   // value of cell
-    GRIDFIELD_LINES                = 0b00000010000000000000000000000000,   // lines feature
-    GRIDFIELD_CYCLE                = 0b00000000000010000000000000000000,   // cell animation sequence number
-    GRIDFIELD_FG_COLOR             = 0b00000000000000100000000000000000,   // palette index color for cell
-    GRIDFIELD_FG_COLOR_CYCLE       = 0b00000000000000010000000000000000,   // color cycle index
-    GRIDFIELD_BG_COLOR             = 0b00000000000000001000000000000000,   // palette index color for cell background
-    GRIDFIELD_BG_COLOR_CYCLE       = 0b00000000000000000100000000000000,   // color cycle index
-    GRIDFIELD_LINES_COLOR          = 0b00000000000000000010000000000000,   // palette index color for cell background
-    GRIDFIELD_LINES_COLOR_CYCLE    = 0b00000000000000000001000000000000,   // color cycle index
-    GRIDFIELD_OFFSET               = 0b00000000000000000000100000000000,   // displacement from top left (x,y)
-    GRIDFIELD_SKEW                 = 0b00000000000000000000010000000000,   // horizontal and vertical skew
-    GRIDFIELD_SCALE                = 0b00000000000000000000001000000000,   // (x,y) cell scale
-    GRIDFIELD_SCALE_SPEED          = 0b00000000000000000000000100000000,   // (x,y) cell scale speed
-    GRIDFIELD_SCROLL_SPEED         = 0b00000000000000000000000010000000,   // (x,y) cell scroll speed
-    GRIDFIELD_ANGLE                = 0b00000000000000000000000001000000,   // degree of angle used to rotate the cell
-    GRIDFIELD_FG_BRIGHTNESS        = 0b00000000000000000000000000100000,   // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
-    GRIDFIELD_BG_BRIGHTNESS        = 0b00000000000000000000000000010000,   // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    GRIDFIELD_COLOR_MASK           = 0b00000000000000000000000000001000,   // RGBA color mask of cell
-    GRIDFIELD_SHADOW_MASK          = 0b00000000000000000000000000000100,   // shadow RGBA mask
-    GRIDFIELD_ALL                  = 0b01111111111111111111111111111111,   // all fields
-    GRIDFIELD_ALL_BUT_STATE        = 0b00111111111111111111111111111111    // all fields except the state of the cell
+    GFLD_RESERVED             = 0b10000000000000000000000000000000,
+    GFLD_STATE                = 0b01000000000000000000000000000000,   // all flags for cell
+    GFLD_VALUE                = 0b00010000000000000000000000000000,   // value of cell
+    GFLD_LINES                = 0b00000010000000000000000000000000,   // lines feature
+    GFLD_CYCLE                = 0b00000000000010000000000000000000,   // cell animation sequence number
+    GFLD_FG_COLOR             = 0b00000000000000100000000000000000,   // palette index color for cell
+    GFLD_FG_COLOR_CYCLE       = 0b00000000000000010000000000000000,   // color cycle index
+    GFLD_BG_COLOR             = 0b00000000000000001000000000000000,   // palette index color for cell background
+    GFLD_BG_COLOR_CYCLE       = 0b00000000000000000100000000000000,   // color cycle index
+    GFLD_LINES_COLOR          = 0b00000000000000000010000000000000,   // palette index color for cell background
+    GFLD_LINES_COLOR_CYCLE    = 0b00000000000000000001000000000000,   // color cycle index
+    GFLD_OFFSET               = 0b00000000000000000000100000000000,   // displacement from top left (x,y)
+    GFLD_SKEW                 = 0b00000000000000000000010000000000,   // horizontal and vertical skew
+    GFLD_SCALE                = 0b00000000000000000000001000000000,   // (x,y) cell scale
+    GFLD_SCALE_SPEED          = 0b00000000000000000000000100000000,   // (x,y) cell scale speed
+    GFLD_SCROLL_SPEED         = 0b00000000000000000000000010000000,   // (x,y) cell scroll speed
+    GFLD_ANGLE                = 0b00000000000000000000000001000000,   // degree of angle used to rotate the cell
+    GFLD_FG_BRIGHTNESS        = 0b00000000000000000000000000100000,   // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+    GFLD_BG_BRIGHTNESS        = 0b00000000000000000000000000010000,   // background brightness (values 0...1 divides, values 1 to 255 multiply)
+    GFLD_COLOR_MASK           = 0b00000000000000000000000000001000,   // RGBA color mask of cell
+    GFLD_SHADOW_MASK          = 0b00000000000000000000000000000100,   // shadow RGBA mask
+    GFLD_ALL                  = 0b01111111111111111111111111111111,   // all fields
+    GFLD_ALL_BUT_STATE        = 0b00111111111111111111111111111111    // all fields except the state of the cell
 } gridfield_features;
 
 void init_cell (int page_id, int layer_id, Rectangle target, EX_cell info_cell, unsigned int state) {
@@ -1156,28 +1195,28 @@ void init_cell (int page_id, int layer_id, Rectangle target, EX_cell info_cell, 
             for (int y = target.y; y++; y < (target.y + target.height)) {
                 if (y >= 0 && y < lsy) {
                     target_offset = lsx * y + x;
-                    if (state & GRIDFIELD_ALL)                   target_cell[target_offset]                       = info_cell;
+                    if (state & GFLD_ALL)                   target_cell[target_offset]                       = info_cell;
                     else {
-                        if (state & GRIDFIELD_STATE)             target_cell[target_offset].state                 = info_cell.state;
-                        if (state & GRIDFIELD_VALUE)             target_cell[target_offset].value                 = info_cell.value;
-                        if (state & GRIDFIELD_LINES)             target_cell[target_offset].lines                 = info_cell.lines;
-                        if (state & GRIDFIELD_CYCLE)             target_cell[target_offset].cycle_id              = info_cell.cycle_id;
-                        if (state & GRIDFIELD_FG_COLOR)          target_cell[target_offset].fg_color_id           = info_cell.fg_color_id;
-                        if (state & GRIDFIELD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = info_cell.fg_color_cycle_id;
-                        if (state & GRIDFIELD_BG_COLOR)          target_cell[target_offset].bg_color_id           = info_cell.bg_color_id;
-                        if (state & GRIDFIELD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = info_cell.bg_color_cycle_id;
-                        if (state & GRIDFIELD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = info_cell.lines_color_id;
-                        if (state & GRIDFIELD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = info_cell.lines_color_cycle_id;
-                        if (state & GRIDFIELD_OFFSET)            target_cell[target_offset].offset                = info_cell.offset;
-                        if (state & GRIDFIELD_SKEW)              target_cell[target_offset].skew                  = info_cell.skew;
-                        if (state & GRIDFIELD_SCALE)             target_cell[target_offset].scale                 = info_cell.scale;
-                        if (state & GRIDFIELD_SCALE_SPEED)       target_cell[target_offset].scale_speed           = info_cell.scale_speed;
-                        if (state & GRIDFIELD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed          = info_cell.scroll_speed;
-                        if (state & GRIDFIELD_ANGLE)             target_cell[target_offset].angle                 = info_cell.angle;
-                        if (state & GRIDFIELD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness         = info_cell.fg_brightness;
-                        if (state & GRIDFIELD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness         = info_cell.bg_brightness;
-                        if (state & GRIDFIELD_COLOR_MASK)        target_cell[target_offset].color_mask            = info_cell.color_mask;
-                        if (state & GRIDFIELD_SHADOW_MASK)       target_cell[target_offset].shadow_mask           = info_cell.shadow_mask;
+                        if (state & GFLD_STATE)             target_cell[target_offset].state                 = info_cell.state;
+                        if (state & GFLD_VALUE)             target_cell[target_offset].value                 = info_cell.value;
+                        if (state & GFLD_LINES)             target_cell[target_offset].lines                 = info_cell.lines;
+                        if (state & GFLD_CYCLE)             target_cell[target_offset].cycle_id              = info_cell.cycle_id;
+                        if (state & GFLD_FG_COLOR)          target_cell[target_offset].fg_color_id           = info_cell.fg_color_id;
+                        if (state & GFLD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = info_cell.fg_color_cycle_id;
+                        if (state & GFLD_BG_COLOR)          target_cell[target_offset].bg_color_id           = info_cell.bg_color_id;
+                        if (state & GFLD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = info_cell.bg_color_cycle_id;
+                        if (state & GFLD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = info_cell.lines_color_id;
+                        if (state & GFLD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = info_cell.lines_color_cycle_id;
+                        if (state & GFLD_OFFSET)            target_cell[target_offset].offset                = info_cell.offset;
+                        if (state & GFLD_SKEW)              target_cell[target_offset].skew                  = info_cell.skew;
+                        if (state & GFLD_SCALE)             target_cell[target_offset].scale                 = info_cell.scale;
+                        if (state & GFLD_SCALE_SPEED)       target_cell[target_offset].scale_speed           = info_cell.scale_speed;
+                        if (state & GFLD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed          = info_cell.scroll_speed;
+                        if (state & GFLD_ANGLE)             target_cell[target_offset].angle                 = info_cell.angle;
+                        if (state & GFLD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness         = info_cell.fg_brightness;
+                        if (state & GFLD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness         = info_cell.bg_brightness;
+                        if (state & GFLD_COLOR_MASK)        target_cell[target_offset].color_mask            = info_cell.color_mask;
+                        if (state & GFLD_SHADOW_MASK)       target_cell[target_offset].shadow_mask           = info_cell.shadow_mask;
                     }
                 }
             }
@@ -1228,28 +1267,28 @@ void copy_cell_in_layer(int page_id, int layer_id, Rectangle source, Vector2 tar
                 if (x >= 0 && ((x + tx) < lsx) && (x + tx) >= 0) {
                     source_offset = lsx * y + x;
                     target_offset = lsx * (y + ty) + (x + tx);
-                    if (state & GRIDFIELD_ALL)                   cell[target_offset]                       = cell[source_offset];
+                    if (state & GFLD_ALL)                   cell[target_offset]                       = cell[source_offset];
                     else {
-                        if (state & GRIDFIELD_STATE)             cell[target_offset].state                 = cell[source_offset].state;
-                        if (state & GRIDFIELD_VALUE)             cell[target_offset].value                 = cell[source_offset].value;
-                        if (state & GRIDFIELD_LINES)             cell[target_offset].lines                 = cell[source_offset].lines;
-                        if (state & GRIDFIELD_CYCLE)             cell[target_offset].cycle_id              = cell[source_offset].cycle_id;
-                        if (state & GRIDFIELD_FG_COLOR)          cell[target_offset].fg_color_id           = cell[source_offset].fg_color_id;
-                        if (state & GRIDFIELD_FG_COLOR_CYCLE)    cell[target_offset].fg_color_cycle_id     = cell[source_offset].fg_color_cycle_id;
-                        if (state & GRIDFIELD_BG_COLOR)          cell[target_offset].bg_color_id           = cell[source_offset].bg_color_id;
-                        if (state & GRIDFIELD_BG_COLOR_CYCLE)    cell[target_offset].bg_color_cycle_id     = cell[source_offset].bg_color_cycle_id;
-                        if (state & GRIDFIELD_LINES_COLOR)       cell[target_offset].lines_color_id        = cell[source_offset].lines_color_id;
-                        if (state & GRIDFIELD_LINES_COLOR_CYCLE) cell[target_offset].lines_color_cycle_id  = cell[source_offset].lines_color_cycle_id;
-                        if (state & GRIDFIELD_OFFSET)            cell[target_offset].offset                = cell[source_offset].offset;
-                        if (state & GRIDFIELD_SKEW)              cell[target_offset].skew                  = cell[source_offset].skew;
-                        if (state & GRIDFIELD_SCALE)             cell[target_offset].scale                 = cell[source_offset].scale;
-                        if (state & GRIDFIELD_SCALE_SPEED)       cell[target_offset].scale_speed           = cell[source_offset].scale_speed;
-                        if (state & GRIDFIELD_SCROLL_SPEED)      cell[target_offset].scroll_speed          = cell[source_offset].scroll_speed;
-                        if (state & GRIDFIELD_ANGLE)             cell[target_offset].angle                 = cell[source_offset].angle;
-                        if (state & GRIDFIELD_FG_BRIGHTNESS)     cell[target_offset].fg_brightness         = cell[source_offset].fg_brightness;
-                        if (state & GRIDFIELD_BG_BRIGHTNESS)     cell[target_offset].bg_brightness         = cell[source_offset].bg_brightness;
-                        if (state & GRIDFIELD_COLOR_MASK)        cell[target_offset].color_mask            = cell[source_offset].color_mask;
-                        if (state & GRIDFIELD_SHADOW_MASK)       cell[target_offset].shadow_mask           = cell[source_offset].shadow_mask;
+                        if (state & GFLD_STATE)             cell[target_offset].state                 = cell[source_offset].state;
+                        if (state & GFLD_VALUE)             cell[target_offset].value                 = cell[source_offset].value;
+                        if (state & GFLD_LINES)             cell[target_offset].lines                 = cell[source_offset].lines;
+                        if (state & GFLD_CYCLE)             cell[target_offset].cycle_id              = cell[source_offset].cycle_id;
+                        if (state & GFLD_FG_COLOR)          cell[target_offset].fg_color_id           = cell[source_offset].fg_color_id;
+                        if (state & GFLD_FG_COLOR_CYCLE)    cell[target_offset].fg_color_cycle_id     = cell[source_offset].fg_color_cycle_id;
+                        if (state & GFLD_BG_COLOR)          cell[target_offset].bg_color_id           = cell[source_offset].bg_color_id;
+                        if (state & GFLD_BG_COLOR_CYCLE)    cell[target_offset].bg_color_cycle_id     = cell[source_offset].bg_color_cycle_id;
+                        if (state & GFLD_LINES_COLOR)       cell[target_offset].lines_color_id        = cell[source_offset].lines_color_id;
+                        if (state & GFLD_LINES_COLOR_CYCLE) cell[target_offset].lines_color_cycle_id  = cell[source_offset].lines_color_cycle_id;
+                        if (state & GFLD_OFFSET)            cell[target_offset].offset                = cell[source_offset].offset;
+                        if (state & GFLD_SKEW)              cell[target_offset].skew                  = cell[source_offset].skew;
+                        if (state & GFLD_SCALE)             cell[target_offset].scale                 = cell[source_offset].scale;
+                        if (state & GFLD_SCALE_SPEED)       cell[target_offset].scale_speed           = cell[source_offset].scale_speed;
+                        if (state & GFLD_SCROLL_SPEED)      cell[target_offset].scroll_speed          = cell[source_offset].scroll_speed;
+                        if (state & GFLD_ANGLE)             cell[target_offset].angle                 = cell[source_offset].angle;
+                        if (state & GFLD_FG_BRIGHTNESS)     cell[target_offset].fg_brightness         = cell[source_offset].fg_brightness;
+                        if (state & GFLD_BG_BRIGHTNESS)     cell[target_offset].bg_brightness         = cell[source_offset].bg_brightness;
+                        if (state & GFLD_COLOR_MASK)        cell[target_offset].color_mask            = cell[source_offset].color_mask;
+                        if (state & GFLD_SHADOW_MASK)       cell[target_offset].shadow_mask           = cell[source_offset].shadow_mask;
                     }
                 }
                 x += xi; if (xi == 1) {if (x >= xb) break;} else if (x < xb) break;
@@ -1283,28 +1322,28 @@ void copy_cell_to_layer(int source_page_id, int source_layer_id, Rectangle sourc
                 if ( (y + ty) < lsy && (y + ty) < lty && (y + ty) >= 0 ) {
                     source_offset = lsx * y + x;
                     target_offset = ltx * (y + ty) + (x + tx);
-                    if (state & GRIDFIELD_ALL)                   target_cell[target_offset]                       = source_cell[source_offset];
+                    if (state & GFLD_ALL)                   target_cell[target_offset]                       = source_cell[source_offset];
                     else {
-                        if (state & GRIDFIELD_STATE)             target_cell[target_offset].state                 = source_cell[source_offset].state;
-                        if (state & GRIDFIELD_VALUE)             target_cell[target_offset].value                 = source_cell[source_offset].value;
-                        if (state & GRIDFIELD_LINES)             target_cell[target_offset].lines                 = source_cell[source_offset].lines;
-                        if (state & GRIDFIELD_CYCLE)             target_cell[target_offset].cycle_id              = source_cell[source_offset].cycle_id;
-                        if (state & GRIDFIELD_FG_COLOR)          target_cell[target_offset].fg_color_id           = source_cell[source_offset].fg_color_id;
-                        if (state & GRIDFIELD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = source_cell[source_offset].fg_color_cycle_id;
-                        if (state & GRIDFIELD_BG_COLOR)          target_cell[target_offset].bg_color_id           = source_cell[source_offset].bg_color_id;
-                        if (state & GRIDFIELD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = source_cell[source_offset].bg_color_cycle_id;
-                        if (state & GRIDFIELD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = source_cell[source_offset].lines_color_id;
-                        if (state & GRIDFIELD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = source_cell[source_offset].lines_color_cycle_id;
-                        if (state & GRIDFIELD_OFFSET)            target_cell[target_offset].offset                = source_cell[source_offset].offset;
-                        if (state & GRIDFIELD_SKEW)              target_cell[target_offset].skew                  = source_cell[source_offset].skew;
-                        if (state & GRIDFIELD_SCALE)             target_cell[target_offset].scale                 = source_cell[source_offset].scale;
-                        if (state & GRIDFIELD_SCALE_SPEED)       target_cell[target_offset].scale_speed           = source_cell[source_offset].scale_speed;
-                        if (state & GRIDFIELD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed          = source_cell[source_offset].scroll_speed;
-                        if (state & GRIDFIELD_ANGLE)             target_cell[target_offset].angle                 = source_cell[source_offset].angle;
-                        if (state & GRIDFIELD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness         = source_cell[source_offset].fg_brightness;
-                        if (state & GRIDFIELD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness         = source_cell[source_offset].bg_brightness;
-                        if (state & GRIDFIELD_COLOR_MASK)        target_cell[target_offset].color_mask            = source_cell[source_offset].color_mask;
-                        if (state & GRIDFIELD_SHADOW_MASK)       target_cell[target_offset].shadow_mask           = source_cell[source_offset].shadow_mask;
+                        if (state & GFLD_STATE)             target_cell[target_offset].state                 = source_cell[source_offset].state;
+                        if (state & GFLD_VALUE)             target_cell[target_offset].value                 = source_cell[source_offset].value;
+                        if (state & GFLD_LINES)             target_cell[target_offset].lines                 = source_cell[source_offset].lines;
+                        if (state & GFLD_CYCLE)             target_cell[target_offset].cycle_id              = source_cell[source_offset].cycle_id;
+                        if (state & GFLD_FG_COLOR)          target_cell[target_offset].fg_color_id           = source_cell[source_offset].fg_color_id;
+                        if (state & GFLD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = source_cell[source_offset].fg_color_cycle_id;
+                        if (state & GFLD_BG_COLOR)          target_cell[target_offset].bg_color_id           = source_cell[source_offset].bg_color_id;
+                        if (state & GFLD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = source_cell[source_offset].bg_color_cycle_id;
+                        if (state & GFLD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = source_cell[source_offset].lines_color_id;
+                        if (state & GFLD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = source_cell[source_offset].lines_color_cycle_id;
+                        if (state & GFLD_OFFSET)            target_cell[target_offset].offset                = source_cell[source_offset].offset;
+                        if (state & GFLD_SKEW)              target_cell[target_offset].skew                  = source_cell[source_offset].skew;
+                        if (state & GFLD_SCALE)             target_cell[target_offset].scale                 = source_cell[source_offset].scale;
+                        if (state & GFLD_SCALE_SPEED)       target_cell[target_offset].scale_speed           = source_cell[source_offset].scale_speed;
+                        if (state & GFLD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed          = source_cell[source_offset].scroll_speed;
+                        if (state & GFLD_ANGLE)             target_cell[target_offset].angle                 = source_cell[source_offset].angle;
+                        if (state & GFLD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness         = source_cell[source_offset].fg_brightness;
+                        if (state & GFLD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness         = source_cell[source_offset].bg_brightness;
+                        if (state & GFLD_COLOR_MASK)        target_cell[target_offset].color_mask            = source_cell[source_offset].color_mask;
+                        if (state & GFLD_SHADOW_MASK)       target_cell[target_offset].shadow_mask           = source_cell[source_offset].shadow_mask;
                     }
                 }
             }
@@ -1488,7 +1527,7 @@ int load_asset (unsigned int assettype, const char* fileName, const char* fileTy
     debug_console_out("int load_asset");
     int id = sys.asset.total_assets;
 
-    INIT(sys.asset.state[id], ASSET_INITIALIZED | assettype);
+    BITS_INIT(sys.asset.state[id], ASSET_INITIALIZED | assettype);
 
     if (fileName > NULL) strcpy(sys.asset.name, fileName);
 
@@ -1675,7 +1714,7 @@ int load_tileset(Vector2 count, const char* fileName, const char* fileType, cons
 }
 
 static void unload_asset(unsigned int id) {
-    if (sys.asset.state[id] && ASSET_ACTIVE) {
+    if (BITS_TEST(sys.asset.state[id], ASSET_ACTIVE)) {
         sys.asset.state[id] |= ASSET_EXPIRED;
         int assettype = asset_type(sys.asset.asset_type[id]);
         switch (assettype) {
@@ -1810,7 +1849,7 @@ typedef enum {
 // no wav or mp3 support implemented yet (!)
 
 bool init_audio_properties(void) {
-    bool status;
+    bool status = 0;
     InitAudioDevice();
     sys.audio.total_tracks = 0;
     sys.audio.global_volume = 1.0f;
@@ -1824,7 +1863,7 @@ bool init_audio_properties(void) {
             sys.audio.track[id].order[j] = 0;
         }
     }
-    status = IsAudioDeviceReady();
+    if  (IsAudioDeviceReady()) return status; else return 1;
     return status;
 }
 
@@ -1961,8 +2000,8 @@ static Vector2 ratio_info(int x, int y) {
 }
 
 bool init_display_properties(bool hide_mouse) {
-    bool status;
-    INIT(sys.video.windowstate_normal, 0);
+    bool status = 0;
+    BITS_INIT(sys.video.windowstate_normal, 0);
     //sys.video.windowstate_normal = FLAG_WINDOW_UNDECORATED; // AVOID AT ALL COST (SCREEN TEARING when VSYNC)
     BITS_ON(sys.video.windowstate_normal, FLAG_FULLSCREEN_MODE);
     BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_ALWAYS_RUN);
@@ -1970,7 +2009,7 @@ bool init_display_properties(bool hide_mouse) {
     BITS_ON(sys.video.windowstate_normal, FLAG_MSAA_4X_HINT);
     BITS_ON(sys.video.windowstate_normal, FLAG_VSYNC_HINT);
 
-    INIT(sys.video.windowstate_paused, 0);
+    BITS_INIT(sys.video.windowstate_paused, 0);
     BITS_ON(sys.video.windowstate_paused, FLAG_FULLSCREEN_MODE);
     BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_UNFOCUSED);
     BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_MINIMIZED);
@@ -1984,9 +2023,7 @@ bool init_display_properties(bool hide_mouse) {
     sys.video.physical_res[sys.video.current_physical] = (Vector2) {GetMonitorWidth(sys.video.current_physical), GetMonitorHeight(sys.video.current_physical)};
     sys.video.refresh_rate[sys.video.current_physical] = GetMonitorRefreshRate(sys.video.current_physical);
 
-    status = IsWindowReady();
-
-    return status;
+    if (IsWindowReady()) return status; else return 1;
 }
 
 void update_display(void) {
@@ -1998,7 +2035,7 @@ void update_display(void) {
         };
         draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[display]]);
 
-        if (sys.program.state & PROGRAM_DEBUG) {
+        if (sys.program.ctrlstate & CTRL_DEBUG) {
             // if debug functionalities activated
             // DISPLAY MANAGE DEBUG INFORMATION
             update_debug(true);
@@ -2018,9 +2055,9 @@ void update_display(void) {
     sys.video.prev_time[display] = current_time;
 
    if (sys.video.window_focus) {        // ************** GO TO APP MODE
-        if (sys.program.state & PROGRAM_OFF_FOCUS) {
+        if (sys.program.ctrlstate & CTRL_OFF_FOCUS) {
             if (GetKeyPressed() != 0) {
-                BITS_OFF(sys.program.state, PROGRAM_OFF_FOCUS);
+                BITS_OFF(sys.program.ctrlstate, CTRL_OFF_FOCUS);
                 flip_frame_buffer(PRIMARYDISPLAY, true);
                 ClearWindowState(sys.video.windowstate_normal ^ sys.video.windowstate_paused);
                 SetWindowState(sys.video.windowstate_normal);
@@ -2029,8 +2066,8 @@ void update_display(void) {
         }
     } else {        // ************* GO TO PAUSE MODE
         //IsWindowMinimized()
-        if (!(sys.program.state & PROGRAM_OFF_FOCUS)) {
-            BITS_ON(sys.program.state, PROGRAM_OFF_FOCUS);
+        if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS)) {
+            BITS_ON(sys.program.ctrlstate, CTRL_OFF_FOCUS);
             flip_frame_buffer(UNFOCUSEDDISPLAY, true);
             ClearWindowState(sys.video.windowstate_paused ^ sys.video.windowstate_normal);
             SetWindowState(sys.video.windowstate_paused);
@@ -2641,30 +2678,30 @@ char *time_stamp(){
     return timestamp;
 }
 
-typedef struct Debug_info {
+typedef struct EX_debug {
     bool audio;
     bool video;
     bool game_data;
     bool controls;
     bool fps;
-    bool trace;
-} Debug_info;
+    //bool trace;
+} EX_debug;
 
-static Debug_info debug_status; // = Init_debug();
+static EX_debug debug; // = Init_debug();
 
-void set_debug_audio(bool s)    {debug_status.audio = s;}
-void set_debug_video(bool s)    {debug_status.video = s;}
-void set_debug_game_data(bool s){debug_status.game_data = s;}
-void set_debug_controls(bool s) {debug_status.controls = s;}
-void set_debug_fps(bool s)      {debug_status.fps = s;}
-void set_debug_trace(bool s)    {debug_status.trace = s;}
+void set_debug_audio(bool s)    {debug.audio = s;}
+void set_debug_video(bool s)    {debug.video = s;}
+void set_debug_game_data(bool s){debug.game_data = s;}
+void set_debug_controls(bool s) {debug.controls = s;}
+void set_debug_fps(bool s)      {debug.fps = s;}
+//void set_debug_trace(bool s)    {debug.trace = s;}
 
-void debug_audio_flip()         {debug_status.audio = !debug_status.audio;}
-void debug_video_flip()         {debug_status.video = !debug_status.video;}
-void debug_game_data_flip()     {debug_status.game_data = !debug_status.game_data;}
-void debug_controls_flip()      {debug_status.controls = !debug_status.controls;}
-void debug_fps_flip()           {debug_status.fps = !debug_status.fps;}
-void debug_trace_flip()         {debug_status.trace = !debug_status.trace;}
+void debug_audio_flip()         {debug.audio = !debug.audio;}
+void debug_video_flip()         {debug.video = !debug.video;}
+void debug_game_data_flip()     {debug.game_data = !debug.game_data;}
+void debug_controls_flip()      {debug.controls = !debug.controls;}
+void debug_fps_flip()           {debug.fps = !debug.fps;}
+//void debug_trace_flip()         {debug.trace = !debug.trace;}
 
 char *bit_status_text(bool s) {if (s) {return "ON";} else {return "OFF";}}
 
@@ -2714,7 +2751,7 @@ void update_debug(bool show_options) {
     int size = 80;
     int x = 0, y = 0;
 
-    if (debug_status.audio) {
+    if (debug.audio) {
         sys.video.next_physical_clear = true;
         if (IsKeyPressed(KEY_ZERO)) change_music_stream(0, 11, true);
         if (IsKeyPressed(KEY_ONE)) change_music_stream(0, 0, true);
@@ -2754,15 +2791,15 @@ void update_debug(bool show_options) {
         show_options = false;
 	}
 
-    if (debug_status.video) {
+    if (debug.video) {
         sys.video.next_physical_clear = true;
-        if (IsKeyPressed(KEY_F10)) debug_fps_flip(&debug_status);
+        if (IsKeyPressed(KEY_F10)) debug_fps_flip(&debug);
         if (IsKeyDown(KEY_F8))  display_all_res();
         //if (IsKeyPressed(KEY_F11)) FlipConfigFlags(FLAG_VSYNC_HINT);
         show_options = false;
     }
 
-    if (debug_status.game_data) {
+    if (debug.game_data) {
         sys.video.next_physical_clear = true;
         if (IsKeyPressed(KEY_KP_1)) {ex_canopy.adjustment.y -= 0.002;};
         if (IsKeyPressed(KEY_KP_2)) {ex_canopy.adjustment.y += 0.002;};
@@ -2789,13 +2826,13 @@ void update_debug(bool show_options) {
         show_options = false;
     }
 
-    if (debug_status.controls) {
+    if (debug.controls) {
         sys.video.next_physical_clear = true;
         display_keybed();
         show_options = false;
     }
 
-    if (debug_status.fps) {
+    if (debug.fps) {
         sys.video.next_physical_clear = true;
         DrawFPS(GetMonitorWidth(sys.video.current_physical) - 100, 10);
     }
@@ -2803,22 +2840,29 @@ void update_debug(bool show_options) {
     if (IsKeyDown(KEY_LEFT_CONTROL)) {
         x = (GetMonitorWidth(sys.video.current_physical) - 12 * size) * 0.5;
         y = (GetMonitorHeight(sys.video.current_physical) - 6 * size) * 0.5;
-        if (show_options || debug_status.audio)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.audio, x, y, size, "F1 -> AUDIO");};
-        if (show_options || debug_status.video)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.video, x, y, size, "F2 -> VIDEO");};
-        if (show_options || debug_status.game_data) { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.game_data, x, y, size, "F3 -> DATA");};
-        if (show_options || debug_status.controls)  { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.controls, x, y, size, "F4 -> CONTROLS");};
-        if (show_options || debug_status.trace)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug_status.trace, x, y, size, "F5 -> TRACE");};
+        if (show_options || debug.audio)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug.audio, x, y, size, "F1 -> AUDIO");};
+        if (show_options || debug.video)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug.video, x, y, size, "F2 -> VIDEO");};
+        if (show_options || debug.game_data) { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug.game_data, x, y, size, "F3 -> DATA");};
+        if (show_options || debug.controls)  { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug.controls, x, y, size, "F4 -> CONTROLS");};
+        if (permission_valid(PMSN_TRACE))     { sys.video.next_physical_clear = true; y += size; debug_display_option(!permission_valid(PMSN_TRACE), x, y, size, "F5 -> TRACE");};
         if (IsKeyPressed(KEY_F1)) debug_audio_flip();
         if (IsKeyPressed(KEY_F2)) debug_video_flip();
         if (IsKeyPressed(KEY_F3)) debug_game_data_flip();
         if (IsKeyPressed(KEY_F4)) debug_controls_flip();
-        if (IsKeyPressed(KEY_F5)) debug_trace_flip();
+        if (IsKeyPressed(KEY_F5)) flip_permission(PMSN_TRACE);
     }
 }
 
 
 void debug_console_out(const char* message) {
-    if (debug_status.trace) TRACELOG(LOG_INFO, "%s | %s >>>>>%s", SOFTWARE, time_stamp(), message);
+    if (BITS_TEST(sys.program.pmsnstate, PMSN_TRACE)) {
+        TRACELOG(LOG_INFO, "%s | %s | CTRL = %i PMSN = %i >>>>>%s",
+        SOFTWARE,
+        time_stamp(),
+        sys.program.ctrlstate,
+        sys.program.pmsnstate,
+        message);
+    }
 }
 
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
@@ -2832,6 +2876,7 @@ void debug_console_out(const char* message) {
 // TERMINALDISPLAY (ie. 4)
 
 bool init_terminal(asset_id) {
+    SetExitKey(false); // Disables the ESCAPE key from the RayLib core
     int display = sys.video.current_virtual;
     unsigned int page_state = 0;
     unsigned int layer_state = 0;
@@ -2969,21 +3014,18 @@ void game_off_focus_scene(void) {
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
 
 void commute_to(unsigned int state) {
-    BITS_OFF(sys.program.previous_state, PROGRAM_SWITCHBOARD);
-    BITS_ON(sys.program.previous_state, sys.program.state & PROGRAM_SWITCHBOARD);
-    BITS_OFF(sys.program.state, PROGRAM_SWITCHBOARD);
-    BITS_ON(sys.program.state, state);
+    BITS_OFF(sys.program.ctrlstate_prev, CTRL_SWITCHBOARD);
+    BITS_ON(sys.program.ctrlstate_prev, sys.program.ctrlstate & CTRL_SWITCHBOARD);
+    BITS_OFF(sys.program.ctrlstate, CTRL_SWITCHBOARD);
+    BITS_ON(sys.program.ctrlstate, state);
+
+    debug_console_out(control_state_literal(state));
 };
 
-void add_service(unsigned int state) {
-    BITS_ON(sys.program.state, state);
-}
-
-void remove_service(unsigned int state) {
-    BITS_OFF(sys.program.state, state);
-}
 
 int init_default_assets() {
+    bool status = 0;
+    
     sys.asset.total_assets = 0;
 
     int id; // when read, id returns -1 from total_assets
@@ -3003,6 +3045,8 @@ int init_default_assets() {
 	id = load_tileset((Vector2){64,1}, FONT_JJ_FILENAME, FONT_JJ_FILEEXT, FONT_JJ_DATA, FONT_JJ_FILESIZE, FONT_JJ_PAK, 32);
 	id = load_tileset((Vector2){96,1}, FONT_OSD_FILENAME, FONT_OSD_FILEEXT, FONT_OSD_DATA, FONT_OSD_FILESIZE, FONT_OSD_PAK, 32);
 	id = load_tileset((Vector2){16,16}, LINES_FILENAME, LINES_FILEEXT, LINES_DATA, LINES_FILESIZE, LINES_PAK, 0);
+    
+    return status;
 }
 
 // establish scripting mechanism.  A script is an asset.  Bootstrap is from a script asset(0) ("rom" program)
@@ -3010,148 +3054,148 @@ int init_default_assets() {
 //RLAPI void SetExitKey(false);
 
 int init_system(void) {
-    int status = false;
+    debug_console_out("//////// init_system");
 
-    bool display_status = init_display_properties(true);
-    add_service(PROGRAM_VIDEO_INITIALIZED);
-    bool assets_status = init_default_assets();
-    add_service(PROGRAM_ASSETS_INITIALIZED);
-    bool terminal_status = init_terminal(8);
-    add_service(PROGRAM_TERMINAL_INITIALIZED);
-    bool audio_status = init_audio_properties();
-    add_service(PROGRAM_AUDIO_INITIALIZED);
+    unsigned int status = 0;
+
+    bool display_status = init_display_properties(true);    if (!display_status) {add_service(CTRL_VIDEO_INITIALIZED); debug_console_out("----------> VIDEO_INITIALIZED");}
+    bool assets_status = init_default_assets();             if (!assets_status) {add_service(CTRL_ASSETS_INITIALIZED); debug_console_out("----------> ASSETS_INITIALIZED");}
+    bool terminal_status = init_terminal(8);                if (!terminal_status) {add_service(CTRL_TERMINAL_INITIALIZED); debug_console_out("----------> TERMINAL_INITIALIZED");}
+    bool audio_status = init_audio_properties();            if (!audio_status) {add_service(CTRL_AUDIO_INITIALIZED); debug_console_out("----------> AUDIO_INITIALIZED");}
 
     // TODO: init bootstrap script
+
+    status = display_status | (assets_status << 1) | (terminal_status << 2) | (audio_status << 3);
 
     return status;
 }
 
 static int update_system(void) {
-    int status = false;
+    int status = 0;
     
-    
-    if (sys.program.state &  PROGRAM_ASSETS_INITIALIZED) {
+    if (sys.program.ctrlstate & CTRL_ASSETS_INITIALIZED) {
         update_assets();
     }
-    if (sys.program.state &  PROGRAM_TERMINAL_INITIALIZED) {
+    if (sys.program.ctrlstate & CTRL_TERMINAL_INITIALIZED) {
         update_terminal();
-        if (sys.program.state & PROGRAM_SHOW_TERMINAL) {
+        if (sys.program.ctrlstate & CTRL_SHOW_TERMINAL) {
             show_terminal();
         }
     }
-    if (sys.program.state &  PROGRAM_VIDEO_INITIALIZED) {
+    if (sys.program.ctrlstate & CTRL_VIDEO_INITIALIZED) {
         update_display();
     }
-    if (sys.program.state &  PROGRAM_AUDIO_INITIALIZED) {
+    if (sys.program.ctrlstate & CTRL_AUDIO_INITIALIZED) {
         update_audio();
     }
     return status;
 }
 
 static int deinit_system(void) {
-    int status = false;
+    int status = 0;
     unload_all_assets();
-    remove_service(PROGRAM_ASSETS_INITIALIZED);
+    remove_service(CTRL_ASSETS_INITIALIZED);
 // implement unload pages layers and cells
     deinit_display();
-    remove_service(PROGRAM_VIDEO_INITIALIZED);
+    remove_service(CTRL_VIDEO_INITIALIZED);
     return status;
 }
 
 void display_initialize_splash(void) {
-//    if (sys.program.state & PROGRAM_INITIALIZE) display_initialize_splash();
+//    if (sys.program.ctrlstate & CTRL_INITIALIZE) display_initialize_splash();
 
     update_system();
 }
 
 void manage_program() {
-    debug_console_out( debug_program_state(sys.program.state & PROGRAM_SWITCHBOARD) );
+    debug_console_out( control_state_literal(sys.program.ctrlstate & CTRL_SWITCHBOARD) );
 
-    if (sys.program.state & PROGRAM_OFF_FOCUS)
+    if (sys.program.ctrlstate & CTRL_OFF_FOCUS)
         game_off_focus_scene();
     else {
-        unsigned int switchboard_state = (sys.program.state & PROGRAM_SWITCHBOARD);
+        unsigned int switchboard_state = (sys.program.ctrlstate & CTRL_SWITCHBOARD);
         switch(switchboard_state) {
-            case PROGRAM_OFF_FOCUS:
+            case CTRL_OFF_FOCUS:
                 game_off_focus_scene();
-            case PROGRAM_INITIALIZE:
-                add_service(PROGRAM_SHOW_TERMINAL);
+            case CTRL_INITIALIZE:
+                add_service(CTRL_SHOW_TERMINAL);
                 init_system();
-                commute_to(PROGRAM_INIT_TITLE);
+                commute_to(CTRL_INIT_TITLE);
                 game_init_assets();
                 break;
-            case PROGRAM_DEINIT:
+            case CTRL_DEINIT:
                 deinit_system();
-                commute_to(PROGRAM_EXIT);
+                commute_to(CTRL_EXIT);
                 break;
-            case PROGRAM_INIT_TITLE:
+            case CTRL_INIT_TITLE:
                 game_init_title();
-                commute_to(PROGRAM_IN_TITLE);
+                commute_to(CTRL_IN_TITLE);
                 break;
-            case PROGRAM_IN_TITLE:
+            case CTRL_IN_TITLE:
                 game_update_title();
                 break;
-            case PROGRAM_INIT_MENU1:
+            case CTRL_INIT_MENU1:
                 break;
-            case PROGRAM_IN_MENU1:
+            case CTRL_IN_MENU1:
                 break;
-            case PROGRAM_INIT_MENU2:
+            case CTRL_INIT_MENU2:
                 break;
-            case PROGRAM_IN_MENU2:
+            case CTRL_IN_MENU2:
                 break;
-            case PROGRAM_INIT_MENU3:
+            case CTRL_INIT_MENU3:
                 break;
-            case PROGRAM_IN_MENU3:
+            case CTRL_IN_MENU3:
                 break;
-            case PROGRAM_INIT_MENU4:
+            case CTRL_INIT_MENU4:
                 break;
-            case PROGRAM_IN_MENU4:
+            case CTRL_IN_MENU4:
                 break;
-            case PROGRAM_INIT_GAME:
+            case CTRL_INIT_GAME:
                 break;
-            case PROGRAM_GAME_PLAY:
+            case CTRL_GAME_PLAY:
                 break;
-            case PROGRAM_GAME_NEXT:
+            case CTRL_GAME_NEXT:
                 break;
-            case PROGRAM_GAME_RESUME:
+            case CTRL_GAME_RESUME:
                 break;
-            case PROGRAM_GAMEOVER:
+            case CTRL_GAMEOVER:
                 break;
-            case PROGRAM_GAME_DEATH:
+            case CTRL_GAME_DEATH:
                 break;
             default: // nowhere?... only happens on program start
-                add_service(PROGRAM_RUNNING);
-                commute_to(PROGRAM_INITIALIZE);
+                add_service(CTRL_RUNNING);
+                commute_to(CTRL_INITIALIZE);
                 break;
         }
     }
 }
 
 ////////////// ENTRY POINT FROM RUNTIME //////////////
-// Once runtime heads here --> stuck till PROGRAM_END
-int process_system(bool debug, const char* name) {
-    SetExitKey(false); // Disables the ESCAPE key from the RayLib core
-
+// Once runtime heads here --> stuck till CTRL_END
+int process_system(unsigned int pmsnstate, const char* name) {
     if (name > NULL) strcpy(sys.program.name, name); else strcpy(sys.program.name, "_o/");
-    set_debug_trace(debug);
+    set_permission(pmsnstate);
     debug_console_out(">>>~~~>>> START <<<~~~<<<");
 
-    commute_to(PROGRAM_INITIALIZE);
-//    add_service(PROGRAM_RUNNING);
-    while (!(sys.program.state & PROGRAM_EXIT)) {
+    add_service(CTRL_RUNNING);
+
+    commute_to(CTRL_INITIALIZE);
+    while (service_active(CTRL_RUNNING)) {
         debug_console_out("_______MAIN LOOP_______BEGIN");
-        if (sys.program.state & PROGRAM_VIDEO_INITIALIZED) {
+
+        if (service_active(CTRL_VIDEO_INITIALIZED)) {
+        debug_console_out("TEST FAILED");
             BeginTextureMode(sys.asset.framebuffer[sys.video.virtual_asset[sys.video.current_virtual]]);
             ClearBackground(BLACK);
             rlDisableDepthMask();            // Disable depth writes
             rlDisableDepthTest();            // Disable depth test for speed
         }
         manage_program();
-        if (sys.program.state & PROGRAM_VIDEO_INITIALIZED) {
-            if (sys.program.state & PROGRAM_IN_GAME)  {
+        if (service_active(CTRL_VIDEO_INITIALIZED)) {
+            if (service_active(CTRL_IN_GAME))  {
                 // possibly health information, lives left, score etc... (HUD)
             }
-            if (sys.program.state & PROGRAM_GAME_PAUSED) {
+            if (service_active(CTRL_GAME_PAUSED)) {
             // something special happening while game is paused
             // DISPLAY PAUSE MESSAGE
             }
@@ -3160,8 +3204,11 @@ int process_system(bool debug, const char* name) {
             EndTextureMode();
             update_system();
         }
+        if (service_active(CTRL_EXIT))     remove_service(CTRL_RUNNING);
+
+        if (IsKeyPressed(KEY_ESCAPE)) commute_to(CTRL_DEINIT);
         debug_console_out("_______MAIN LOOP_______END");
-        if (IsKeyPressed(KEY_ESCAPE)) commute_to(PROGRAM_DEINIT);
+
     }
     return sys.program.status;
 }
