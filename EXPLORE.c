@@ -17,5 +17,5 @@
 
 int main(void) {
     printf("PROGRAM STARTED - %s\n", SOFTWARE);
-    return process_system(true, SOFTWARE);
+    return process_system(CTRL_DEBUG, NULL, SOFTWARE);
 }
