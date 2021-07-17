@@ -1,7 +1,7 @@
 GRID ][
 =======
 
-The goal of this project is to concieve a full featured 2D game engine in principle using the RayLib base library with some added custom external.
+The goal of this project is to conceive a full featured 2D game engine in principle using the RayLib base library with some added custom external.
 
 The external will compile as partof RayLib to supply extra features such as more audio functionalities and more control over IO and OpenGL.
 
