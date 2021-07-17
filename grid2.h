@@ -291,7 +291,7 @@ void DrawQuadSprite ( Texture texture , Vector2 position, Vector2 scale, Color c
 }
 
 // Draw a color-filled rectangle with pro parameters
-void DrawRectangleProSK(Rectangle rec, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
+void DrawRectanglePro2(Rectangle rec, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
     rlCheckRenderBatchLimit(4);
 
     const static inline Texture   texShapes = { 1, 1, 1, 1, 7 };
@@ -347,7 +347,7 @@ void DrawRectangleProSK(Rectangle rec, Vector2 origin, Vector2 skew, float rotat
 
 // Draw a part of a texture (defined by a rectangle) with 'pro' parameters
 // NOTE: origin is relative to destination rectangle size
-void DrawTextureProSK (Texture texture, Rectangle source, Rectangle dest, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
+void DrawTexturePro2 (Texture texture, Rectangle source, Rectangle dest, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
     if (texture.id > 0) {
         float width = (float)texture.width;
         float height = (float)texture.height;
@@ -405,6 +405,8 @@ void DrawTextureProSK (Texture texture, Rectangle source, Rectangle dest, Vector
 }
 
 Color get_pixel_color(Image *image, Vector2 position) {
+    //check for out of bound
+
     unsigned int offset = (position.y * image->width + position.x) * 4;
     Color *data = &image->data;
     return data[offset];
@@ -414,9 +416,6 @@ Color get_pixel_color(Image *image, Vector2 position) {
 //    unsigned char a = data[offset + 3];
 //    return (Color){r, g, b, a};
 }
-
-
-// **************************************************************************************** L O O S E   S T R U C T U R E S
 
 
 // **************************************************************************************** G R I D   S T R U C T U R E S
@@ -500,6 +499,9 @@ typedef struct EX_tileset {
 typedef struct EX_asset {
     char name[NAMELENGTH_MAX + 1];
     unsigned int total_assets;
+    unsigned short lines_id;
+    unsigned short basefont_id;
+
     unsigned int dead_assets[MAXASSETS];
 
     unsigned int asset_type[MAXASSETS];
@@ -743,11 +745,21 @@ EX_system sys;
 void set_permission(unsigned int state)     {BITS_ON(sys.program.pmsnstate, state);}
 void unset_permission(unsigned int state)   {BITS_OFF(sys.program.pmsnstate, state);}
 void flip_permission(unsigned int state)    {BITS_FLIP(sys.program.pmsnstate, state);}
-bool permission_valid(unsigned int state)   {return BITS_TEST(sys.program.pmsnstate, state);}
+unsigned int permission_valid(unsigned int state)   {return BITS_TEST(sys.program.pmsnstate, state);}
 
 void add_service(unsigned int state)        {BITS_ON(sys.program.ctrlstate, state);}
 void remove_service(unsigned int state)     {BITS_OFF(sys.program.ctrlstate, state);}
-bool service_active(unsigned int state)     {return BITS_TEST(sys.program.ctrlstate, state);}
+unsigned int service_active(unsigned int state)     {return BITS_TEST(sys.program.ctrlstate, state);}
+
+void commute_to(unsigned int state) {
+    BITS_OFF(sys.program.ctrlstate_prev, CTRL_SWITCHBOARD);
+    BITS_ON(sys.program.ctrlstate_prev, sys.program.ctrlstate & CTRL_SWITCHBOARD);
+    BITS_OFF(sys.program.ctrlstate, CTRL_SWITCHBOARD);
+    BITS_ON(sys.program.ctrlstate, state);
+
+    debug_console_out(control_state_literal(state));
+};
+
 
 Color get_palette_color(int palette_id, unsigned short id) {
     Color *color = sys.asset.palette[palette_id];
@@ -773,7 +785,7 @@ typedef enum {
     GRID_FGBLEND_URIGHT     = 0b00000010000000000000000000000000, // foreground vertex color blend upper right
     GRID_FGBLEND_ULEFT      = 0b00000001000000000000000000000000, // foreground vertex color blend upper left
     GRID_PROTECTED          = 0b00000000100000000000000000000000, // protect value from being changed
-    GRID_HIDDEN             = 0b00000000010000000000000000000000, // hide value (not displayed)
+    GRID_RESERVED           = 0b00000000010000000000000000000000, // RESERVED ********************************************* 
     GRID_CELLDIS            = 0b00000000001000000000000000000000, // turn on cell corners C1 to C4 displacements
     GRID_LINESSEQ           = 0b00000000000100000000000000000000, // turn on lines sequencing
     GRID_COLORSEQ           = 0b00000000000010000000000000000000, // turn on color sequencing
@@ -795,9 +807,9 @@ typedef enum {
     GRID_LINES              = 0b00000000000000000000000000001000, // turn on lines tiles
     GRID_BACKGROUND         = 0b00000000000000000000000000000100, // turn on cell background (tile rectangle fill)
     GRID_SHADOW             = 0b00000000000000000000000000000010, // turn on shadow cell
-    GRID_FOREGROUND         = 0b00000000000000000000000000000001, // turn on cell foreground (value)
+    GRID_FOREGROUND         = 0b00000000000000000000000000000001, // turn on cell foreground (value) (used for hidden mode)
     GRID_DEFAULT1           = 0b00000000011100000000000011111101, // DEFAULT STATE :HEAVY PROCESSING
-    GRID_DEFAULT2           = 0b00000000000000000000000000000000, // DEFAULT STATE :LIGHT PROCESSING
+    GRID_DEFAULT2           = 0b00000000000000001100000011111111, // DEFAULT STATE :SCROLLTEXT
     GRID_DEFAULT3           = 0b00000000000000000000000000000000, // DEFAULT STATE :GAME LAYER
     GRID_DEFAULT4           = 0b00000000000000000000000000000000  // DEFAULT STATE :TERMINAL DISPLAY
 } grid_features;
@@ -809,10 +821,9 @@ typedef enum {
     LINE_RIG                = 0b00010000, // turn on line right
     LINE_HOR                = 0b00001000, // turn on line center horizontal
     LINE_VER                = 0b00000100, // turn on line center vertical
-    LINE_UP                 = 0b00000010, // turn on line angle up
-    LINE_DOW                = 0b00000001  // turn on line angle down
+    LINE_DOW                = 0b00000010, // turn on line angle down
+    LINE_UP                 = 0b00000001, // turn on line angle up
 } lines_features;
-
 
 Rectangle get_tilezone_from_position(int asset_id, Vector2 position) {
     EX_tileset *tileset = &sys.asset.tileset[asset_id];
@@ -834,17 +845,20 @@ Rectangle get_tilezone_from_code(int asset_id, int code) {
     return (Rectangle) {px * tilesize->x, py * tilesize->y,  tilesize->x, tilesize->y};
 }
 
-//        plot_character(ex_scrolltext[s].font, ch, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].bg_color, state);
-void plot_character(int asset_id, int palette_id, int code, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color color_fg, Color color_bg, unsigned int state) {
+//        plot_character(ex_scrolltext[s].font, ch, lines, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].bg_color, lines_color, state);
+void plot_character(int asset_id, int palette_id, unsigned short code, unsigned char lines, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, unsigned int state) {
     Color vertex_colors[4];
     if (!(state & GRID_ROTATION)) angle = 0.f;
 
     if (state & GRID_BACKGROUND) {
-        vertex_colors[0] = color_bg;
-        vertex_colors[1] = color_bg;
-        vertex_colors[2] = color_bg;
-        vertex_colors[3] = color_bg;
-        DrawRectangleProSK(
+        if (state & GRID_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
+        if (state & GRID_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
+        if (state & GRID_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
+        if (state & GRID_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
+        vertex_colors[1] = vertex_colors[0];
+        vertex_colors[2] = vertex_colors[0];
+        vertex_colors[3] = vertex_colors[0];
+        DrawRectanglePro2(
             (Rectangle) { position.x, position.y, scale.x, scale.y },
             (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
     }
@@ -854,17 +868,34 @@ void plot_character(int asset_id, int palette_id, int code, Vector2 position, Ve
                 vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
                 vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
                 vertex_colors[3] = (Color) {0.f, 0.f, 0.f, 48.f};
-                DrawTextureProSK(sys.asset.tex[asset_id],
+                DrawTexturePro2(sys.asset.tex[asset_id],
                     get_tilezone_from_code(asset_id, code),
                     (Rectangle) { position.x + shadow.x, position.y + shadow.y, scale.x, scale.y },
                     (Vector2) {0,0}, skew, angle, vertex_colors);
             };
-            vertex_colors[0] = color_fg;
-            vertex_colors[1] = color_fg;
-            vertex_colors[2] = color_fg;
-            vertex_colors[3] = color_fg;
-            DrawTextureProSK(sys.asset.tex[asset_id],
+            if (state & GRID_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
+            if (state & GRID_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
+            if (state & GRID_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
+            if (state & GRID_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
+            vertex_colors[1] = vertex_colors[0];
+            vertex_colors[2] = vertex_colors[0];
+            vertex_colors[3] = vertex_colors[0];
+            DrawTexturePro2(sys.asset.tex[asset_id],
                 get_tilezone_from_code(asset_id, code),
+                (Rectangle) { position.x, position.y , scale.x, scale.y },
+                (Vector2) {0,0}, skew, angle, vertex_colors);
+    }
+
+    if ((state & GRID_LINES) && lines) {
+            if (state & GRID_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
+            if (state & GRID_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
+            if (state & GRID_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
+            if (state & GRID_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
+            vertex_colors[1] = vertex_colors[0];
+            vertex_colors[2] = vertex_colors[0];
+            vertex_colors[3] = vertex_colors[0];
+            DrawTexturePro2(sys.asset.tex[sys.asset.lines_id],
+                get_tilezone_from_code(sys.asset.lines_id, lines),
                 (Rectangle) { position.x, position.y , scale.x, scale.y },
                 (Vector2) {0,0}, skew, angle, vertex_colors);
     }
@@ -906,9 +937,7 @@ bool init_layer(int page_id, int layer_id, Vector2 size, unsigned int layer_stat
     return 0;
 }
 
-bool init_page(Vector2 size, unsigned int page_state, unsigned int layer_state, unsigned int cell_state, int asset_id) {
-    int page_id = sys.video.current_virtual; // A single page per Virtual Display
-
+bool init_page(unsigned int page_id, Vector2 size, unsigned int page_state, unsigned int layer_state, unsigned int cell_state, int asset_id) {
     sys.video.page[page_id].state = page_state;
     sys.video.page[page_id].layer_count = 1;
     sys.video.page[page_id].layer = calloc(sys.video.page[page_id].layer_count, sizeof(EX_layer));
@@ -937,10 +966,12 @@ bool init_page_multilayer(Vector2 size, unsigned int page_state, unsigned int la
 }
 
 void layer_set_mouse_position(int page_id, int layer_id, Vector2 target) {
+    //check for out of bound
     sys.video.page[page_id].layer[layer_id].mouse.offset = target;
 }
 
 void layer_set_keyboard_position(int page_id, int layer_id, Vector2 target) {
+    //check for out of bound
     sys.video.page[page_id].layer[layer_id].keyboard.offset = target;
 }
 
@@ -1106,24 +1137,6 @@ void set_cell_angle(int page_id, int layer_id, Rectangle target, float angle) {
     }
 }
 
-void shift_cell_value(int page_id, int layer_id, Rectangle target, int shift) {
-    int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
-
-    if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
-    if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
-    if ((target.y + target.height) > lsy) target.height = lsy - target.y;
-
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
-            linear_offset = lsx * y + x;
-            target_cell[linear_offset].value += shift;
-        }
-    }
-}
-
 void set_cell_scale(int page_id, int layer_id, Rectangle target, Vector2 scale) {
     int linear_offset;
     EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
@@ -1152,7 +1165,7 @@ void plot_big_characters(int page_id, int layer_id, Vector2 target, unsigned int
     int length = sizeof(ch);
 
     for (int i= 0; i++; i<length) {
-
+// to complete
     }    
 }
 
@@ -1229,6 +1242,63 @@ void clear_cell (int page_id, int layer_id, Rectangle target, unsigned int state
     init_cell(page_id, layer_id, target, blank_cell, state);
 }
 
+void shift_cell_field_rectangle(int page_id, int layer_id, Rectangle target, float shift, unsigned int state) {
+    int target_offset;
+    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
+    int lsx = layer->size.x, lsy = layer->size.y;
+    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+
+    if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
+    if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
+    if ((target.y + target.height) > lsy) target.height = lsy - target.y;
+
+    for (int x = target.x; x++; x < (target.x + target.width)) {
+        for (int y = target.y; y++; y < (target.y + target.height)) {
+            target_offset = lsx * y + x;
+                        if (state & GFLD_STATE)             {target_cell[target_offset].state                 += shift;} // 0xffffffff
+                        if (state & GFLD_VALUE)             {target_cell[target_offset].value                 += shift;} // determined by texture # tiles
+                        if (state & GFLD_LINES)             {target_cell[target_offset].lines                 += shift;} // 0...255
+                        if (state & GFLD_CYCLE)             {target_cell[target_offset].cycle_id              += shift;} // determined by texture # tiles
+                        if (state & GFLD_FG_COLOR)          {target_cell[target_offset].fg_color_id           += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_FG_COLOR_CYCLE)    {target_cell[target_offset].fg_color_cycle_id     += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_BG_COLOR)          {target_cell[target_offset].bg_color_id           += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_BG_COLOR_CYCLE)    {target_cell[target_offset].bg_color_cycle_id     += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_LINES_COLOR)       {target_cell[target_offset].lines_color_id        += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_LINES_COLOR_CYCLE) {target_cell[target_offset].lines_color_cycle_id  += shift;} // 0...255 (or palette size)
+                        //if (state & GFLD_OFFSET)            {target_cell[target_offset].offset                += shift;} // Vector2 x,y
+                        //if (state & GFLD_SKEW)              {target_cell[target_offset].skew                  += shift;} // Vector2 x,y
+                        //if (state & GFLD_SCALE)             {target_cell[target_offset].scale                 += shift;} // Vector2 x,y
+                        //if (state & GFLD_SCALE_SPEED)       {target_cell[target_offset].scale_speed           += shift;} // 
+                        //if (state & GFLD_SCROLL_SPEED)      {target_cell[target_offset].scroll_speed          += shift;} // 
+                        if (state & GFLD_ANGLE)             {target_cell[target_offset].angle                 += shift;} // 0...360
+                        if (state & GFLD_FG_BRIGHTNESS)     {target_cell[target_offset].fg_brightness         += shift;} // 0...255
+                        if (state & GFLD_BG_BRIGHTNESS)     {target_cell[target_offset].bg_brightness         += shift;} // 0...255
+                        //if (state & GFLD_COLOR_MASK)        {target_cell[target_offset].color_mask            += shift;} // Color
+                        //if (state & GFLD_SHADOW_MASK)       {target_cell[target_offset].shadow_mask           += shift;} // Color
+        }
+    }
+}
+
+void shift_cell_field_circle(int page_id, int layer_id, Rectangle target, float shift, unsigned int state) {
+    int linear_offset;
+    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
+    int lsx = layer->size.x, lsy = layer->size.y;
+    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+
+    if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
+    if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
+    if ((target.y + target.height) > lsy) target.height = lsy - target.y;
+
+    for (int x = target.x; x++; x < (target.x + target.width)) {
+        for (int y = target.y; y++; y < (target.y + target.height)) {
+            // determine if circle border or full and if inside then modify
+            // The same logic as rectangle
+            linear_offset = lsx * y + x;
+            target_cell[linear_offset].value += shift;
+        }
+    }
+}
+
 
 typedef enum {
     GRIDSHIFT_UP        = 1,
@@ -1239,10 +1309,7 @@ typedef enum {
     GRIDSHIFT_DOWNLEFT  = 6,
     GRIDSHIFT_UPRIGHT   = 7,
     GRIDSHIFT_DOWNRIGHT = 8
-};
-
-void shift_cell (int page_id, int layer_id, Rectangle source, unsigned char shift_method, bool cycle, unsigned int state) {
-}
+} cell_direction;
 
 void copy_cell_in_layer(int page_id, int layer_id, Rectangle source, Vector2 target, unsigned int state) {
     int source_offset, target_offset;
@@ -1298,6 +1365,21 @@ void copy_cell_in_layer(int page_id, int layer_id, Rectangle source, Vector2 tar
     }
 }
 
+// Move cell content to any of 8 directions
+void shift_cell (int page_id, int layer_id, Rectangle source, unsigned char shift_method, bool cycle, unsigned int state) {
+    int source_offset, target_offset;
+    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
+    int lsx = layer->size.x, lsy = layer->size.y;
+    EX_cell  *cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+
+    //if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
+    //if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.y + source.height) < 0) return;
+    if ((source.x + source.width) > lsx) source.width = lsx - source.x;
+    if ((source.y + source.width) > lsy) source.width = lsy - source.y;
+
+
+}
+
 void copy_cell_to_layer(int source_page_id, int source_layer_id, Rectangle source, int target_page_id, int target_layer_id, Vector2 target, unsigned int state) {
     int source_offset, target_offset;
 
@@ -1322,6 +1404,9 @@ void copy_cell_to_layer(int source_page_id, int source_layer_id, Rectangle sourc
                 if ( (y + ty) < lsy && (y + ty) < lty && (y + ty) >= 0 ) {
                     source_offset = lsx * y + x;
                     target_offset = ltx * (y + ty) + (x + tx);
+
+//    if (!(state & GRID_PROTECTED))   // if not protected destination field, then you can write
+
                     if (state & GFLD_ALL)                   target_cell[target_offset]                       = source_cell[source_offset];
                     else {
                         if (state & GFLD_STATE)             target_cell[target_offset].state                 = source_cell[source_offset].state;
@@ -1366,6 +1451,25 @@ void render_layer(int layer_id) {
             // calculate position x,y
             // ascii code is in c.value
             // reading color from palette get_palette_color(palette,id);
+
+            if (c->state & GRID_BACKGROUND) {// then you can draw the background
+    // background set color of corner to color of next tile 
+//    GRID_BGBLEND_LLEFT       // background vertex color blend lower left
+//    GRID_BGBLEND_LRIGHT      // background vertex color blend lower right
+//    GRID_BGBLEND_URIGHT      // background vertex color blend upper right
+//    GRID_BGBLEND_ULEFT       // background vertex color blend upper left
+            }
+
+            if (c->state & GRID_SHADOW) {    // then you can draw the shadow
+            }
+
+            if (c->state & GRID_FOREGROUND) { // then you can draw the foreground
+    // foreground set color of corner to color of next tile 
+//    GRID_FGBLEND_LLEFT       // foreground vertex color blend lower left
+//    GRID_FGBLEND_LRIGHT      // foreground vertex color blend lower right
+//    GRID_FGBLEND_URIGHT      // foreground vertex color blend upper right
+//    GRID_FGBLEND_ULEFT       // foreground vertex color blend upper left
+
 /*
                     unsigned int state = GRID_FOREGROUND | GRID_RED | GRID_GREEN | GRID_BLUE | GRID_SCALE_X | GRID_SCALE_Y;
                     if (ex_scrolltext[s].bg_color_flag > 0) state |= GRID_BACKGROUND;
@@ -1382,6 +1486,53 @@ void render_layer(int layer_id) {
                         get_palette_color_pro(palette_id, ex_scrolltext[s].bg_color, ex_scrolltext[s].alpha), 
                         state);
 */
+
+/*  All STATES (exhaustive logic) and LINES (just a DrawTexture) to consider
+
+    // This is a different beast and not sure yet how to handle sequences
+    GRID_LINESSEQ            // turn on lines sequencing
+    GRID_COLORSEQ            // turn on color sequencing
+    GRID_VALUESEQ            // turn on cell value sequencing
+
+    // This is a different beast and not sure yet how to handle scrolling of tiles
+    GRID_AUTOSCRX            // turn on automatic scrolling on x axis
+    GRID_AUTOSCRY            // turn on automatic scrolling on y axis
+
+    if (state & GRID_ROTATION) // then allow using the rotation value else use 0 
+    if (state & GRID_SKEW)   // then allow using the skew value else use 0
+    if (state & GRID_CELLDIS)  // then allow corner displacements
+
+    GRID_SCALE_X             // turn on cell scaling on x axis
+    GRID_SCALE_Y             // turn on cell scaling on y axis
+
+    GRID_WRAP_X              // turn on wrap around on x axis
+    GRID_WRAP_Y              // turn on wrap around on y axis
+
+    GRID_FLIPH               // flip cell(s) horizontally
+    GRID_FLIPV               // flip cell(s) vertically
+
+    // a simple & of each Color value with the flag @ true
+    GRID_RED                 // turn on red channel
+    GRID_GREEN               // turn on green channel
+    GRID_BLUE                // turn on blue channel
+    GRID_ALPHA               // turn on transparency
+
+// DrawTexturePro2();
+//verified against texture
+    if (state & GRID_LINES) {
+    DrawTexturePro of the Lines texture based on the cell Lines 
+
+    LINE_TOP            // turn on line top
+    LINE_BOT            // turn on line bottom
+    LINE_LEF            // turn on line left
+    LINE_RIG            // turn on line right
+    LINE_HOR            // turn on line center horizontal
+    LINE_VER            // turn on line center vertical
+    LINE_DOW            // turn on line angle down
+    LINE_UP             // turn on line angle up
+    }
+*/
+            }
         }
     }
 //logic to show mouse cursor
@@ -2007,7 +2158,7 @@ bool init_display_properties(bool hide_mouse) {
     BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_ALWAYS_RUN);
     BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_TOPMOST);
     BITS_ON(sys.video.windowstate_normal, FLAG_MSAA_4X_HINT);
-    BITS_ON(sys.video.windowstate_normal, FLAG_VSYNC_HINT);
+    //BITS_ON(sys.video.windowstate_normal, FLAG_VSYNC_HINT);
 
     BITS_INIT(sys.video.windowstate_paused, 0);
     BITS_ON(sys.video.windowstate_paused, FLAG_FULLSCREEN_MODE);
@@ -2365,7 +2516,7 @@ static void update_canopy(int asset_id) {
                     vertex_colors[1] = vertex_colors[0];
                     vertex_colors[2] = vertex_colors[0];
                     vertex_colors[3] = vertex_colors[0];
-                    DrawRectangleProSK(
+                    DrawRectanglePro2(
                     (Rectangle){ex_canopy.grid[y][x].x, ex_canopy.grid[y][x].y, cell_size.x, cell_size.y}, 
                     (Vector2) {0.f, 0.f}, (Vector2) {0.f, 0.f}, 0.f,
                     vertex_colors);
@@ -2377,7 +2528,7 @@ static void update_canopy(int asset_id) {
                     vertex_colors[2] = vertex_colors[0];
                     vertex_colors[3] = vertex_colors[0];
                     float value = (float)(sys.asset.data[asset_id][y * ex_canopy.cells_x + x]);
-                    DrawTextureProSK(sys.asset.tex[ex_canopy.font_id],
+                    DrawTexturePro2(sys.asset.tex[ex_canopy.font_id],
                     get_tilezone_from_code(ex_canopy.font_id, value),
                     (Rectangle) {ex_canopy.grid[y][x].x, ex_canopy.grid[y][x].y, cell_size.x, cell_size.y},
                     (Vector2) {0.f, 0.f}, (Vector2) {0.f, 0.f},0.f,
@@ -2619,20 +2770,21 @@ static void update_scrolltext(int s, float text_scale) {
                     };
 
                     unsigned int state = 0;
-                    BITS_ON(state, (GRID_FOREGROUND | GRID_RED | GRID_GREEN | GRID_BLUE | GRID_SCALE_X | GRID_SCALE_Y));
-                    if (ex_scrolltext[s].bg_color_flag > 0) BITS_ON(state, GRID_BACKGROUND);
-                    if (ex_scrolltext[s].text_angle)        BITS_ON(state, GRID_ROTATION);
-                    if (ex_scrolltext[s].text_shadow > 0.0) BITS_ON(state, GRID_SHADOW);
-                    if (!(ex_scrolltext[s].text_angle))     BITS_ON(state, GRID_SKEW);
+                    BITS_ON(state, GRID_DEFAULT2);
+                    if (ex_scrolltext[s].bg_color_flag == 0) BITS_OFF(state, GRID_BACKGROUND);
+                    if (!(ex_scrolltext[s].text_angle))     BITS_OFF(state, GRID_ROTATION);
+                    if (ex_scrolltext[s].text_shadow == 0.0) BITS_OFF(state, GRID_SHADOW);
+                    if (ex_scrolltext[s].text_angle)        BITS_OFF(state, GRID_SKEW);
 
-                    plot_character(ex_scrolltext[s].font_id, ex_scrolltext[s].palette_id, ch,
+                    plot_character(ex_scrolltext[s].font_id, ex_scrolltext[s].palette_id, ch, 0, 
                         (Vector2) {(ex_scrolltext[s].position.x +  i_x) * text_scale, (ex_scrolltext[s].position.y * text_scale) + ex_scrolltext[s].text_wave}, 
                         (Vector2) {text_scale, text_scale}, 
                         ex_scrolltext[s].skew,
                         (Vector2) {2, 2},
                         ex_scrolltext[s].text_angle, 
                         get_palette_color_pro(palette_id, ex_scrolltext[s].fg_color, ex_scrolltext[s].alpha), 
-                        get_palette_color_pro(palette_id, ex_scrolltext[s].bg_color, ex_scrolltext[s].alpha), 
+                        get_palette_color_pro(palette_id, ex_scrolltext[s].bg_color, ex_scrolltext[s].alpha),
+                        (Color) {255, 255, 255, 255},
                         state);
                 };
             } else {
@@ -2875,13 +3027,15 @@ void debug_console_out(const char* message) {
 
 // TERMINALDISPLAY (ie. 4)
 
-bool init_terminal(asset_id) {
+bool init_terminal(tileset_id) {
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
     int display = sys.video.current_virtual;
     unsigned int page_state = 0;
     unsigned int layer_state = 0;
     unsigned int cell_state = 0;
-    init_page((Vector2){40, 24}, page_state, layer_state, cell_state, asset_id);
+    unsigned int page_id = sys.video.current_virtual; // A single page per Virtual Display
+
+    init_page(page_id, (Vector2){40, 24}, page_state, layer_state, cell_state, tileset_id);
     return 0;
 }
 
@@ -2911,6 +3065,9 @@ void show_terminal(void) {
 // ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
 // ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
 
+// SCRIPTING GOAL: Everything in GAME_LOGIC is supposed to be script basaed.
+// SCRIPTING GOAL: In the current form it is not but it is simplified in a way to make it mport to scripting in the simplest way possible.
+// SCRIPTING GOAL: Once the scripting is completed, we will see how to inject that into the dispatcher with hooks.
 void game_init_assets(void) {
     int id;
 	id = load_asset(ASSET_TEXTURE, TITLE_FILENAME, TITLE_FILEEXT, TITLE_DATA, TITLE_FILESIZE, TITLE_PAK);
@@ -3013,16 +3170,6 @@ void game_off_focus_scene(void) {
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
 
-void commute_to(unsigned int state) {
-    BITS_OFF(sys.program.ctrlstate_prev, CTRL_SWITCHBOARD);
-    BITS_ON(sys.program.ctrlstate_prev, sys.program.ctrlstate & CTRL_SWITCHBOARD);
-    BITS_OFF(sys.program.ctrlstate, CTRL_SWITCHBOARD);
-    BITS_ON(sys.program.ctrlstate, state);
-
-    debug_console_out(control_state_literal(state));
-};
-
-
 int init_default_assets() {
     bool status = 0;
     
@@ -3042,9 +3189,9 @@ int init_default_assets() {
 	id = load_tileset((Vector2){16,16}, FONT_ATASCII_FILENAME, FONT_ATASCII_FILEEXT, FONT_ATASCII_DATA, FONT_ATASCII_FILESIZE, FONT_ATASCII_PAK, 0);
 	id = load_tileset((Vector2){16,16}, FONT_ATASCII_BIG_FILENAME, FONT_ATASCII_BIG_FILEEXT, FONT_ATASCII_BIG_DATA, FONT_ATASCII_BIG_FILESIZE, FONT_ATASCII_BIG_PAK, 0);
 	id = load_tileset((Vector2){16,16}, FONT_VGA_FILENAME, FONT_VGA_FILEEXT, FONT_VGA_DATA, FONT_VGA_FILESIZE, FONT_VGA_PAK, 0);
-	id = load_tileset((Vector2){64,1}, FONT_JJ_FILENAME, FONT_JJ_FILEEXT, FONT_JJ_DATA, FONT_JJ_FILESIZE, FONT_JJ_PAK, 32);
+	sys.asset.basefont_id = load_tileset((Vector2){64,1}, FONT_JJ_FILENAME, FONT_JJ_FILEEXT, FONT_JJ_DATA, FONT_JJ_FILESIZE, FONT_JJ_PAK, 32);
 	id = load_tileset((Vector2){96,1}, FONT_OSD_FILENAME, FONT_OSD_FILEEXT, FONT_OSD_DATA, FONT_OSD_FILESIZE, FONT_OSD_PAK, 32);
-	id = load_tileset((Vector2){16,16}, LINES_FILENAME, LINES_FILEEXT, LINES_DATA, LINES_FILESIZE, LINES_PAK, 0);
+	sys.asset.lines_id = load_tileset((Vector2){256,1}, LINES_FILENAME, LINES_FILEEXT, LINES_DATA, LINES_FILESIZE, LINES_PAK, 0);
     
     return status;
 }
@@ -3113,8 +3260,8 @@ void manage_program() {
     if (sys.program.ctrlstate & CTRL_OFF_FOCUS)
         game_off_focus_scene();
     else {
-        unsigned int switchboard_state = (sys.program.ctrlstate & CTRL_SWITCHBOARD);
-        switch(switchboard_state) {
+//        unsigned int switchboard_state = service_active(CTRL_SWITCHBOARD);
+        switch (service_active(CTRL_SWITCHBOARD)) {   //(switchboard_state) {
             case CTRL_OFF_FOCUS:
                 game_off_focus_scene();
             case CTRL_INITIALIZE:
@@ -3172,9 +3319,11 @@ void manage_program() {
 
 ////////////// ENTRY POINT FROM RUNTIME //////////////
 // Once runtime heads here --> stuck till CTRL_END
-int process_system(unsigned int pmsnstate, const char* name) {
+int process_system(unsigned int ctrlstate, unsigned int pmsnstate, const char* name) {
     if (name > NULL) strcpy(sys.program.name, name); else strcpy(sys.program.name, "_o/");
     set_permission(pmsnstate);
+    add_service(ctrlstate);
+
     debug_console_out(">>>~~~>>> START <<<~~~<<<");
 
     add_service(CTRL_RUNNING);
@@ -3184,7 +3333,6 @@ int process_system(unsigned int pmsnstate, const char* name) {
         debug_console_out("_______MAIN LOOP_______BEGIN");
 
         if (service_active(CTRL_VIDEO_INITIALIZED)) {
-        debug_console_out("TEST FAILED");
             BeginTextureMode(sys.asset.framebuffer[sys.video.virtual_asset[sys.video.current_virtual]]);
             ClearBackground(BLACK);
             rlDisableDepthMask();            // Disable depth writes
