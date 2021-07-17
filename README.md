@@ -27,7 +27,7 @@ Audio System:
 - EQ control
 - Basic synthesizer with pure waves and noise
 
-Video SYstem:
+Video System:
 - Allow for shader effects
 - Palette driven capabilities for color cycling and easy color swapping
 - Proper control over the display hardware; resolution, refresh (no hiccups or stuttering)
@@ -42,13 +42,13 @@ Game Engine:
 - Cut down as much as possible on false positives for online tools such as virustotal
 - Aimed at best performance and animation smoothness
 - Excellent gameflow management
-- Full featurered command line terminal system
+- Full featured command line terminal system
 - Extensive debugging abilities
 
 As of mid July 2021 - Grid ][ is roughly 15% done.  Development is going smoothly yet there is a lot of heavy lifting to do before it becomes useful to anyone.
 
 Also I am planning to have it ported to C++ and have multi-threading, in some distant future.
 
-A game engine is a lot of work so I do wish that people following this project to be armed with patience before wanting to work using it.  And of course yuou may contact me for any type of Game Engien oriented topics.
+A game engine is a lot of work so I do wish that people following this project to be armed with patience before wanting to work using it.  And of course you may contact me for any type of Game Engien oriented topics.
 
 m4ntr0n1c
