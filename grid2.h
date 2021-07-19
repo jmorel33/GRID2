@@ -24,6 +24,7 @@
 #include <math.h>
 #include <limits.h>
 #include <string.h>         // set of functions implementing operations on strings
+#include <time.h>
 //#include <strsafe.h>      // replace standard C string handling and I/O functions including printf, strlen, strcpy and strcat
 //#include <tchar.h>        // for string functions makes code compliant to both Unicode and non-unicode environments
 //#include <errno.h>        // A value (the error number) is stored in errno by certain library functions when they detect errors
@@ -125,11 +126,11 @@ uint32_t fifo_lock;
 
 void fifo_putc(uint8_t data) {
 	while(fifo_lock);
-	fifo_lock = 1;
-	while(fifo_entries >= (sizeof(fifo_data)));
-	fifo_entries++;
-	fifo_data[fifo_entries-1] = data;
-	fifo_lock = 0;
+        fifo_lock = 1;
+        while(fifo_entries >= (sizeof(fifo_data)));
+            fifo_entries++;
+    fifo_data[fifo_entries-1] = data;
+    fifo_lock = 0;
 }
 
 uint8_t fifo_getc() {
@@ -137,11 +138,9 @@ uint8_t fifo_getc() {
 	uint32_t i;
 	if (fifo_entries == 0) return 0;
 	while(fifo_lock);
-	fifo_lock = 1;
-	ret = fifo_data[0];
-	for(i = 0; i < fifo_entries; i++) {
-		fifo_data[i] = fifo_data[i+1];
-	}
+        fifo_lock = 1;
+        ret = fifo_data[0];
+        for(i = 0; i < fifo_entries; i++) {            fifo_data[i] = fifo_data[i+1];	}
 	fifo_entries--;
 	fifo_lock = 0;
 	return ret;
@@ -156,23 +155,31 @@ uint8_t fifo_getc() {
 	printf("'%s'\n", fifo_data);    
 */
 
-static inline float Rand(float a) {
-	return (float)rand()/(float)(RAND_MAX/a);
-}
-//#define PI         3.14159265358979323846f // raymath.h
-#define HALF_PI    1.57079632679489661923f
-#define QUARTER_PI 0.78539816339744830961f
-#define DIVIDEH_PI 0.159154943091895335768f
+#define EPSILON     1.19209290e-7f
+#define TAU         6.28318530717958647692528676655900576f
+#define TAU_OVER2   3.14159265358979323846264338327950288f
+#define HALF_PI     1.570796326794896619231321691639751442f
+#define QUARTER_PI  0.785398163397448309615660845819875721f
+#define DIVIDEH_PI  0.159154943091895335768883763372514362f
+#define DIVIDEH_TAU 0.636619772367581343075535053490057448f
+#define LOG2        0.693147180559945309417232121458176568f
+#define LOG10       2.30258509299404568401799145468436421f
+#define E           2.71828182845904523536f
+#define SQRT2       1.41421356237309504880168872420969808f
+#define SQRT3       1.73205080756887729352744634150587236f
+#define SQRT5       2.23606797749978969640917366873127623f
+
+static inline float Rand(float a) {	return (float)rand()/(float)(RAND_MAX/a);}
 
 static inline float fast_sin(double x) {
     x *= DIVIDEH_PI;
     x -= (int) x;
     if (x <= 0.5) {
         double t = 2 * x * (2 * x - 1);
-        return (PI * t) / ((PI - 4) * t - 1);
+        return (TAU_OVER2 * t) / ((TAU_OVER2 - 4) * t - 1);
     } else {
         double t = 2 * (1 - x) * (1 - 2 * x);
-        return -(PI * t) / ((PI - 4) * t - 1);
+        return -(TAU_OVER2 * t) / ((TAU_OVER2 - 4) * t - 1);
     }
 }
 
@@ -185,10 +192,10 @@ static inline double dfast_sin(double x) {
     x -= (int) x;
     if (x <= 0.5) {
         double t = 2 * x * (2 * x - 1);
-        return (PI * t) / ((PI - 4) * t - 1);
+        return (TAU_OVER2 * t) / ((TAU_OVER2 - 4) * t - 1);
     } else {
         double t = 2 * (1 - x) * (1 - 2 * x);
-        return -(PI * t) / ((PI - 4) * t - 1);
+        return -(TAU_OVER2 * t) / ((TAU_OVER2 - 4) * t - 1);
     }
 }
 
@@ -196,41 +203,83 @@ static inline double dfast_cos(double x) {
     return fast_sin(x + HALF_PI);
 }
 
-// use type punning instead of pointer arithmatics, to require proper alignment
-static inline float absf(float f) {
-  // optimizer will optimize away the `if` statement and the library call
-  if (sizeof(float) == sizeof(uint32_t)) {
-    union {
-      float f;
-      uint32_t i;
-    } u;
-    u.f = f;
-    u.i &= 0x7fffffff;
-    return u.f;
-  }
-  return fabsf(f);
+#define SIGN(x) ((x) >= 0 ? 1 : -1)
+#define ABS(x) ((x) > 0 ? (x) : -(x))
+
+float ffast_rsqrt(float a) {  /* PULLED FROM QUAKE SOURCE */
+	union { int i; float f; } t;
+	float x2 = a * 0.5f;
+	t.f = a;
+	t.i = 0x5f375a86 - (t.i >> 1);
+	t.f = t.f * (1.5f - (x2 * t.f * t.f)); /* 1st iteration */
+	t.f = t.f * (1.5f - (x2 * t.f * t.f)); /* 2nd iteration, this can be removed */
+	return t.f;
 }
 
-static long gcdl(long a, long b)
-{
-    if (a == 0)
-        return b;
-    else if (b == 0)
-        return a;
+static inline float ffast_ceil(float x)  { return (float)((x < 0) ? (int)x : ((int)x)+1); }
+static inline float ffast_floor(float x) { return (float)((x >= 0.0f) ? (int)x : (int)(x-0.9999999999999999f)); }
+static inline float ffast_round(float x) { return (float)((x >= 0.0f) ? ffast_floor(x + 0.5f) : ffast_ceil(x - 0.5f)); }
+static inline float ffast_remainder(float x, float y) {	return x - (ffast_round(x/y)*y);}
+static inline float ffast_copysign(float x, float y) {
+	int ix, iy;
+	ix = *(int *)&x;
+	iy = *(int *)&y;
+	ix &= 0x7fffffff;
+	ix |= iy & 0x80000000;
+	return *(float *)&ix;
+}
 
-    if (a < b)
-        return gcd_l(a, b % a);
-    else
-        return gcd_l(b, a % b);
+static inline float ffast_mod(float x, float y) {
+	float result;
+	y = ABS(y);
+	result = ffast_remainder(gb_abs(x), y);
+	if (SIGN(result)) result += y;
+	return ffast_copysign(result, x);
+}
+
+static inline float ffast_tan(float radians) {
+    float rr = radians * radians;
+    float a;
+    a = 9.5168091e-03f;     a *= rr;
+    a += 2.900525e-03f;     a *= rr;
+    a += 2.45650893e-02f;   a *= rr;
+    a += 5.33740603e-02f;   a *= rr;
+    a += 1.333923995e-01f;  a *= rr;
+    a += 3.333314036e-01f;  a *= rr;
+    a += 1.0f;
+    a *= radians;
+    return a;
+}
+
+static inline float ffast_atan(float a)	{
+    float u  = a*a;
+    float u2 = u*u;
+    float u3 = u2*u;
+    float u4 = u3*u;
+    float f  = 1.0f + 0.33288950512027f * u - 0.08467922817644f * u2 + 0.03252232640125f * u3 - 0.00749305860992f * u4;
+    return a/f;
+}
+
+// use type punning instead of pointer arithmatics, to require proper alignment
+static inline float absf(float f) {
+    // optimizer will optimize away the `if` statement and the library call
+    if (sizeof(float) == sizeof(uint32_t)) {
+        union { float f; uint32_t i; } u;
+        u.f = f;
+        u.i &= 0x7fffffff;
+        return u.f;
+    }
+    return fabsf(f);
+}
+
+static long gcdl(long a, long b) {
+    if (a == 0) return b; else if (b == 0) return a;
+    if (a < b) return gcd_l(a, b % a); else return gcd_l(b, a % b);
 }
 
 static int gcdi(int a, int b) {
     int res = a%b;
-    while (res > 0) {
-        a = b;
-        b = res;
-        res = a % b;
-    }
+    while (res > 0) { a = b; b = res; res = a % b; }
     return b;
 }
 
@@ -273,6 +322,29 @@ Color gtia_ntsc_to_rgb(int val) {
     return col;
 }
 
+
+// to be determined (need this to replace the RayLib basic Vector structs)
+/*typedef union Vector2 {
+	struct { float x, y; };
+	float f[2];
+} Vector2;
+
+typedef union Vector3 {
+	struct { float x, y, z; };
+	struct { float r, g, b; };
+	Vector2 xy;
+	float f[3];
+} Vector3;
+
+typedef union Vector4 {
+	struct { float x, y, z, w; };
+	struct { float r, g, b, a; };
+	struct { Vector2 xy, zw; };
+	Vector3 xyz;
+	Vector3 rgb;
+	float f[4];
+} Vector4;
+*/
 // **************************************************************************************** R A Y L I B   E X T E N S I O N S
 
 void DrawTextImage(Texture texture, char* txt, Vector2 position) {
@@ -429,12 +501,12 @@ typedef struct EX_cell {
     unsigned short value;                       // value of cell
     unsigned char lines;                        // lines feature
     unsigned short cycle_id;                    // cell animation sequence number
-    unsigned short fg_color_id;                 // palette index color for cell
-    unsigned short fg_color_cycle_id;           // color cycle index
-    unsigned short bg_color_id;                 // palette index color for cell background
-    unsigned short bg_color_cycle_id;           // color cycle index
-    unsigned short lines_color_id;              // palette index color for cell background
-    unsigned short lines_color_cycle_id;        // color cycle index
+    unsigned short colorfg_id;                  // palette index color for cell
+    unsigned short colorfg_cycle_id;            // color cycle index
+    unsigned short colorbg_id;                  // palette index color for cell background
+    unsigned short colorbg_cycle_id;            // color cycle index
+    unsigned short colorln_id;                  // palette index color for cell background
+    unsigned short colorln_cycle_id;            // color cycle index
     Vector2 offset;                             // displacement from top left (x,y)
     Vector2 skew;                               // horizontal and vertical skew
     Vector2 scale;                              // (x,y) cell scale
@@ -450,14 +522,15 @@ typedef struct EX_cell {
 typedef struct EX_layer {
     char name[NAMELENGTH_MAX + 1];
     unsigned int state;                         // all flags for grid
-    int asset_id;                               // tilset used for this layer
+    unsigned short asset_id;                    // tilset used for this layer
     Vector2 size;                               // total cells x and y
-    unsigned short fg_color_id;                 // palette index color for cell
-    unsigned short fg_color_cycle_id;           // color cycle index
-    unsigned short bg_color_id;                 // palette index color for cell background
-    unsigned short bg_color_cycle_id;           // color cycle index
-    unsigned short lines_color_id;              // palette index color for cell background
-    unsigned short lines_color_cycle_id;        // color cycle index
+    unsigned short palette_id;                  // color palette used for whole layer
+    unsigned short colorfg_id;                  // palette index color for cell
+    unsigned short colorfg_cycle_id;            // color cycle index
+    unsigned short colorbg_id;                  // palette index color for cell background
+    unsigned short colorbg_cycle_id;            // color cycle index
+    unsigned short colorln_id;                  // palette index color for cell background
+    unsigned short colorln_cycle_id;            // color cycle index
     Vector2 offset;                             // displacement from top left (x,y)
     Vector2 displace[4];                        // cell corner displacement (x,y)
     Vector2 scale;                              // (x,y) cell scale
@@ -587,7 +660,7 @@ typedef struct EX_video {
 
 typedef struct EX_terminal {
     unsigned int state;
-    int asset_id;
+    unsigned short asset_id;
     int page_id;
     int layer_id;
 } EX_terminal;
@@ -825,7 +898,7 @@ typedef enum {
     LINE_UP                 = 0b00000001, // turn on line angle up
 } lines_features;
 
-Rectangle get_tilezone_from_position(int asset_id, Vector2 position) {
+Rectangle get_tilezone_from_position(unsigned short asset_id, Vector2 position) {
     EX_tileset *tileset = &sys.asset.tileset[asset_id];
     if ((position.x >= tileset->count.x) || position.x < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.x, tileset->tilesize.y};
     if ((position.y >= tileset->count.y) || position.y < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.y, tileset->tilesize.y};
@@ -833,7 +906,7 @@ Rectangle get_tilezone_from_position(int asset_id, Vector2 position) {
     return (Rectangle) {position.x * tilesize->x, position.y * tilesize->y,  tilesize->x, tilesize->y};
 }
 
-Rectangle get_tilezone_from_code(int asset_id, int code) {
+Rectangle get_tilezone_from_code(unsigned short asset_id, int code) {
     EX_tileset *tileset = &sys.asset.tileset[asset_id];
 
     code -= sys.asset.tileset[asset_id].ascii_start;
@@ -845,8 +918,8 @@ Rectangle get_tilezone_from_code(int asset_id, int code) {
     return (Rectangle) {px * tilesize->x, py * tilesize->y,  tilesize->x, tilesize->y};
 }
 
-//        plot_character(ex_scrolltext[s].font, ch, lines, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].bg_color, lines_color, state);
-void plot_character(int asset_id, int palette_id, unsigned short code, unsigned char lines, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, unsigned int state) {
+//        plot_character(ex_scrolltext[s].font, ch, lines, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].colorbg, colorln, state);
+void plot_character(unsigned short asset_id, int palette_id, unsigned short code, unsigned char lines, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, unsigned int state) {
     Color vertex_colors[4];
     if (!(state & GRID_ROTATION)) angle = 0.f;
 
@@ -901,11 +974,11 @@ void plot_character(int asset_id, int palette_id, unsigned short code, unsigned 
     }
 }
 
-bool init_cell_linear(EX_cell *cell, unsigned int cell_state, unsigned int color_id, unsigned int bg_color_id) {
+bool init_cell_linear(EX_cell *cell, unsigned int cell_state, unsigned int color_id, unsigned int colorbg_id) {
     cell->state = cell_state;
     cell->value = 0;
-    cell->fg_color_id = color_id;
-    cell->bg_color_id = bg_color_id;
+    cell->colorfg_id = color_id;
+    cell->colorbg_id = colorbg_id;
     cell->offset = (Vector2) {0,0};
     cell->scale = (Vector2) {1,1};
     cell->angle = 0;
@@ -915,7 +988,7 @@ bool init_cell_linear(EX_cell *cell, unsigned int cell_state, unsigned int color
     return 0;
 }
 
-bool init_layer(int page_id, int layer_id, Vector2 size, unsigned int layer_state, unsigned int cell_state, int asset_id) {
+bool init_layer(int page_id, int layer_id, Vector2 size, unsigned int layer_state, unsigned int cell_state, unsigned short asset_id) {
     int cell_count = (int)size.x * (int)size.y;
     EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
     layer->size = size;
@@ -937,7 +1010,7 @@ bool init_layer(int page_id, int layer_id, Vector2 size, unsigned int layer_stat
     return 0;
 }
 
-bool init_page(unsigned int page_id, Vector2 size, unsigned int page_state, unsigned int layer_state, unsigned int cell_state, int asset_id) {
+bool init_page(unsigned int page_id, Vector2 size, unsigned int page_state, unsigned int layer_state, unsigned int cell_state, unsigned short asset_id) {
     sys.video.page[page_id].state = page_state;
     sys.video.page[page_id].layer_count = 1;
     sys.video.page[page_id].layer = calloc(sys.video.page[page_id].layer_count, sizeof(EX_layer));
@@ -966,13 +1039,19 @@ bool init_page_multilayer(Vector2 size, unsigned int page_state, unsigned int la
 }
 
 void layer_set_mouse_position(int page_id, int layer_id, Vector2 target) {
-    //check for out of bound
-    sys.video.page[page_id].layer[layer_id].mouse.offset = target;
+    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
+    int lsx = layer->size.x, lsy = layer->size.y;
+    if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
+    if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
+    layer->mouse.offset = target;
 }
 
 void layer_set_keyboard_position(int page_id, int layer_id, Vector2 target) {
-    //check for out of bound
-    sys.video.page[page_id].layer[layer_id].keyboard.offset = target;
+    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
+    int lsx = layer->size.x, lsy = layer->size.y;
+    if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
+    if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
+    layer->keyboard.offset = target;
 }
 
 void set_cell_state(int page_id, int layer_id, Rectangle target, unsigned int state) {
@@ -1011,7 +1090,7 @@ void clear_cell_state(int page_id, int layer_id, Rectangle target, unsigned int 
     }
 }
 
-void set_cell_fg_color(int page_id, int layer_id, Rectangle target, int color_id) {
+void set_cell_colorfg(int page_id, int layer_id, Rectangle target, int color_id) {
     int linear_offset;
     EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
     int lsx = layer->size.x, lsy = layer->size.y;
@@ -1024,12 +1103,12 @@ void set_cell_fg_color(int page_id, int layer_id, Rectangle target, int color_id
     for (int x = target.x; x++; x < (target.x + target.width)) {
         for (int y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
-            target_cell[linear_offset].fg_color_id = color_id;
+            target_cell[linear_offset].colorfg_id = color_id;
         }
     }
 }
 
-void set_cell_bg_color(int page_id, int layer_id, Rectangle target, int color_id) {
+void set_cell_colorbg(int page_id, int layer_id, Rectangle target, int color_id) {
     int linear_offset;
     EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
     int lsx = layer->size.x, lsy = layer->size.y;
@@ -1042,12 +1121,12 @@ void set_cell_bg_color(int page_id, int layer_id, Rectangle target, int color_id
     for (int x = target.x; x++; x < (target.x + target.width)) {
         for (int y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
-            target_cell[linear_offset].bg_color_id = color_id;
+            target_cell[linear_offset].colorbg_id = color_id;
         }
     }
 }
 
-void set_cell_lines_color(int page_id, int layer_id, Rectangle target, int color_id) {
+void set_cell_colorln(int page_id, int layer_id, Rectangle target, int color_id) {
     int linear_offset;
     EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
     int lsx = layer->size.x, lsy = layer->size.y;
@@ -1060,7 +1139,7 @@ void set_cell_lines_color(int page_id, int layer_id, Rectangle target, int color
     for (int x = target.x; x++; x < (target.x + target.width)) {
         for (int y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
-            target_cell[linear_offset].lines_color_id = color_id;
+            target_cell[linear_offset].colorln_id = color_id;
         }
     }
 }
@@ -1156,7 +1235,7 @@ void set_cell_scale(int page_id, int layer_id, Rectangle target, Vector2 scale) 
 }
 
 // iterate through charracter ascii codes, if font pixels then copy desired source_cell information to the layer
-void plot_big_characters(int page_id, int layer_id, Vector2 target, unsigned int state, int font_id, EX_cell source_cell, unsigned char *ch) {
+void plot_big_characters(int page_id, int layer_id, Vector2 target, unsigned int state, int font_id, unsigned char *ch) {
     int linear_offset;
     EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
     int lsx = layer->size.x, lsy = layer->size.y;
@@ -1214,12 +1293,12 @@ void init_cell (int page_id, int layer_id, Rectangle target, EX_cell info_cell, 
                         if (state & GFLD_VALUE)             target_cell[target_offset].value                 = info_cell.value;
                         if (state & GFLD_LINES)             target_cell[target_offset].lines                 = info_cell.lines;
                         if (state & GFLD_CYCLE)             target_cell[target_offset].cycle_id              = info_cell.cycle_id;
-                        if (state & GFLD_FG_COLOR)          target_cell[target_offset].fg_color_id           = info_cell.fg_color_id;
-                        if (state & GFLD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = info_cell.fg_color_cycle_id;
-                        if (state & GFLD_BG_COLOR)          target_cell[target_offset].bg_color_id           = info_cell.bg_color_id;
-                        if (state & GFLD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = info_cell.bg_color_cycle_id;
-                        if (state & GFLD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = info_cell.lines_color_id;
-                        if (state & GFLD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = info_cell.lines_color_cycle_id;
+                        if (state & GFLD_FG_COLOR)          target_cell[target_offset].colorfg_id           = info_cell.colorfg_id;
+                        if (state & GFLD_FG_COLOR_CYCLE)    target_cell[target_offset].colorfg_cycle_id     = info_cell.colorfg_cycle_id;
+                        if (state & GFLD_BG_COLOR)          target_cell[target_offset].colorbg_id           = info_cell.colorbg_id;
+                        if (state & GFLD_BG_COLOR_CYCLE)    target_cell[target_offset].colorbg_cycle_id     = info_cell.colorbg_cycle_id;
+                        if (state & GFLD_LINES_COLOR)       target_cell[target_offset].colorln_id        = info_cell.colorln_id;
+                        if (state & GFLD_LINES_COLOR_CYCLE) target_cell[target_offset].colorln_cycle_id  = info_cell.colorln_cycle_id;
                         if (state & GFLD_OFFSET)            target_cell[target_offset].offset                = info_cell.offset;
                         if (state & GFLD_SKEW)              target_cell[target_offset].skew                  = info_cell.skew;
                         if (state & GFLD_SCALE)             target_cell[target_offset].scale                 = info_cell.scale;
@@ -1259,12 +1338,12 @@ void shift_cell_field_rectangle(int page_id, int layer_id, Rectangle target, flo
                         if (state & GFLD_VALUE)             {target_cell[target_offset].value                 += shift;} // determined by texture # tiles
                         if (state & GFLD_LINES)             {target_cell[target_offset].lines                 += shift;} // 0...255
                         if (state & GFLD_CYCLE)             {target_cell[target_offset].cycle_id              += shift;} // determined by texture # tiles
-                        if (state & GFLD_FG_COLOR)          {target_cell[target_offset].fg_color_id           += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_FG_COLOR_CYCLE)    {target_cell[target_offset].fg_color_cycle_id     += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_BG_COLOR)          {target_cell[target_offset].bg_color_id           += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_BG_COLOR_CYCLE)    {target_cell[target_offset].bg_color_cycle_id     += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_LINES_COLOR)       {target_cell[target_offset].lines_color_id        += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_LINES_COLOR_CYCLE) {target_cell[target_offset].lines_color_cycle_id  += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_FG_COLOR)          {target_cell[target_offset].colorfg_id           += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_FG_COLOR_CYCLE)    {target_cell[target_offset].colorfg_cycle_id     += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_BG_COLOR)          {target_cell[target_offset].colorbg_id           += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_BG_COLOR_CYCLE)    {target_cell[target_offset].colorbg_cycle_id     += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_LINES_COLOR)       {target_cell[target_offset].colorln_id        += shift;} // 0...255 (or palette size)
+                        if (state & GFLD_LINES_COLOR_CYCLE) {target_cell[target_offset].colorln_cycle_id  += shift;} // 0...255 (or palette size)
                         //if (state & GFLD_OFFSET)            {target_cell[target_offset].offset                += shift;} // Vector2 x,y
                         //if (state & GFLD_SKEW)              {target_cell[target_offset].skew                  += shift;} // Vector2 x,y
                         //if (state & GFLD_SCALE)             {target_cell[target_offset].scale                 += shift;} // Vector2 x,y
@@ -1340,12 +1419,12 @@ void copy_cell_in_layer(int page_id, int layer_id, Rectangle source, Vector2 tar
                         if (state & GFLD_VALUE)             cell[target_offset].value                 = cell[source_offset].value;
                         if (state & GFLD_LINES)             cell[target_offset].lines                 = cell[source_offset].lines;
                         if (state & GFLD_CYCLE)             cell[target_offset].cycle_id              = cell[source_offset].cycle_id;
-                        if (state & GFLD_FG_COLOR)          cell[target_offset].fg_color_id           = cell[source_offset].fg_color_id;
-                        if (state & GFLD_FG_COLOR_CYCLE)    cell[target_offset].fg_color_cycle_id     = cell[source_offset].fg_color_cycle_id;
-                        if (state & GFLD_BG_COLOR)          cell[target_offset].bg_color_id           = cell[source_offset].bg_color_id;
-                        if (state & GFLD_BG_COLOR_CYCLE)    cell[target_offset].bg_color_cycle_id     = cell[source_offset].bg_color_cycle_id;
-                        if (state & GFLD_LINES_COLOR)       cell[target_offset].lines_color_id        = cell[source_offset].lines_color_id;
-                        if (state & GFLD_LINES_COLOR_CYCLE) cell[target_offset].lines_color_cycle_id  = cell[source_offset].lines_color_cycle_id;
+                        if (state & GFLD_FG_COLOR)          cell[target_offset].colorfg_id           = cell[source_offset].colorfg_id;
+                        if (state & GFLD_FG_COLOR_CYCLE)    cell[target_offset].colorfg_cycle_id     = cell[source_offset].colorfg_cycle_id;
+                        if (state & GFLD_BG_COLOR)          cell[target_offset].colorbg_id           = cell[source_offset].colorbg_id;
+                        if (state & GFLD_BG_COLOR_CYCLE)    cell[target_offset].colorbg_cycle_id     = cell[source_offset].colorbg_cycle_id;
+                        if (state & GFLD_LINES_COLOR)       cell[target_offset].colorln_id        = cell[source_offset].colorln_id;
+                        if (state & GFLD_LINES_COLOR_CYCLE) cell[target_offset].colorln_cycle_id  = cell[source_offset].colorln_cycle_id;
                         if (state & GFLD_OFFSET)            cell[target_offset].offset                = cell[source_offset].offset;
                         if (state & GFLD_SKEW)              cell[target_offset].skew                  = cell[source_offset].skew;
                         if (state & GFLD_SCALE)             cell[target_offset].scale                 = cell[source_offset].scale;
@@ -1376,7 +1455,6 @@ void shift_cell (int page_id, int layer_id, Rectangle source, unsigned char shif
     //if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.y + source.height) < 0) return;
     if ((source.x + source.width) > lsx) source.width = lsx - source.x;
     if ((source.y + source.width) > lsy) source.width = lsy - source.y;
-
 
 }
 
@@ -1413,12 +1491,12 @@ void copy_cell_to_layer(int source_page_id, int source_layer_id, Rectangle sourc
                         if (state & GFLD_VALUE)             target_cell[target_offset].value                 = source_cell[source_offset].value;
                         if (state & GFLD_LINES)             target_cell[target_offset].lines                 = source_cell[source_offset].lines;
                         if (state & GFLD_CYCLE)             target_cell[target_offset].cycle_id              = source_cell[source_offset].cycle_id;
-                        if (state & GFLD_FG_COLOR)          target_cell[target_offset].fg_color_id           = source_cell[source_offset].fg_color_id;
-                        if (state & GFLD_FG_COLOR_CYCLE)    target_cell[target_offset].fg_color_cycle_id     = source_cell[source_offset].fg_color_cycle_id;
-                        if (state & GFLD_BG_COLOR)          target_cell[target_offset].bg_color_id           = source_cell[source_offset].bg_color_id;
-                        if (state & GFLD_BG_COLOR_CYCLE)    target_cell[target_offset].bg_color_cycle_id     = source_cell[source_offset].bg_color_cycle_id;
-                        if (state & GFLD_LINES_COLOR)       target_cell[target_offset].lines_color_id        = source_cell[source_offset].lines_color_id;
-                        if (state & GFLD_LINES_COLOR_CYCLE) target_cell[target_offset].lines_color_cycle_id  = source_cell[source_offset].lines_color_cycle_id;
+                        if (state & GFLD_FG_COLOR)          target_cell[target_offset].colorfg_id           = source_cell[source_offset].colorfg_id;
+                        if (state & GFLD_FG_COLOR_CYCLE)    target_cell[target_offset].colorfg_cycle_id     = source_cell[source_offset].colorfg_cycle_id;
+                        if (state & GFLD_BG_COLOR)          target_cell[target_offset].colorbg_id           = source_cell[source_offset].colorbg_id;
+                        if (state & GFLD_BG_COLOR_CYCLE)    target_cell[target_offset].colorbg_cycle_id     = source_cell[source_offset].colorbg_cycle_id;
+                        if (state & GFLD_LINES_COLOR)       target_cell[target_offset].colorln_id        = source_cell[source_offset].colorln_id;
+                        if (state & GFLD_LINES_COLOR_CYCLE) target_cell[target_offset].colorln_cycle_id  = source_cell[source_offset].colorln_cycle_id;
                         if (state & GFLD_OFFSET)            target_cell[target_offset].offset                = source_cell[source_offset].offset;
                         if (state & GFLD_SKEW)              target_cell[target_offset].skew                  = source_cell[source_offset].skew;
                         if (state & GFLD_SCALE)             target_cell[target_offset].scale                 = source_cell[source_offset].scale;
@@ -1437,55 +1515,47 @@ void copy_cell_to_layer(int source_page_id, int source_layer_id, Rectangle sourc
 }
 
 void render_layer(int layer_id) {
+    Color vertex_colors[4];
     int page_id = sys.video.current_virtual; // A single page per Virtual Display
 
     EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
     EX_cell  *cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
     int offset;
-    int lsx = layer->size.x, sy = layer->size.y;
+    unsigned short asset_id = layer->asset_id;
+    unsigned short palette_id = layer->palette_id;
+    Vector2 shadow = layer->shadow;
+    int lsx = layer->size.x, lsy = layer->size.y;
     for (int x = 0; x < lsx; x++) {
-        for (int y = 0; y < sy; y++) {
+        for (int y = 0; y < lsy; y++) {
             offset = lsx * y + x;
             EX_cell *c = &cell[offset];
+            unsigned int state = c->state;
+            unsigned char lines = c->lines;
+            Color colorfg = get_palette_color(palette_id, c->colorfg_id);
+            Color colorbg = get_palette_color(palette_id, c->colorbg_id);
+            Color colorln = get_palette_color(palette_id, c->colorln_id);
+            Vector2 offset = c->offset;
+            Vector2 scale = c->scale;
+            Vector2 skew = c->skew;
+            float angle = c->angle;
+            if (!(state & GRID_ROTATION)) angle = 0.f;
+            
             // we have the cell data we can use it to draw our background, foreground and shadow
             // calculate position x,y
             // ascii code is in c.value
             // reading color from palette get_palette_color(palette,id);
 
-            if (c->state & GRID_BACKGROUND) {// then you can draw the background
     // background set color of corner to color of next tile 
 //    GRID_BGBLEND_LLEFT       // background vertex color blend lower left
 //    GRID_BGBLEND_LRIGHT      // background vertex color blend lower right
 //    GRID_BGBLEND_URIGHT      // background vertex color blend upper right
 //    GRID_BGBLEND_ULEFT       // background vertex color blend upper left
-            }
 
-            if (c->state & GRID_SHADOW) {    // then you can draw the shadow
-            }
-
-            if (c->state & GRID_FOREGROUND) { // then you can draw the foreground
     // foreground set color of corner to color of next tile 
 //    GRID_FGBLEND_LLEFT       // foreground vertex color blend lower left
 //    GRID_FGBLEND_LRIGHT      // foreground vertex color blend lower right
 //    GRID_FGBLEND_URIGHT      // foreground vertex color blend upper right
 //    GRID_FGBLEND_ULEFT       // foreground vertex color blend upper left
-
-/*
-                    unsigned int state = GRID_FOREGROUND | GRID_RED | GRID_GREEN | GRID_BLUE | GRID_SCALE_X | GRID_SCALE_Y;
-                    if (ex_scrolltext[s].bg_color_flag > 0) state |= GRID_BACKGROUND;
-                    if (ex_scrolltext[s].text_angle)        state |= GRID_ROTATION;
-                    if (ex_scrolltext[s].text_shadow > 0.0) state |= GRID_SHADOW;
-                    if (!(ex_scrolltext[s].text_angle))     state |= GRID_SKEW;
-                    plot_character(ex_scrolltext[s].font_id, ex_scrolltext[s].palette_id, ch,
-                        (Vector2) {x * text_scale, y * text_scale}, 
-                        (Vector2) {text_scale, text_scale}, 
-                        ex_scrolltext[s].skew,
-                        (Vector2) {2, 2},
-                        ex_scrolltext[s].text_angle, 
-                        get_palette_color_pro(palette_id, ex_scrolltext[s].fg_color, ex_scrolltext[s].alpha), 
-                        get_palette_color_pro(palette_id, ex_scrolltext[s].bg_color, ex_scrolltext[s].alpha), 
-                        state);
-*/
 
 /*  All STATES (exhaustive logic) and LINES (just a DrawTexture) to consider
 
@@ -1517,21 +1587,61 @@ void render_layer(int layer_id) {
     GRID_BLUE                // turn on blue channel
     GRID_ALPHA               // turn on transparency
 
-// DrawTexturePro2();
-//verified against texture
-    if (state & GRID_LINES) {
-    DrawTexturePro of the Lines texture based on the cell Lines 
-
-    LINE_TOP            // turn on line top
-    LINE_BOT            // turn on line bottom
-    LINE_LEF            // turn on line left
-    LINE_RIG            // turn on line right
-    LINE_HOR            // turn on line center horizontal
-    LINE_VER            // turn on line center vertical
-    LINE_DOW            // turn on line angle down
-    LINE_UP             // turn on line angle up
-    }
+    DrawTexturePro2(
+    );
 */
+            {
+                // to elaborate color blending between tiles... (will involve snooping all 4 directions for color depend on blending options)
+                if (state & GRID_BACKGROUND) {
+                    if (state & GRID_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
+                    if (state & GRID_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
+                    if (state & GRID_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
+                    if (state & GRID_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
+                    vertex_colors[1] = vertex_colors[0];
+                    vertex_colors[2] = vertex_colors[0];
+                    vertex_colors[3] = vertex_colors[0];
+                    DrawRectanglePro2(
+                        (Rectangle) { x, y, scale.x, scale.y },
+                        (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
+                }
+                if (state & GRID_FOREGROUND) {
+                        unsigned short value = c->value;
+                        if (state & GRID_SHADOW) {
+                            vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
+                            vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
+                            vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
+                            vertex_colors[3] = (Color) {0.f, 0.f, 0.f, 48.f};
+                            DrawTexturePro2(sys.asset.tex[asset_id],
+                                get_tilezone_from_code(asset_id, value),
+                                (Rectangle) { x + shadow.x, y + shadow.y, scale.x, scale.y },
+                                (Vector2) {0,0}, skew, angle, vertex_colors);
+                        };
+                        if (state & GRID_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
+                        if (state & GRID_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
+                        if (state & GRID_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
+                        if (state & GRID_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
+                        vertex_colors[1] = vertex_colors[0];
+                        vertex_colors[2] = vertex_colors[0];
+                        vertex_colors[3] = vertex_colors[0];
+                        DrawTexturePro2(sys.asset.tex[asset_id],
+                            get_tilezone_from_code(asset_id, value),
+                            (Rectangle) { x, y , scale.x, scale.y },
+                            (Vector2) {0,0}, skew, angle, vertex_colors);
+                }
+
+                if ((state & GRID_LINES) && lines) {
+                    if (state & GRID_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
+                    if (state & GRID_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
+                    if (state & GRID_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
+                    if (state & GRID_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
+                    vertex_colors[1] = vertex_colors[0];
+                    vertex_colors[2] = vertex_colors[0];
+                    vertex_colors[3] = vertex_colors[0];
+                    DrawTexturePro2(sys.asset.tex[sys.asset.lines_id],
+                        get_tilezone_from_code(sys.asset.lines_id, lines),
+                        (Rectangle) { x, y , scale.x, scale.y },
+                        (Vector2) {0,0}, skew, angle, vertex_colors);
+                }
             }
         }
     }
@@ -1833,7 +1943,7 @@ int load_asset (unsigned int assettype, const char* fileName, const char* fileTy
 
 
 int load_palette(Vector2 count, const char* fileName, const char* fileType, const unsigned char* fileData, int dataSize, int pak) {
-    int asset_id = load_asset(ASSET_PALETTE, fileName, fileType, fileData, dataSize, pak);
+    unsigned short asset_id = load_asset(ASSET_PALETTE, fileName, fileType, fileData, dataSize, pak);
     float width = (float)sys.asset.img[asset_id].width;
     float height = (float)sys.asset.img[asset_id].height;
 
@@ -1849,7 +1959,7 @@ int load_palette(Vector2 count, const char* fileName, const char* fileType, cons
 
 int load_tileset(Vector2 count, const char* fileName, const char* fileType, const unsigned char* fileData, int dataSize, int pak, int ascii_start) {
 
-    int asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
+    unsigned short asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
     float width = (float)sys.asset.img[asset_id].width;
     float height = (float)sys.asset.img[asset_id].height;
 
@@ -2398,7 +2508,7 @@ typedef struct EX_marquee {
 
 EX_marquee ex_marquee[MAXDISPLAYS];
 
-static void update_marquee_animation(int asset_id, int palette_id, Vector2 logosize, float transparency, Vector2 offset, float speed, float shadow_transparency) {
+static void update_marquee_animation(unsigned short asset_id, int palette_id, Vector2 logosize, float transparency, Vector2 offset, float speed, float shadow_transparency) {
     int display = sys.video.current_virtual;
     if (ex_marquee[display].palptr_next_frame_time < sys.video.frame_time_inc[display]) {
         ex_marquee[display].palptr_next_frame_time = sys.video.frame_time_inc[display] + 1/absf(speed);
@@ -2490,7 +2600,7 @@ static void init_canopy (int font_id, int palette_id, Vector2 cells, Vector2 cel
     };
 }
 
-static void update_canopy(int asset_id) {
+static void update_canopy(unsigned short asset_id) {
     ex_canopy.offset.x = (sys.video.virtual_res[sys.video.current_virtual].x-((ex_canopy.cells_x+1)*ex_canopy.cell_size.x))*0.5f;
     ex_canopy.offset.y = 7.0f * ex_canopy.cell_size.x + (255.f - ex_canopy.transparency);
     if ((ex_canopy.transparency > 0.0f) & (ex_canopy.offset.y <= sys.video.virtual_res[sys.video.current_virtual].y)) {
@@ -2566,7 +2676,7 @@ static void draw_colorbar(void) {
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** B E G I N
 
 typedef struct EX_scrolltext {
-    int asset_id;
+    unsigned short asset_id;
     int font_id;
     int palette_id;
     Vector2 position;
@@ -2579,15 +2689,15 @@ typedef struct EX_scrolltext {
     float text_pause;
     float text_scroll_speed;
     float text_shadow;
-    unsigned short fg_color;
-    unsigned short fg_color_flag;
-    unsigned short bg_color;
-    unsigned short bg_color_flag;
+    unsigned short colorfg;
+    unsigned short colorfg_flag;
+    unsigned short colorbg;
+    unsigned short colorbg_flag;
 } EX_scrolltext;
 
 EX_scrolltext ex_scrolltext[16];
 
-static void init_scrolltext(int s, int asset_id, int font_id, int palette_id, float speed, Vector2 position, Vector2 skew, float alpha) {
+static void init_scrolltext(int s, unsigned short asset_id, int font_id, int palette_id, float speed, Vector2 position, Vector2 skew, float alpha) {
     ex_scrolltext[s].asset_id = asset_id;
     ex_scrolltext[s].font_id = font_id;
     ex_scrolltext[s].palette_id = palette_id;
@@ -2601,13 +2711,13 @@ static void init_scrolltext(int s, int asset_id, int font_id, int palette_id, fl
     ex_scrolltext[s].alpha = alpha;
     ex_scrolltext[s].text_scroll_speed = speed;
     ex_scrolltext[s].text_shadow = 0.0;
-    ex_scrolltext[s].fg_color_flag = 0;
-    ex_scrolltext[s].bg_color_flag = 0;
-    ex_scrolltext[s].fg_color = 15;
-    ex_scrolltext[s].bg_color = 0;
+    ex_scrolltext[s].colorfg_flag = 0;
+    ex_scrolltext[s].colorbg_flag = 0;
+    ex_scrolltext[s].colorfg = 15;
+    ex_scrolltext[s].colorbg = 0;
 }
 
-const int scrolltext_colors[] = {
+const int scrolltext_color[] = {
         33,   // BROWN
         41,   // BEIGE
         58,   // ORANGE
@@ -2630,9 +2740,9 @@ const int scrolltext_colors[] = {
 };
 
 int scrolltext_color_pick(int id) {
-    int colors = sizeof(scrolltext_colors) / 4;
+    int colors = sizeof(scrolltext_color) / 4;
     if (id >= colors) id = (colors - 1); else if (id < 0) id = 0;
-    return scrolltext_colors[id];
+    return scrolltext_color[id];
 }
 
 //S C R O L L T E X T   C O M M A N D S
@@ -2703,32 +2813,32 @@ static void update_scrolltext(int s, float text_scale) {
             ex_scrolltext[s].text_wave_flag = 0;
             break;
         case SCROLL_TEXTCOLCYCLE: // text color grayscale wave
-            ex_scrolltext[s].fg_color_flag = 1;
+            ex_scrolltext[s].colorfg_flag = 1;
             break;
         case SCROLL_TEXTCOLOR: // text color table chooser
             i++;
-            ex_scrolltext[s].fg_color = scrolltext_color_pick((sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97);
+            ex_scrolltext[s].colorfg = scrolltext_color_pick((sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97);
             break;
         case SCROLL_BKGNDCOLOR: // background color table chooser
             i++;
-            ex_scrolltext[s].bg_color_flag = 1;
+            ex_scrolltext[s].colorbg_flag = 1;
             id = (sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97;
-            ex_scrolltext[s].bg_color = scrolltext_color_pick(id);
-            if (id > 18) ex_scrolltext[s].bg_color_flag = 0;
+            ex_scrolltext[s].colorbg = scrolltext_color_pick(id);
+            if (id > 18) ex_scrolltext[s].colorbg_flag = 0;
             break;
         case SCROLL_BKGNDCOLORX: // background color extended chooser 
             i++;
-            ex_scrolltext[s].bg_color_flag = 1;
+            ex_scrolltext[s].colorbg_flag = 1;
             int hue = (sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97;
             if (hue > 15) hue = 15; // can not test id
             i++;
             int lum = (sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97;
             if (lum > 15) lum = 15; // can not test id
-            ex_scrolltext[s].bg_color = (hue * 16 + lum);
+            ex_scrolltext[s].colorbg = (hue * 16 + lum);
             break;
         case SCROLL_TEXTNOCOLOR: // text color normal
-            ex_scrolltext[s].fg_color = 15;
-            ex_scrolltext[s].fg_color_flag = 0;
+            ex_scrolltext[s].colorfg = 15;
+            ex_scrolltext[s].colorfg_flag = 0;
             break;
         default:
             if(((ex_scrolltext[s].position.x + (i_x - 1)) * text_scale ) < sys.video.virtual_res[sys.video.current_virtual].x && ((ex_scrolltext[s].position.x + (i_x + 2)) * text_scale ) > 0) {
@@ -2760,8 +2870,8 @@ static void update_scrolltext(int s, float text_scale) {
                     } else {
                         ex_scrolltext[s].text_wave = 0;
                     };
-                    if (ex_scrolltext[s].fg_color_flag == 1) {
-                        ex_scrolltext[s].fg_color = (unsigned short)(displacement.y * 0.5f) + 7;
+                    if (ex_scrolltext[s].colorfg_flag == 1) {
+                        ex_scrolltext[s].colorfg = (unsigned short)(displacement.y * 0.5f) + 7;
                     };
                     if (ex_scrolltext[s].text_pause > 0.0 || ex_scrolltext[s].text_wave_flag == 0) {
                         ex_scrolltext[s].text_angle = 0;
@@ -2771,7 +2881,7 @@ static void update_scrolltext(int s, float text_scale) {
 
                     unsigned int state = 0;
                     BITS_ON(state, GRID_DEFAULT2);
-                    if (ex_scrolltext[s].bg_color_flag == 0) BITS_OFF(state, GRID_BACKGROUND);
+                    if (ex_scrolltext[s].colorbg_flag == 0) BITS_OFF(state, GRID_BACKGROUND);
                     if (!(ex_scrolltext[s].text_angle))     BITS_OFF(state, GRID_ROTATION);
                     if (ex_scrolltext[s].text_shadow == 0.0) BITS_OFF(state, GRID_SHADOW);
                     if (ex_scrolltext[s].text_angle)        BITS_OFF(state, GRID_SKEW);
@@ -2782,8 +2892,8 @@ static void update_scrolltext(int s, float text_scale) {
                         ex_scrolltext[s].skew,
                         (Vector2) {2, 2},
                         ex_scrolltext[s].text_angle, 
-                        get_palette_color_pro(palette_id, ex_scrolltext[s].fg_color, ex_scrolltext[s].alpha), 
-                        get_palette_color_pro(palette_id, ex_scrolltext[s].bg_color, ex_scrolltext[s].alpha),
+                        get_palette_color_pro(palette_id, ex_scrolltext[s].colorfg, ex_scrolltext[s].alpha), 
+                        get_palette_color_pro(palette_id, ex_scrolltext[s].colorbg, ex_scrolltext[s].alpha),
                         (Color) {255, 255, 255, 255},
                         state);
                 };
@@ -2805,11 +2915,11 @@ static void update_scrolltext(int s, float text_scale) {
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** E N D
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** E N D
 
-// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
-// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
-// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
 
-static const kb_layout[] = {
+static const kbmap_scancodes[] = {
     KEY_ESCAPE ,0 , 0, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12, 0, KEY_PRINT_SCREEN, KEY_SCROLL_LOCK, KEY_PAUSE, 0, 0, 0, 0, 0, 
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
     KEY_GRAVE, KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_FIVE, KEY_SIX, KEY_SEVEN, KEY_EIGHT, KEY_NINE, KEY_ZERO, KEY_MINUS, KEY_EQUAL, KEY_BACKSPACE, KEY_BACKSPACE, 0, KEY_INSERT, KEY_HOME, KEY_PAGE_UP, 0, KEY_NUM_LOCK, KEY_KP_DIVIDE, KEY_KP_MULTIPLY, KEY_KP_SUBTRACT, 
@@ -2819,7 +2929,90 @@ static const kb_layout[] = {
     KEY_LEFT_CONTROL, KEY_LEFT_SUPER, KEY_LEFT_ALT, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_RIGHT_ALT, KEY_RIGHT_SUPER, KEY_KB_MENU, KEY_RIGHT_CONTROL, 0, KEY_LEFT, KEY_DOWN, KEY_RIGHT, 0, KEY_KP_0, KEY_KP_0, KEY_KP_DECIMAL, KEY_KP_ENTER
 };
 
-#include <time.h>
+static const kbmap_ascii[] = {
+    27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    96, 49, 50, 51, 52, 53, 54, 55, 56, 57, 45, 61, 8, 0, 0, 0, 0, 0, 0, 0, 0, 47, 42, 45, 
+    9, 9, 81, 87, 69, 82, 84, 89, 85, 73, 79, 80, 91, 93, 92, 0, 0, 0, 127, 0, 55, 56, 57, 43, 
+    0, 0, 65, 83, 68, 70, 71, 72, 74, 75, 76, 59, 44, 13, 13, 0, 0, 0, 0, 0, 52, 53, 54, 43, 
+    0, 0, 90, 88, 67, 86, 66, 78, 77, 44, 46, 47, 0, 0, 0, 0, 0, 0, 0, 0, 49, 50, 51, 13, 
+    0, 0, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 48, 48, 46, 13
+};
+
+typedef enum {
+    octave_up           = 192,
+    octave_down         = 193,
+    instrument_up       = 194,
+    instrument_down     = 195,
+    enable_arpeggio     = 196,
+    disable_arpeggio    = 197,
+    perc_bd1            = 224,
+    perc_bd2            = 225,
+    perc_sn1            = 226,
+    perc_sn2            = 227,
+    perc_tom1           = 228,
+    perc_tom2           = 229,
+    perc_tom3           = 230,
+    perc_cymbal         = 231,
+    perc_oph            = 232,
+    perc_clhh           = 233,
+    perc_cbell          = 234,
+    perc_wblk           = 235,
+    perc_clap           = 236,
+    perc_rim            = 237,
+    perc_tamb           = 238,
+    null_function       = 255
+} track_editor;
+
+static const kbmap_piano[] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+// TERMINALDISPLAY (ie. 4)
+
+bool init_terminal(tileset_id) {
+    SetExitKey(false); // Disables the ESCAPE key from the RayLib core
+    int display = sys.video.current_virtual;
+    unsigned int page_state = 0;
+    unsigned int layer_state = 0;
+    unsigned int cell_state = 0;
+    unsigned int page_id = sys.video.current_virtual; // A single page per Virtual Display
+
+    init_page(page_id, (Vector2){40, 24}, page_state, layer_state, cell_state, tileset_id);
+    return 0;
+}
+
+// Establish keyboard management / buffer
+// Establish mouse management (old x,y / current x,y)
+void update_terminal(void) {
+// RLAPI void PollInputEvents(void);                                 // Register all input events
+// RLAPI int GetKeyPressed(void);                                // Get key pressed (keycode), call it multiple times for keys queued
+// RLAPI int GetCharPressed(void);                               // Get char pressed (unicode), call it multiple times for chars queued
+// RLAPI bool IsMouseButtonPressed(int button);                  // Check if a mouse button has been pressed once
+// RLAPI bool IsMouseButtonDown(int button);                     // Check if a mouse button is being pressed
+// RLAPI bool IsMouseButtonReleased(int button);                 // Check if a mouse button has been released once
+// RLAPI bool IsMouseButtonUp(int button);                       // Check if a mouse button is NOT being pressed
+
+}
+
+void show_terminal(void) {
+    // aimed at displaying the terminal page only
+}
+
+
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
+
+// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
+// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
+// *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
 
 char *time_stamp(){
     char *timestamp = (char *)malloc(20);
@@ -2867,7 +3060,7 @@ void display_keybed(void)  {
     for (int j = 0; j < 7; j++) {
         for (int i = 0; i < row; i++) {
             int letter = (j*row)+i;
-            int key = kb_layout[letter];
+            int key = kbmap_scancodes[letter];
             if (key) {
                 if (IsKeyDown(key)) {
                     DrawRectangle(i*64, 20+j*64, 64, 64, GREEN);
@@ -3020,46 +3213,6 @@ void debug_console_out(const char* message) {
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
-
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
-
-// TERMINALDISPLAY (ie. 4)
-
-bool init_terminal(tileset_id) {
-    SetExitKey(false); // Disables the ESCAPE key from the RayLib core
-    int display = sys.video.current_virtual;
-    unsigned int page_state = 0;
-    unsigned int layer_state = 0;
-    unsigned int cell_state = 0;
-    unsigned int page_id = sys.video.current_virtual; // A single page per Virtual Display
-
-    init_page(page_id, (Vector2){40, 24}, page_state, layer_state, cell_state, tileset_id);
-    return 0;
-}
-
-// Establish keyboard management / buffer
-// Establish mouse management (old x,y / current x,y)
-void update_terminal(void) {
-// RLAPI void PollInputEvents(void);                                 // Register all input events
-// RLAPI int GetKeyPressed(void);                                // Get key pressed (keycode), call it multiple times for keys queued
-// RLAPI int GetCharPressed(void);                               // Get char pressed (unicode), call it multiple times for chars queued
-// RLAPI bool IsMouseButtonPressed(int button);                  // Check if a mouse button has been pressed once
-// RLAPI bool IsMouseButtonDown(int button);                     // Check if a mouse button is being pressed
-// RLAPI bool IsMouseButtonReleased(int button);                 // Check if a mouse button has been released once
-// RLAPI bool IsMouseButtonUp(int button);                       // Check if a mouse button is NOT being pressed
-
-}
-
-void show_terminal(void) {
-    // aimed at displaying the terminal page only
-}
-
-
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
 
 // ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
 // ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
