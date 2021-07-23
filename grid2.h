@@ -14,7 +14,7 @@
 #include "utils.h"           // Required for: TRACELOG macros
 #include "raylib.h"          // works on version 3.8 development
 #include "raymath.h"
-#include "rlgl.h"            // raylib OpenGL abstraction layer to OpenGL 1.1, 3.3 or ES2
+#include "rlgl.h"            // raylib OpenGL abstraction to OpenGL 1.1, 3.3 or ES2
 #include <GLFW/glfw3.h>
 
 //#include <windows.h> 
@@ -289,8 +289,9 @@ static int gcdi(int a, int b) {
         { -0.199,  0.118 },	{ -0.243,  0.037 },	{ -0.237, -0.052 },	{ -0.180, -0.129 },	{ -0.087, -0.181 },	{  0.021, -0.196 },	{  0.130, -0.169 },	{  0.210, -0.107 }
 	};*/
 // YIQ formula for Atari 8bit GTIA colors (0-255) index
-// https://atariage.com/forums/topic/107853-need-the-256-colors/page/2/#comments
+// https://atariage.com/forums/topic/107853-need-the-256-colors/pagegroup/2/#comments
 // The following routine is currently dead code as I personally do not like the resulting colors...  Something is wrong in the translation from YIQ
+// separate in tywo functions; one that takes a value and returns RGB, and one that takes YIQ and returns RGB
 Color gtia_ntsc_to_rgb(int val) {
     int chroma = (val >> 4) & 15;
     int luminence = val & 15;
@@ -302,26 +303,74 @@ Color gtia_ntsc_to_rgb(int val) {
     float i = crlv * cos(phase);
     float q = crlv * sin(phase);
 
-    float r = y + 0.9563 * i + 0.621 * q;
-    float g = y - 0.2721 * i - 0.6474 * q;
-    float b = y - 1.107 * i + 1.7046 * q;
+    float r = y + 0.956294832320893995 * i + 0.621025125444728741 * q;
+    float g = y - 0.2721214740839773195 * i - 0.6473809535176157223 * q;
+    float b = y - 1.106989908567128216 * i + 1.704614975498829329 * q;
 
-	if (r < 0) r = 0;
-	if (g < 0) g = 0;
-	if (b < 0) b = 0;
+	if (r < 0) r = 0; else if (r > 255) r = 255;
+	if (g < 0) g = 0; else if (g > 255) g = 255;;
+	if (b < 0) b = 0; else if (b > 255) b = 255;;
 
     r = pow(r, 0.9);
     g = pow(g, 0.9);
 	b = pow(b, 0.9);
 
-	//if (r > 1) r = 1;
-	//if (g > 1) g = 1;
-	//if (b > 1) b = 1;
-
-    Color col={r + 0.5, g + 0.5, b + 0.5, 255};
+    Color col={(unsigned char)r, (unsigned char)g, (unsigned char)b, 255};
     return col;
 }
 
+/*  VERY OLD Blitz3D code
+Function yiq_rgb(y#,i#,q#, r#, g#, b#)
+;Y = range [0.,1.] (luminance)
+;I = range [-0.5957161349127745527,0.5957161349127745527] (red/green)
+;Q = range [-0.5225910452916111684,0.5225910452916111684] (blue/yellow)
+   red%   = (y + (0.956294832320893995 * i) + (0.621025125444728741 * q)) * r
+   green% = (y - (0.2721214740839773195 * i) - (0.6473809535176157223 * q)) * g
+   blue%  = (y - (1.106989908567128216 * i) + (1.704614975498829329 * q)) * b
+   If red < 0   Then red = 0 ElseIf red > 255 Then red = 255
+   If green < 0   Then green = 0 ElseIf green > 255 Then green = 255
+   If blue < 0   Then blue = 0 ElseIf blue > 255 Then blue = 255
+   Return ((red And $FF) Shl 16) Or ((green And $FF) Shl 8) Or (blue And $FF)
+End Function
+*/
+
+/* ******** KEYBOARD SCANNING
+************** USING WINDOWS: api_OemKeyScan% (wOemChar%) : "OemKeyScan"
+Dim scancodes(256)
+For i = 0 To 255
+   scancodes(i) = api_OemKeyScan(i) And $ff
+Next
+repeat_delay = 500
+repeat_rate = 100
+Print "TYPE HERE:"
+While Not KeyDown(1)
+   timer = MilliSecs()
+   ascii% = GetKey()
+   If ascii > 0 Then
+      ascii_repeat = ascii
+      scancode% = scancodes(ascii)
+      repeat_timer = timer + repeat_delay
+      Write Chr$(ascii)
+   EndIf
+   If KeyDown(scancode) = True Then
+      If timer >= repeat_timer Then
+         Write Chr$(ascii_repeat)
+         repeat_timer = timer + repeat_rate
+      EndIf
+   Else
+      scancode = 0
+   EndIf
+Wend
+*/
+
+char *time_stamp(){
+    char *timestamp = (char *)malloc(20);
+    time_t ltime = time(NULL);
+    struct tm *tm;
+    tm = localtime(&ltime);
+    sprintf(timestamp,"%04d/%02d/%02d-%02d:%02d:%02d", tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+    return timestamp;
+}
 
 // to be determined (need this to replace the RayLib basic Vector structs)
 /*typedef union Vector2 {
@@ -493,13 +542,14 @@ Color get_pixel_color(Image *image, Vector2 position) {
 // **************************************************************************************** G R I D   S T R U C T U R E S
 #define NAMELENGTH_MAX 80
 #define GRID_MAX_CELLS 65536
-#define GRID_MAX_PAGES 5
-#define GRID_MAX_LAYERS 16
+#define GRID_MAX_pagegroupS 5
+#define GRID_MAX_pageS 16
 
 typedef struct EX_cell {
     unsigned int state;                         // all flags for cell
     unsigned short value;                       // value of cell
     unsigned char lines;                        // lines feature
+    unsigned short asset_id;                    // Each cell can point to a different tileset
     unsigned short cycle_id;                    // cell animation sequence number
     unsigned short colorfg_id;                  // palette index color for cell
     unsigned short colorfg_cycle_id;            // color cycle index
@@ -519,12 +569,12 @@ typedef struct EX_cell {
     Color shadow_mask;                          // shadow RGBA mask
 } EX_cell;
 
-typedef struct EX_layer {
+typedef struct EX_page {
     char name[NAMELENGTH_MAX + 1];
     unsigned int state;                         // all flags for grid
-    unsigned short asset_id;                    // tilset used for this layer
+    unsigned short asset_id;                    // tilset used for this page ******* MAKE IT MULTI_ASSET CAPABLE
     Vector2 size;                               // total cells x and y
-    unsigned short palette_id;                  // color palette used for whole layer
+    unsigned short palette_id;                  // color palette used for whole page
     unsigned short colorfg_id;                  // palette index color for cell
     unsigned short colorfg_cycle_id;            // color cycle index
     unsigned short colorbg_id;                  // palette index color for cell background
@@ -535,27 +585,27 @@ typedef struct EX_layer {
     Vector2 displace[4];                        // cell corner displacement (x,y)
     Vector2 scale;                              // (x,y) cell scale
     Vector2 scale_speed;                        // (x,y) cell scale speed
-    Vector2 scroll_speed;                       // layer scroll speed (x,y)
-    float angle;                                // degree of angle to rotate layer
+    Vector2 scroll_speed;                       // page scroll speed (x,y)
+    float angle;                                // degree of angle to rotate page
     float fg_brightness;                        // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
     float bg_brightness;                        // background brightness (values 0...1 divides, values 1 to 255 multiply)
     Vector2 shadow;                             // shadow corner displacement (x,y)
     Vector2 shadow_displace[4];                 // shadow corners displacement (x,y)
-    Color   color_mask;                         // RGBA color mask of layer
+    Color   color_mask;                         // RGBA color mask of page
     Color   shadow_mask;                        // shadow RGBA mask
     EX_cell mouse;                              // mouse cursor
     EX_cell keyboard;                           // key cursor
     EX_cell mask;                               // used for when replicating
     unsigned int cell_count;
     EX_cell* cell; // could be NULL
-} EX_layer;
+} EX_page;
 
-typedef struct EX_page {
+typedef struct EX_pagegroup {
     unsigned int state;
     char name[NAMELENGTH_MAX + 1];
-    int layer_count;                            // total number of layers
-    EX_layer* layer;                            // could be NULL
-} EX_page;
+    int page_count;                            // total number of pages
+    EX_page* page;                            // could be NULL
+} EX_pagegroup;
 
 // **************************************************************************************** A S S E T   S T R U C T U R E S
 #define MAXASSETS 256
@@ -644,7 +694,7 @@ typedef struct EX_video {
     Vector2 virtual_res[MAXDISPLAYS];           // virtual display resolution (x, y)
     int virtual_asset[MAXDISPLAYS];             // virtual display asset number
 
-    EX_page page[MAXDISPLAYS];                  // page data
+    EX_pagegroup pagegroup[MAXDISPLAYS];                  // pagegroup data
 
     int windowstate_normal;                     // physical display window state in normal mode
     int windowstate_paused;                     // physical display window state when game is paused
@@ -661,8 +711,10 @@ typedef struct EX_video {
 typedef struct EX_terminal {
     unsigned int state;
     unsigned short asset_id;
-    int page_id;
-    int layer_id;
+    int pagegroup_id; // Where all terminal pagegroups reside
+    int page_id; // ALl terminal pagegroups are pages
+    
+
 } EX_terminal;
 
 
@@ -883,7 +935,7 @@ typedef enum {
     GRID_FOREGROUND         = 0b00000000000000000000000000000001, // turn on cell foreground (value) (used for hidden mode)
     GRID_DEFAULT1           = 0b00000000011100000000000011111101, // DEFAULT STATE :HEAVY PROCESSING
     GRID_DEFAULT2           = 0b00000000000000001100000011111111, // DEFAULT STATE :SCROLLTEXT
-    GRID_DEFAULT3           = 0b00000000000000000000000000000000, // DEFAULT STATE :GAME LAYER
+    GRID_DEFAULT3           = 0b00000000000000000000000000000000, // DEFAULT STATE :GAME page
     GRID_DEFAULT4           = 0b00000000000000000000000000000000  // DEFAULT STATE :TERMINAL DISPLAY
 } grid_features;
 
@@ -988,77 +1040,77 @@ bool init_cell_linear(EX_cell *cell, unsigned int cell_state, unsigned int color
     return 0;
 }
 
-bool init_layer(int page_id, int layer_id, Vector2 size, unsigned int layer_state, unsigned int cell_state, unsigned short asset_id) {
+bool init_page(int pagegroup_id, int page_id, Vector2 size, unsigned int page_state, unsigned int cell_state, unsigned short asset_id) {
     int cell_count = (int)size.x * (int)size.y;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    layer->size = size;
-    layer->state = layer_state;
-    layer->cell_count = cell_count;
-    layer->cell = calloc(cell_count, sizeof(EX_cell));
-    layer->offset = (Vector2) {0,0};
-    layer->scale = (Vector2) {1,1};
-    layer->angle = 0;
-    layer->fg_brightness = 1.f;
-    layer->bg_brightness = 1.f;
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    page->size = size;
+    page->state = page_state;
+    page->cell_count = cell_count;
+    page->cell = calloc(cell_count, sizeof(EX_cell));
+    page->offset = (Vector2) {0,0};
+    page->scale = (Vector2) {1,1};
+    page->angle = 0;
+    page->fg_brightness = 1.f;
+    page->bg_brightness = 1.f;
 
-    EX_cell *cell = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_cell *cell = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
     for (int i = 0; i < cell_count; i++) {
         init_cell_linear(&cell[i], cell_state, 0, 0);
     }
-    sys.video.page[page_id].layer[layer_id].asset_id = asset_id;
+    sys.video.pagegroup[pagegroup_id].page[page_id].asset_id = asset_id;
     
     return 0;
 }
 
-bool init_page(unsigned int page_id, Vector2 size, unsigned int page_state, unsigned int layer_state, unsigned int cell_state, unsigned short asset_id) {
-    sys.video.page[page_id].state = page_state;
-    sys.video.page[page_id].layer_count = 1;
-    sys.video.page[page_id].layer = calloc(sys.video.page[page_id].layer_count, sizeof(EX_layer));
-    init_layer(page_id, 0, size, layer_state, cell_state, asset_id);
+bool init_pagegroup(unsigned int pagegroup_id, Vector2 size, unsigned int pagegroup_state, unsigned int page_state, unsigned int cell_state, unsigned short asset_id) {
+    sys.video.pagegroup[pagegroup_id].state = pagegroup_state;
+    sys.video.pagegroup[pagegroup_id].page_count = 1;
+    sys.video.pagegroup[pagegroup_id].page = calloc(sys.video.pagegroup[pagegroup_id].page_count, sizeof(EX_page));
+    init_page(pagegroup_id, 0, size, page_state, cell_state, asset_id);
     return 0;
 }
 
 // *************** REFERENCING SHORTCUTS TO USE *****************
-// EX_page  *page  = &sys.video.page[page_id];
-// EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-// EX_cell  *cell  = &sys.video.page[page_id].layer[layer_id].cell[0]; ( cell[50].state )
+// EX_pagegroup  *pagegroup  = &sys.video.pagegroup[pagegroup_id];
+// EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+// EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0]; ( cell[50].state )
 // This functionality requires setting a bunch of stuff afterwards;
 // - per cell states
-// - per layer asset
-bool init_page_multilayer(Vector2 size, unsigned int page_state, unsigned int layer_state[]) {
-    int page_id = sys.video.current_virtual; // A single page per Virtual Display
+// - per page asset
+bool init_pagegroup_multipage(Vector2 size, unsigned int pagegroup_state, unsigned int page_state[]) {
+    int pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
 
-    sys.video.page[page_id].state = page_state;
-    sys.video.page[page_id].layer_count = sizeof(layer_state) / sizeof_member(EX_cell, state);
+    sys.video.pagegroup[pagegroup_id].state = pagegroup_state;
+    sys.video.pagegroup[pagegroup_id].page_count = sizeof(page_state) / sizeof_member(EX_cell, state);
 
-    sys.video.page[page_id].layer = calloc(sys.video.page[page_id].layer_count, sizeof(EX_layer));
-    for (int i = 0; i < sys.video.page[page_id].layer_count; i++) {
-        init_layer(page_id, i, size, layer_state[i], 0, 0);
+    sys.video.pagegroup[pagegroup_id].page = calloc(sys.video.pagegroup[pagegroup_id].page_count, sizeof(EX_page));
+    for (int i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
+        init_page(pagegroup_id, i, size, page_state[i], 0, 0);
     }
     return 0;
 }
 
-void layer_set_mouse_position(int page_id, int layer_id, Vector2 target) {
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
+void page_set_mouse_position(int pagegroup_id, int page_id, Vector2 target) {
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
-    layer->mouse.offset = target;
+    page->mouse.offset = target;
 }
 
-void layer_set_keyboard_position(int page_id, int layer_id, Vector2 target) {
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
+void page_set_keyboard_position(int pagegroup_id, int page_id, Vector2 target) {
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
-    layer->keyboard.offset = target;
+    page->keyboard.offset = target;
 }
 
-void set_cell_state(int page_id, int layer_id, Rectangle target, unsigned int state) {
+void set_cell_state(int pagegroup_id, int page_id, Rectangle target, unsigned int state) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1072,11 +1124,11 @@ void set_cell_state(int page_id, int layer_id, Rectangle target, unsigned int st
     }
 }
 
-void clear_cell_state(int page_id, int layer_id, Rectangle target, unsigned int state) {
+void clear_cell_state(int pagegroup_id, int page_id, Rectangle target, unsigned int state) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1090,11 +1142,11 @@ void clear_cell_state(int page_id, int layer_id, Rectangle target, unsigned int 
     }
 }
 
-void set_cell_colorfg(int page_id, int layer_id, Rectangle target, int color_id) {
+void set_cell_colorfg(int pagegroup_id, int page_id, Rectangle target, int color_id) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1108,11 +1160,11 @@ void set_cell_colorfg(int page_id, int layer_id, Rectangle target, int color_id)
     }
 }
 
-void set_cell_colorbg(int page_id, int layer_id, Rectangle target, int color_id) {
+void set_cell_colorbg(int pagegroup_id, int page_id, Rectangle target, int color_id) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1126,11 +1178,11 @@ void set_cell_colorbg(int page_id, int layer_id, Rectangle target, int color_id)
     }
 }
 
-void set_cell_colorln(int page_id, int layer_id, Rectangle target, int color_id) {
+void set_cell_colorln(int pagegroup_id, int page_id, Rectangle target, int color_id) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1144,11 +1196,11 @@ void set_cell_colorln(int page_id, int layer_id, Rectangle target, int color_id)
     }
 }
 
-void set_cell_color_mask(int page_id, int layer_id, Rectangle target, Color color) {
+void set_cell_color_mask(int pagegroup_id, int page_id, Rectangle target, Color color) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1162,11 +1214,11 @@ void set_cell_color_mask(int page_id, int layer_id, Rectangle target, Color colo
     }
 }
 
-void set_cell_color_shadow_mask(int page_id, int layer_id, Rectangle target, Color color) {
+void set_cell_color_shadow_mask(int pagegroup_id, int page_id, Rectangle target, Color color) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1180,11 +1232,11 @@ void set_cell_color_shadow_mask(int page_id, int layer_id, Rectangle target, Col
     }
 }
 
-void set_cell_offset(int page_id, int layer_id, Rectangle target, Vector2 offset) {
+void set_cell_offset(int pagegroup_id, int page_id, Rectangle target, Vector2 offset) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1198,11 +1250,11 @@ void set_cell_offset(int page_id, int layer_id, Rectangle target, Vector2 offset
     }
 }
 
-void set_cell_angle(int page_id, int layer_id, Rectangle target, float angle) {
+void set_cell_angle(int pagegroup_id, int page_id, Rectangle target, float angle) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1216,11 +1268,11 @@ void set_cell_angle(int page_id, int layer_id, Rectangle target, float angle) {
     }
 }
 
-void set_cell_scale(int page_id, int layer_id, Rectangle target, Vector2 scale) {
+void set_cell_scale(int pagegroup_id, int page_id, Rectangle target, Vector2 scale) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1234,12 +1286,12 @@ void set_cell_scale(int page_id, int layer_id, Rectangle target, Vector2 scale) 
     }
 }
 
-// iterate through charracter ascii codes, if font pixels then copy desired source_cell information to the layer
-void plot_big_characters(int page_id, int layer_id, Vector2 target, unsigned int state, int font_id, unsigned char *ch) {
+// iterate through charracter ascii codes, if font pixels then copy desired source_cell information to the page
+void plot_big_characters(int pagegroup_id, int page_id, Vector2 target, unsigned int state, int font_id, unsigned char *ch) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     int length = sizeof(ch);
 
@@ -1274,11 +1326,11 @@ typedef enum {
     GFLD_ALL_BUT_STATE        = 0b00111111111111111111111111111111    // all fields except the state of the cell
 } gridfield_features;
 
-void init_cell (int page_id, int layer_id, Rectangle target, EX_cell info_cell, unsigned int state) {
+void init_cell (int pagegroup_id, int page_id, Rectangle target, EX_cell info_cell, unsigned int state) {
     int target_offset, source_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
 
@@ -1316,16 +1368,16 @@ void init_cell (int page_id, int layer_id, Rectangle target, EX_cell info_cell, 
     }
 }
 
-void clear_cell (int page_id, int layer_id, Rectangle target, unsigned int state) {
+void clear_cell (int pagegroup_id, int page_id, Rectangle target, unsigned int state) {
     static inline EX_cell blank_cell;
-    init_cell(page_id, layer_id, target, blank_cell, state);
+    init_cell(pagegroup_id, page_id, target, blank_cell, state);
 }
 
-void shift_cell_field_rectangle(int page_id, int layer_id, Rectangle target, float shift, unsigned int state) {
+void shift_cell_field_rectangle(int pagegroup_id, int page_id, Rectangle target, float shift, unsigned int state) {
     int target_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1358,11 +1410,11 @@ void shift_cell_field_rectangle(int page_id, int layer_id, Rectangle target, flo
     }
 }
 
-void shift_cell_field_circle(int page_id, int layer_id, Rectangle target, float shift, unsigned int state) {
+void shift_cell_field_circle(int pagegroup_id, int page_id, Rectangle target, float shift, unsigned int state) {
     int linear_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1390,11 +1442,11 @@ typedef enum {
     GRIDSHIFT_DOWNRIGHT = 8
 } cell_direction;
 
-void copy_cell_in_layer(int page_id, int layer_id, Rectangle source, Vector2 target, unsigned int state) {
+void copy_cell_in_page(int pagegroup_id, int page_id, Rectangle source, Vector2 target, unsigned int state) {
     int source_offset, target_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
     
     if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
     if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.y + source.height) < 0) return;
@@ -1445,11 +1497,11 @@ void copy_cell_in_layer(int page_id, int layer_id, Rectangle source, Vector2 tar
 }
 
 // Move cell content to any of 8 directions
-void shift_cell (int page_id, int layer_id, Rectangle source, unsigned char shift_method, bool cycle, unsigned int state) {
+void shift_cell (int pagegroup_id, int page_id, Rectangle source, unsigned char shift_method, bool cycle, unsigned int state) {
     int source_offset, target_offset;
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    int lsx = layer->size.x, lsy = layer->size.y;
-    EX_cell  *cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    int lsx = page->size.x, lsy = page->size.y;
+    EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     //if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
     //if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.y + source.height) < 0) return;
@@ -1458,16 +1510,16 @@ void shift_cell (int page_id, int layer_id, Rectangle source, unsigned char shif
 
 }
 
-void copy_cell_to_layer(int source_page_id, int source_layer_id, Rectangle source, int target_page_id, int target_layer_id, Vector2 target, unsigned int state) {
+void copy_cell_to_page(int source_pagegroup_id, int source_page_id, Rectangle source, int target_pagegroup_id, int target_page_id, Vector2 target, unsigned int state) {
     int source_offset, target_offset;
 
-    EX_layer *source_layer = &sys.video.page[source_page_id].layer[source_layer_id];
-    int lsx = source_layer->size.x, lsy = source_layer->size.y;
-    EX_cell  *source_cell  = &sys.video.page[source_page_id].layer[source_layer_id].cell[0];
+    EX_page *source_page = &sys.video.pagegroup[source_pagegroup_id].page[source_page_id];
+    int lsx = source_page->size.x, lsy = source_page->size.y;
+    EX_cell  *source_cell  = &sys.video.pagegroup[source_pagegroup_id].page[source_page_id].cell[0];
 
-    EX_layer *target_layer = &sys.video.page[target_page_id].layer[target_layer_id];
-    int ltx = target_layer->size.x, lty = target_layer->size.y;
-    EX_cell  *target_cell  = &sys.video.page[target_page_id].layer[target_layer_id].cell[0];
+    EX_page *target_page = &sys.video.pagegroup[target_pagegroup_id].page[target_page_id];
+    int ltx = target_page->size.x, lty = target_page->size.y;
+    EX_cell  *target_cell  = &sys.video.pagegroup[target_pagegroup_id].page[target_page_id].cell[0];
 
     if (source.x >= lsx || source.y >= lsy || target.x >= ltx || target.y >= lty) return;
     if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.x + source.height) < 0) return;
@@ -1514,17 +1566,17 @@ void copy_cell_to_layer(int source_page_id, int source_layer_id, Rectangle sourc
     }
 }
 
-void render_layer(int layer_id) {
+void render_page(int page_id) {
     Color vertex_colors[4];
-    int page_id = sys.video.current_virtual; // A single page per Virtual Display
+    int pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
 
-    EX_layer *layer = &sys.video.page[page_id].layer[layer_id];
-    EX_cell  *cell  = &sys.video.page[page_id].layer[layer_id].cell[0];
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
     int offset;
-    unsigned short asset_id = layer->asset_id;
-    unsigned short palette_id = layer->palette_id;
-    Vector2 shadow = layer->shadow;
-    int lsx = layer->size.x, lsy = layer->size.y;
+    unsigned short asset_id = page->asset_id;
+    unsigned short palette_id = page->palette_id;
+    Vector2 shadow = page->shadow;
+    int lsx = page->size.x, lsy = page->size.y;
     for (int x = 0; x < lsx; x++) {
         for (int y = 0; y < lsy; y++) {
             offset = lsx * y + x;
@@ -1650,32 +1702,37 @@ void render_layer(int layer_id) {
 //RLAPI Vector2 GetMousePosition(void);                         // Get mouse position XY
 }
 
-void render_page() {
-    int page_id = sys.video.current_virtual; // A single page per Virtual Display
-    EX_page  *page  = &sys.video.page[page_id];
+void render_pagegroup() {
+    int pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
+    EX_pagegroup  *pagegroup  = &sys.video.pagegroup[pagegroup_id];
 
 //begin draw necessary here
 
-    for (int i = 0; i < sys.video.page[page_id].layer_count; i++) {
-        render_layer(i);
+    for (int i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
+        render_page(i);
     }
     return 0;
 // end draw here
 }
 
-void process_layer(int layer_id) {
 
-}
-
+// does the execution of the modifiers
 void process_page(int page_id) {
-    
 }
 
-/*char* load_page(int page_id, const char*, size_t, char*) {
+void process_pagegroup(int pagegroup_id) {
+    unsigned short page_id = 0;
+    process_page(page_id);
+    render_page(page_id);
 }
-*/
 
-void deinit_layer(int id) {
+void load_page() {
+}
+
+void save_page() {
+}
+
+void deinit_page(int id) {
     
 }
 
@@ -2915,30 +2972,11 @@ static void update_scrolltext(int s, float text_scale) {
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** E N D
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** E N D
 
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
-// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** B E G I N
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** B E G I N
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** B E G I N
 
-static const kbmap_scancodes[] = {
-    KEY_ESCAPE ,0 , 0, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12, 0, KEY_PRINT_SCREEN, KEY_SCROLL_LOCK, KEY_PAUSE, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    KEY_GRAVE, KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_FIVE, KEY_SIX, KEY_SEVEN, KEY_EIGHT, KEY_NINE, KEY_ZERO, KEY_MINUS, KEY_EQUAL, KEY_BACKSPACE, KEY_BACKSPACE, 0, KEY_INSERT, KEY_HOME, KEY_PAGE_UP, 0, KEY_NUM_LOCK, KEY_KP_DIVIDE, KEY_KP_MULTIPLY, KEY_KP_SUBTRACT, 
-    KEY_TAB, KEY_TAB, KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T, KEY_Y, KEY_U, KEY_I, KEY_O, KEY_P, KEY_LEFT_BRACKET, KEY_RIGHT_BRACKET, KEY_BACKSLASH, 0, KEY_DELETE, KEY_END, KEY_PAGE_DOWN, 0, KEY_KP_7, KEY_KP_8, KEY_KP_9, KEY_KP_ADD, 
-    KEY_CAPS_LOCK, KEY_CAPS_LOCK, KEY_A, KEY_S, KEY_D, KEY_F, KEY_G, KEY_H, KEY_J, KEY_K, KEY_L, KEY_SEMICOLON, KEY_APOSTROPHE, KEY_ENTER, KEY_ENTER, 0, 0, 0, 0, 0, KEY_KP_4, KEY_KP_5, KEY_KP_6, KEY_KP_ADD, 
-    KEY_LEFT_SHIFT, KEY_LEFT_SHIFT, KEY_Z, KEY_X, KEY_C, KEY_V, KEY_B, KEY_N, KEY_M, KEY_COMMA, KEY_PERIOD, KEY_SLASH, KEY_RIGHT_SHIFT, KEY_RIGHT_SHIFT, KEY_RIGHT_SHIFT, 0, 0, KEY_UP, 0, 0, KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_KP_ENTER, 
-    KEY_LEFT_CONTROL, KEY_LEFT_SUPER, KEY_LEFT_ALT, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_RIGHT_ALT, KEY_RIGHT_SUPER, KEY_KB_MENU, KEY_RIGHT_CONTROL, 0, KEY_LEFT, KEY_DOWN, KEY_RIGHT, 0, KEY_KP_0, KEY_KP_0, KEY_KP_DECIMAL, KEY_KP_ENTER
-};
-
-static const kbmap_ascii[] = {
-    27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    96, 49, 50, 51, 52, 53, 54, 55, 56, 57, 45, 61, 8, 0, 0, 0, 0, 0, 0, 0, 0, 47, 42, 45, 
-    9, 9, 81, 87, 69, 82, 84, 89, 85, 73, 79, 80, 91, 93, 92, 0, 0, 0, 127, 0, 55, 56, 57, 43, 
-    0, 0, 65, 83, 68, 70, 71, 72, 74, 75, 76, 59, 44, 13, 13, 0, 0, 0, 0, 0, 52, 53, 54, 43, 
-    0, 0, 90, 88, 67, 86, 66, 78, 77, 44, 46, 47, 0, 0, 0, 0, 0, 0, 0, 0, 49, 50, 51, 13, 
-    0, 0, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 48, 48, 46, 13
-};
-
+// MUSIC SCORING
 typedef enum {
     octave_up           = 192,
     octave_down         = 193,
@@ -2974,17 +3012,296 @@ static const kbmap_piano[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
+// LEVEL DESIGN
+
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E N D
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E N D
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E N D
+
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
+// ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
+
+static const kbmap_scancode[] = {
+    KEY_ESCAPE ,0 , 0, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12, 0, KEY_PRINT_SCREEN, KEY_SCROLL_LOCK, KEY_PAUSE, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    KEY_GRAVE, KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_FIVE, KEY_SIX, KEY_SEVEN, KEY_EIGHT, KEY_NINE, KEY_ZERO, KEY_MINUS, KEY_EQUAL, KEY_BACKSPACE, KEY_BACKSPACE, 0, KEY_INSERT, KEY_HOME, KEY_PAGE_UP, 0, KEY_NUM_LOCK, KEY_KP_DIVIDE, KEY_KP_MULTIPLY, KEY_KP_SUBTRACT, 
+    KEY_TAB, KEY_TAB, KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T, KEY_Y, KEY_U, KEY_I, KEY_O, KEY_P, KEY_LEFT_BRACKET, KEY_RIGHT_BRACKET, KEY_BACKSLASH, 0, KEY_DELETE, KEY_END, KEY_PAGE_DOWN, 0, KEY_KP_7, KEY_KP_8, KEY_KP_9, KEY_KP_ADD, 
+    KEY_CAPS_LOCK, KEY_CAPS_LOCK, KEY_A, KEY_S, KEY_D, KEY_F, KEY_G, KEY_H, KEY_J, KEY_K, KEY_L, KEY_SEMICOLON, KEY_APOSTROPHE, KEY_ENTER, KEY_ENTER, 0, 0, 0, 0, 0, KEY_KP_4, KEY_KP_5, KEY_KP_6, KEY_KP_ADD, 
+    KEY_LEFT_SHIFT, KEY_LEFT_SHIFT, KEY_Z, KEY_X, KEY_C, KEY_V, KEY_B, KEY_N, KEY_M, KEY_COMMA, KEY_PERIOD, KEY_SLASH, KEY_RIGHT_SHIFT, KEY_RIGHT_SHIFT, KEY_RIGHT_SHIFT, 0, 0, KEY_UP, 0, 0, KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_KP_ENTER, 
+    KEY_LEFT_CONTROL, KEY_LEFT_SUPER, KEY_LEFT_ALT, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_SPACE, KEY_RIGHT_ALT, KEY_RIGHT_SUPER, KEY_KB_MENU, KEY_RIGHT_CONTROL, 0, KEY_LEFT, KEY_DOWN, KEY_RIGHT, 0, KEY_KP_0, KEY_KP_0, KEY_KP_DECIMAL, KEY_KP_ENTER
+};
+
+static const kbmap_ascii[] = {
+    27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    96, 49, 50, 51, 52, 53, 54, 55, 56, 57, 45, 61, 8, 0, 0, 0, 0, 0, 0, 0, 0, 47, 42, 45, 
+    9, 9, 81, 87, 69, 82, 84, 89, 85, 73, 79, 80, 91, 93, 92, 0, 0, 0, 127, 0, 55, 56, 57, 43, 
+    0, 0, 65, 83, 68, 70, 71, 72, 74, 75, 76, 59, 44, 13, 13, 0, 0, 0, 0, 0, 52, 53, 54, 43, 
+    0, 0, 90, 88, 67, 86, 66, 78, 77, 44, 46, 47, 0, 0, 0, 0, 0, 0, 0, 0, 49, 50, 51, 13, 
+    0, 0, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 48, 48, 46, 13
+};
+
+//  Note for ANSi, colors expected are 0: black, 1: red, 2: green, 3: yellow, 4: blue, 5: magenta, 6: cyan, 7: white
+// CSI introduces a Control Sequence, which continues until an alphabetic character is received (general rule).
+// EXCELLENT REFERENCE OF USAGE: https://handwiki.org/wiki/ANSI_escape_code
+// https://vt100.net/emu/dec_ansi_parser
+typedef enum {
+
+//
+    CMD_CSI     = 155,  // Control Sequence Introducer, 0x9b or 0x1b + [, 0x5b ( [ ) is necessary when 7-bit (0x1b) CSI used
+    CMD_SEP     = 59,   // Value separator for numeric parameter characters ( ; ) 
+    CMD_ST      = 92,   // String Terminator ( \ )
+    CMD_OSC     = 93,   // Operating System Command ( ] )
+    CMD_PM      = 94,   // CSI ^    Privacy message (String Control Sequence)
+    CMD_APC     = 95,   // CSI _    Application Program Command (for embedding custom commands)
+
+    CMD_6       = 54,   // Move cursor back 1 column
+    CMD_9       = 57,   // Move cursor forward 1 column
+    CMD_LT      = 60,   // (VT-52) Enter ANSi mode
+    CMD_EQ      = 61,   // (VT-52) Enter Alternate Keypad mode (num lock, directional arrows)
+    CMD_GT      = 62,   // (VT-52) Exit alternate keypad mode (numeric character mode)
+    CMD_A       = 65,   // (VT-52) Cursor up
+    CMD_B       = 66,   // (VT-52) Cursor down
+    CMD_C       = 67,   // (VT-52) Cursor right
+    CMD_D       = 68,   // (VT-52) Cursor left
+    CMD_E       = 69,   // (VT-52) Next Line
+    CMD_F       = 70,   // (VT-52) Enter Graphics mode
+    CMD_G       = 71,   // (VT-52) Exit Graphics mode
+    CMD_H       = 72,   // (VT-52) Cursor to Home
+    CMD_I       = 73,   // (VT-52) Reverse Line Feed
+    CMD_J       = 74,   // (VT-52) Erase to end of screen
+    CMD_K       = 75,   // (VT-52) Erase to end of line
+    CMD_N       = 78,   // SS2 - Single Shift 2 - Call a single character from G2 font
+    CMD_O       = 79,   // SS3 - Single Shift 3 - Call a single character from G3 font
+    CMD_V       = 86,   // (VT-52) Print Cursor Line
+    CMD_W       = 87,   // (VT-52) Enter printer controller mode
+    CMD_X       = 88,   // (VT-52) Exit printer controller mode
+    CMD_Y       = 89,   // (VT-52) Direct cursor address CSIY10 20
+    CMD_Z       = 90,   // (VT-52) Identify (DECID)
+    CMD_CL      = 93,   // (VT-52) Print screen
+    CMD_EX      = 94,   // (VT-52) Enter auto print mode
+    CMD_UN      = 95,   // (VT-52) Exit auto print mode
+    CMD_LA      = 35,   // Line Attribute: Double height = CSI#3 Top Half, CSI#4 Bottom Half, Width = CSI#5 Single Width Line, CSI#6 Double Width Line
+    CMD_DECALN  = 56,   // CSI#8    Screen Alignment Pattern; sets margins to extreem of pagegroup and cursor to home, fills display with pattern
+    CMD_RIS     = 99,   // CSIc     Reset to Initial State (Performs a communications line disconnect.  Clears UDKs.    Clears a down-line-loaded character set.
+                        // Clears the screen.  Returns the cursor to the upper-left corner of the screen.  Sets the SGR state to normal.
+                        // Sets the selective erase attribute write state to "not erasable".   Sets all character sets to the default.)
+    CMD_DCS     = 80,   // CSIP{Pc;Pl|Ky1/st1;ky2/st2;...kyn/stn}ST  Device Control String Introducer(P)
+                        // {Pc} None or 0 = Clear all keys before loading new values. 1 = Load new key values, clear old ones
+                        // {pl} None	or 0 = Lock the keys. (Cannot be redefined.) 1 = Do not lock the keys. (Can be redefined.)
+                        // {Kyn/Stn} Function Key Definition string where Kyn = number (1 - 12), Stn = String parameter (up to 1024 char)
+                        // User programmed function keys are accessed using the shift + Fn key combo
+                        // CSIP{Ps v D...D}ST Load Answerback Message
+                        // answerback data string may consist of from 0 to 30, 8-bit characters
+                        // Ps =decoding mode, 1 = standard for VT510
+                        // CSIP{Ps r D...D}ST Load Banner Message
+                        // Ps = 0 Omitted, 1 Interprets as ASCII, 2 Loads as text in VT default character set
+                        // D...D is a 30 character string
+
+    CMD_DECSC   = 55,   // CSI 7    DEC Save cursor (position, graphic rendition, character set shift state, state of wrap flag, state of origin mode, state of selective erase)
+    CMD_DECRC   = 56,   // CSI 8    DEC Restore Cursor
+    CMD_CUU     = 65,   // CSI #A   Cursor Up: move cursor up # lines
+    CMD_CUD     = 66,   // CSI #B   Cursor Down: move cursor down # lines
+    CMD_CUF     = 67,   // CSI #C   Cursor Forward: move cursor right # columns
+    CMD_CUB     = 68,   // CSI #D   Cursor Backwards: move cursor left # columns
+    CMD_CNL     = 69,   // CSI #E   Cursor Next Line: moves cursor to beginning of next line, # lines down
+    CMD_CPL     = 70,   // CSI #F   Cursor Previous Line: moves cursor to beginning of previous line, # lines down
+    CMD_CHA     = 71,   // CSI #G   moves cursor to column # (Horizontal absolute)
+    CMD_CUP     = 72,   // Cursor Position (ie. CSI H = cursor to home position (0, 0), CSI {line};{column}H = cursor to specific cell
+    CMD_CHT     = 73,   // CSI #I   Cursor Horizontal Forward Tabulation (where # is the number of tabs)
+    CMD_ED      = 74,   // Erase in Display
+                        // CSI J    Erase from the cursor position to end of display (line attr become single width / height on erased lines)
+                        // CSI 0J   <same as above>
+                        // CSI 1J   clears from cursor to beginning of display
+                        // CSI 2J   clears entire display
+                        // CSI ?J   DECSCA Erase all erasable characters from the cursor position to end of display (line attr become single width / height on erased lines), does not affect video char attr or video line attr (SGR)
+                        // CSI ?0J  DECSCA <same as above>
+                        // CSI ?1J  DECSCA Erase all erasable characters from cursor to beginning of display, does not affect video char attr or video line attr (SGR)
+                        // CSI ?2J  DECSCA Erase all erasable characters entire display, does not affect video char attr or video line attr (SGR)
+
+    CMD_EL      = 75,   // Erase in Line
+                        // CSI K    Erase to end of current line (including at cursor position)
+                        // CSI 0K   <same as above>
+                        // CSI 1K   clears from cursor to start of line
+                        // CSI 2K   clears entire line
+                        // CSI ?K   DECSCA Erase all erasable characters to end of current line (including at cursor position), does not affect video char attr or video line attr (SGR)
+                        // CSI ?0K  DECSCA <same as above>
+                        // CSI ?1K  DECSCA Erase all erasable characters from cursor to start of line, does not affect video char attr or video line attr (SGR)
+                        // CSI ?2K  DECSCA Erase all erasable characters entire line, does not affect video char attr or video line attr (SGR)
+    CMD_IL      = 76,   // CSI #L   Inserts # Lines at the cursor.  If fewer than # lines remain from the current line to the end of the scrolling region, the number of lines inserted is the lesser number.  Lines within the scrolling region at and below the cursor is moved down. Lines moved past the bottom margin are lost.  The cursor is reset to the first column. sequence is ignore outisde of the sscrolling rtegion.
+    CMD_DL      = 77,    // CSI #M   Deletes # lines starting at the line with the cursor.  If fewer than # lines remain from the current line to the end of the scrolling region, the number of lines deleted is the lesser number. As lines are deleted, lines within the scrolling region and below the cursor move up, and blank lines are added at the bottom of the scrolling region. The cursor is reset to the first column. This sequence is ignored when the cursor is outside the scrolling region.
+    CMD_ICH     = 64,   // CSI{#@   Insert # blank characters at the cursor position, with the character attributes set to normal. The cursor does not move and remains at the beginning of the inserted blank characters. A parameter of 0 or 1 inserts one blank character. Data on the line is shifted forward as in character insertion.
+    CMD_SS2     = 78,   // CSI #N   Single Shift 2 = Get a character from G2 character set
+    CMD_SS3     = 79,   // CSI #O   Single Shift 3 = Get a character from G3 character set
+    CMD_DCH     = 80,   // CSI #P   Deletes # characters starting with the character at the cursor position. When a character is deleted, all characters to the right of the cursor move to the left. This creates a space character at the right margin for each character deleted. Character attributes move with the characters. The spaces created at the end of the line have all their character attributes off.
+                        // pagegroup Position Absolute (PPA)     CSI #SPP
+    CMD_PPR     = 81,   // pagegroup Position Relative (PPR)     CSI #SPQ
+    CMD_CPR     = 82,   // CSI #;#R Report cursor position
+                        // pagegroup Position Backward (PPB)     CSI #SPR
+    CMD_SU      = 83,   // CSI #S   Scroll window up by n lines (pan down)
+    CMD_SD      = 84,   // CSI #T   Scroll window down by n lines (pan up)
+    CMD_NP      = 85,   // CSI #U   Next pagegroup
+    CMD_PP      = 86,   // CSI #V   Previous pagegroup
+    CMD_SOS     = 88,   // CSI {arg}X   Start Of String (String Control Sequence)
+    CMD_IDENT   = 90,   // CSI Z    Identify what the terminal is
+    CMD_VPA     = 100,  // CSI #d   Vertical Line Position Absolute: Where # is the column number (move cursor to line #)
+    CMD_VPR     = 101,  // CSI #e   Vertical Position Relative: Where # is the # of columns to move cursor    
+    CMD_HVP     = 102,  // Horizontal Vertical Position: CSI {line};{column}f	moves cursor to line #, column #
+    CMD_TBC     = 103,  // CSI g (or 0g)  Clear horizontal tab stop at cursor position
+                        // CSI 3g   Clear all horizontal tab stops
+    CMD_SETMODE = 104,  // CSI 3h   Set Show Control Character mode
+                        // CSI 12h  Local Echo off
+                        // CSI ={value}h	Changes the screen width or type to the mode specified by value.
+                        // CSI =0h  40 x 25 monochrome (text)                // CSI =1h	40 x 25 color (text)
+                        // CSI =2h  80 x 25 monochrome (text)                // CSI =3h	80 x 25 color (text)
+                        // CSI =4h  320 x 200 4-color (graphics)             // CSI =5h	320 x 200 monochrome (graphics)
+                        // CSI =6h  640 x 200 monochrome (graphics)
+                        // CSI =7h  Enables line wrapping
+                        // CSI =13h	320 x 200 color (graphics)               // CSI =14h    640 x 200 color (16-color graphics)
+                        // CSI =15h	640 x 350 monochrome (2-color graphics)  // CSI =16h    640 x 350 color (16-color graphics)
+                        // CSI =17h	640 x 480 monochrome (2-color graphics)  // CSI =18h    640 x 480 color (16-color graphics)
+                        // CSI =19h	320 x 200 color (256-color graphics)
+                        // CSI ?3h  Set to 132 column mode
+                        // CSI ?4h  enable scrolling
+                        // CSI ?5h  enable display
+                        // CSI ?6h  Enable Origin
+                        // CSI ?7h  Enbable auto wrap
+                        // CSI ?8h  Enable auto repeat (some keys do not repeat: Alt, Caps Lock, Ctrl, Enter, Scroll Lock, Num Lock, Shift)
+                        // CSI ?25h	make cursor visible
+                        // CSI ?34h Cursor direction right to left
+                        // CSI ?47h	save screen
+                        // CSI ?66h engage numlock
+                        // CSI ?67h set backspace key for back arrow
+                        // CSI ?69h engage vertical split screen
+                        // CSI ?97h enable screen saver
+                        // CSI ?100h set enables auto answerback
+                        // CSI ?101h Conceal answerback message
+                        // CSI ?103h Set Half-Duplex mode
+                        // CSI ?109h    Set caps lock
+                        // CSI ?110h    Set keyboard LED's host indicator mode
+                        // CSI ?1049h	enables the alternative buffer
+    CMD_RESMODE = 108,  // CSI 3l   Reset Interpret Control Character
+                        // CSI 12l  Local Echo on
+                        // CSI ={value}l    Resets the mode by using the same values that Set Mode uses, except for 7, which disables line wrapping.
+                        // CSI =0l  40 x 25 monochrome (text)                // CSI =1l 40 x 25 color (text)
+                        // CSI =2l  80 x 25 monochrome (text)                // CSI =3l 80 x 25 color (text)
+                        // CSI =4l  320 x 200 4-color (graphics)             // CSI =5l 320 x 200 monochrome (graphics)
+                        // CSI =6l  640 x 200 monochrome (graphics)
+                        // CSI =7l  Disable line wrapping
+                        // CSI =13l	320 x 200 color (graphics)               // CSI =14l    640 x 200 color (16-color graphics)
+                        // CSI =15l	640 x 350 monochrome (2-color graphics)  // CSI =16l    640 x 350 color (16-color graphics)
+                        // CSI =17l	640 x 480 monochrome (2-color graphics)  // CSI =18l    640 x 480 color (16-color graphics)
+                        // CSI =19l	320 x 200 color (256-color graphics)
+                        // CSI ?3l  set to 80 column mode
+                        // CSI ?4l  disable scrolling
+                        // CSI ?5l  disable display
+                        // CSI ?6l  disable Origin
+                        // CSI ?7l  disable auto wrap
+                        // CSI ?8l  disable auto repeat
+                        // CSI ?25l	make cursor invisible
+                        // CSI ?34l Cursor direction left to right
+                        // CSI ?47l	restore screen
+                        // CSI ?66l disengage numlock
+                        // CSI ?67l set delete key for back arrow (reset)
+                        // CSI ?69l disengage vertical split screen
+                        // CSI ?97l disable screen saver
+                        // CSI ?100l reset disables auto answerback
+                        // CSI ?101l do not conceal answerback message
+                        // CSI ?103l Set Full-Duplex mode
+                        // CSI ?109l    Reset caps lock
+                        // CSI ?110h    Reset keyboard LED's host indicator mode
+                        // CSI ?1049l	disables the alternative buffer
+    CMD_SGR    = 109,   // CSI 1;34;{...}m	Select Graphic Rendition; set appearance of following characters (values separated by semicolon (;)).
+                        // CSI 0m   (Reset or Normal) All Attributes off
+                        // CSI 1m   (Bold or increased Intensity) set bold mode
+                        // CSI 2m   (Faint, decreased intensity or dim) set dim/faint mode
+                        // CSI 3m   (Italic) set italic mode
+                        // CSI 4m   (Underline) set underline mode
+                        // CSI 5m   (Slow Blink) set blinking mode, less than 150 per minute
+                        // CSI 6m   (Rapid Blink) set blinking mode, more than 150 per minute
+                        // CSI 7m   (Reverse Video or Invert) set inverse/reverse mode
+                        // CSI 8m   (Conceal or Hide) set invisible mode
+                        // CSI 9m   (Crossed-out, strike) set strikethrough mode.
+                        // CSI 10m  (Primary (Default) font)
+                        // CSI 11-19m   (Alternative font) - Select Alternative font n - 10
+                        // CSI 20m      (Blackletter font)
+                        // CSI 21m  (Doubly underlined, or not bold)
+                        // CSI 22m  (Normal Intensity - Neither bold nor faint)
+                        // CSI 23m  (neither Italic, nor blackletter)
+                        // CSI 24m  (not underlined - Neither singly nor doubly underlined)
+                        // CSI 25m  (not blinking)
+                        // CSI 26m  (Proportional spacing)
+                        // CSI 27m  (Not reversed)
+                        // CSI 28m  (Reveal - not concealed)
+                        // CSI 29m  (not crossed out)
+                        // CSI 30-37m   Set text color from the basic color palette of 0-7
+                        // CSI 38;5;{ID}m	Set foreground color
+                        // CSI 38;2;{r};{g};{b}m	Set foreground color as RGB
+                        // CSI 39m  Default foreground color
+                        // CSI 40-47m   Set background color from the basic color palette of 0-7
+                        // CSI 48;5;{ID}m	Set background color
+                        // CSI 48;2;{r};{g};{b}m	Set background color as RGB
+                        // CSI 49m  Default background color
+                        // CSI 50m  Disable proportional spacing
+                        // CSI 51m  Framed
+                        // CSI 52m  Encircled
+                        // CSI 53m  Overlined
+                        // CSI 54m  Neither framed Nor Circled
+                        // CSI 55m  Not overlined
+                        // CSI 58{arg}m     Set Underline Color (Next arguments are 5;n or 2;r;g;b.)
+                        // CSI 59m  Default underline color
+                        // CSI 60m  Ideogram underline or right side line
+                        // CSI 61m  Ideogram double underline or douible line on the right side
+                        // CSI 62m  Ideogram overline or left side line
+                        // CSI 63m  Ideogram double overline, or double lilne on the left side
+                        // CSI 64m  Ideogram stress marking
+                        // CSI 65m  No ideogram attributes / Reset the effects of all of 60-64
+                        // CSI 73m  Superscript
+                        // CSI 74m  Subscript
+                        // CSI 75m  Neither subscript or superscript
+                        // CSI 90-97m       Set bright foreground color
+                        // CSI 100-107m     Set bright background color
+    CMD_DSR     = 110,  // Device Status Report Call: CSI 5n
+                        // Response: CSI 0n = terminal is ok
+                        // Response: CSI 3n = terminal is not ok
+                        // CSI 6n   Cursor Position Report : request cursor position, Response: CSI #;#R
+    CMD_STRING  = 112,  // CSI {code};{string};{...}p
+    CMD_DECSCA  = 113,  // CSI #q   (0=All attributes off.(Does not apply to SGR.)1=not erasable by DECSEL/DECSED. 2=Designate character as erasable by DECSEL/DECSED. (Attribute off.)))
+    CMD_DECSTBM = 114,  // CSI #;#r   This sequence selects top and bottom margins defining the scrolling region
+                        // Change Attributes in Rectangular Area    CSI Pt; Pl; Pb; Pr;Ps1; . . . Psn $r
+                        // Source rectangle to change: Pt = Top Line, Pl = Left column, Pb = bottom line, Pr = right column, Ps1 = Select attribute to change
+                        // 0 (default)	Attributes off (no bold, no underline, no blink, positive image)
+                        // 1    Bold        // 4    Underline           // 5    Blink       // 7    Negative image
+                        // 22   No bold     // 24   No underline        // 25   No blink    // 27   Positive image
+    CMD_SCP     = 115,  // CSI s    Save Current Cursor Position
+    CMD_RCP     = 117,  // CSI u    Restore Saved Cursor Position
+    CMD_DECCRA  = 118,  // Copy Rectangular area CSI Pts; Pls; Pbs; Prs; Pps; Ptd; Pld; Ppd$v
+                        // Source rectangle to copy: Pts = Top Line, Pls = Left column, Pbs = bottom line, Prs = right column, Pps = pagegroup number
+                        // Destination: Ptd = top line border, Pld = Left column border, Ppd = pagegroup number
+    CMD_DECFRA  = 120,  // Fill Rectangular Area CSI Pch;Pt; Pl; Pb; Pr $x
+                        // Pch is the ascii value of the fill character
+                        // Fill rectangle: Pt = Top Line, Pl = Left column, Pb = bottom line, Pr = right column
+    CMD_DECTST  = 121,  // CSI 4;Ps;...;Psy
+                        //  0	Test 1, 2, 3 and 6          1	Power-up self test          2	EIA port data loopback test
+                        //  3	Printer port loopback test  4	Not used    5	Not used    6	EIA port modem control line loopback test
+                        //  7	20 mA port loopback test    8	Not used                    9	Repeat any selected test continuously until power-off or failure
+    CMD_DECINVM = 122,  // CSI#*z Invoke Macro (# is the macro id)
+    CMD_DECIC   = 125,  // CSI#'}   Insert column in scrolling region from cursor column
+    CMD_DECDC   = 126   // CSI #'~  Delete # of columns, shift columns of Righrt side to the left
+} ansi_commands;
+
 // TERMINALDISPLAY (ie. 4)
 
 bool init_terminal(tileset_id) {
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
     int display = sys.video.current_virtual;
+    unsigned int pagegroup_state = 0;
     unsigned int page_state = 0;
-    unsigned int layer_state = 0;
     unsigned int cell_state = 0;
-    unsigned int page_id = sys.video.current_virtual; // A single page per Virtual Display
+    unsigned int pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
 
-    init_page(page_id, (Vector2){40, 24}, page_state, layer_state, cell_state, tileset_id);
+    init_pagegroup(pagegroup_id, (Vector2){40, 24}, pagegroup_state, page_state, cell_state, tileset_id);
     return 0;
 }
 
@@ -3001,8 +3318,9 @@ void update_terminal(void) {
 
 }
 
+
 void show_terminal(void) {
-    // aimed at displaying the terminal page only
+    // aimed at displaying the terminal pagegroup only
 }
 
 
@@ -3013,15 +3331,6 @@ void show_terminal(void) {
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
-
-char *time_stamp(){
-    char *timestamp = (char *)malloc(20);
-    time_t ltime = time(NULL);
-    struct tm *tm;
-    tm = localtime(&ltime);
-    sprintf(timestamp,"%04d/%02d/%02d-%02d:%02d:%02d", tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
-    return timestamp;
-}
 
 typedef struct EX_debug {
     bool audio;
@@ -3056,19 +3365,20 @@ debug_display_option(bool bit, int x, int y, int size, const char* text) {
 }
 
 void display_keybed(void)  {
-    int row = 24;
+    int keys_in_row = 24;
     for (int j = 0; j < 7; j++) {
-        for (int i = 0; i < row; i++) {
-            int letter = (j*row)+i;
-            int key = kbmap_scancodes[letter];
-            if (key) {
-                if (IsKeyDown(key)) {
-                    DrawRectangle(i*64, 20+j*64, 64, 64, GREEN);
-                    DrawText(TextFormat("%c", (int)key), i*64, 20+j*64, 64, WHITE);
+        for (int i = 0; i < keys_in_row; i++) {
+            int key = (j * keys_in_row) + i;
+            int code = kbmap_scancode[key];
+            if (code) {
+                int ascii = kbmap_ascii[key];
+                if (IsKeyDown(code)) {
+                    DrawRectangle(i*64, 20 + j * 64, 64, 64, GREEN);
+                    DrawText(TextFormat("%c", (int)ascii), i * 64, 20 + j * 64, 64, WHITE);
                 }
                 else {
-                    DrawRectangle(i*64, 20+j*64, 64, 64, DARKGRAY);
-                    DrawText(TextFormat("%c", (int)key), i*64, 20+j*64, 64, GRAY);
+                    DrawRectangle(i*64, 20 + j * 64, 64, 64, DARKGRAY);
+                    DrawText(TextFormat("%c", (int)ascii), i * 64, 20 + j * 64, 64, GRAY);
                 };
             };
         
@@ -3395,7 +3705,7 @@ static int deinit_system(void) {
     int status = 0;
     unload_all_assets();
     remove_service(CTRL_ASSETS_INITIALIZED);
-// implement unload pages layers and cells
+// implement unload pagegroups pages and cells
     deinit_display();
     remove_service(CTRL_VIDEO_INITIALIZED);
     return status;
