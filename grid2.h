@@ -289,7 +289,7 @@ static int gcdi(int a, int b) {
         { -0.199,  0.118 },	{ -0.243,  0.037 },	{ -0.237, -0.052 },	{ -0.180, -0.129 },	{ -0.087, -0.181 },	{  0.021, -0.196 },	{  0.130, -0.169 },	{  0.210, -0.107 }
 	};*/
 // YIQ formula for Atari 8bit GTIA colors (0-255) index
-// https://atariage.com/forums/topic/107853-need-the-256-colors/pagegroup/2/#comments
+// https://atariage.com/forums/topic/107853-need-the-256-colors/page/2/#comments
 // The following routine is currently dead code as I personally do not like the resulting colors...  Something is wrong in the translation from YIQ
 // separate in tywo functions; one that takes a value and returns RGB, and one that takes YIQ and returns RGB
 Color gtia_ntsc_to_rgb(int val) {
@@ -542,21 +542,21 @@ Color get_pixel_color(Image *image, Vector2 position) {
 // **************************************************************************************** G R I D   S T R U C T U R E S
 #define NAMELENGTH_MAX 80
 #define GRID_MAX_CELLS 65536
-#define GRID_MAX_pagegroupS 5
-#define GRID_MAX_pageS 16
+#define GRID_MAX_PAGEGROUPS 5
+#define GRID_MAX_PAGES 16
 
 typedef struct EX_cell {
-    unsigned int state;                         // all flags for cell
+    unsigned long state;                        // all flags for cell
     unsigned short value;                       // value of cell
     unsigned char lines;                        // lines feature
     unsigned short asset_id;                    // Each cell can point to a different tileset
     unsigned short cycle_id;                    // cell animation sequence number
     unsigned short colorfg_id;                  // palette index color for cell
-    unsigned short colorfg_cycle_id;            // color cycle index
+    unsigned short colorfg_cycle_id;            // color cycle index for cell
     unsigned short colorbg_id;                  // palette index color for cell background
-    unsigned short colorbg_cycle_id;            // color cycle index
-    unsigned short colorln_id;                  // palette index color for cell background
-    unsigned short colorln_cycle_id;            // color cycle index
+    unsigned short colorbg_cycle_id;            // color cycle index for cell background
+    unsigned short colorln_id;                  // palette index color for cell lines
+    unsigned short colorln_cycle_id;            // color cycle index for cell lines
     Vector2 offset;                             // displacement from top left (x,y)
     Vector2 skew;                               // horizontal and vertical skew
     Vector2 scale;                              // (x,y) cell scale
@@ -571,16 +571,16 @@ typedef struct EX_cell {
 
 typedef struct EX_page {
     char name[NAMELENGTH_MAX + 1];
-    unsigned int state;                         // all flags for grid
+    unsigned long state;                        // all flags for grid
     unsigned short asset_id;                    // tilset used for this page ******* MAKE IT MULTI_ASSET CAPABLE
     Vector2 size;                               // total cells x and y
     unsigned short palette_id;                  // color palette used for whole page
     unsigned short colorfg_id;                  // palette index color for cell
-    unsigned short colorfg_cycle_id;            // color cycle index
+    unsigned short colorfg_cycle_id;            // color cycle index for cell
     unsigned short colorbg_id;                  // palette index color for cell background
-    unsigned short colorbg_cycle_id;            // color cycle index
-    unsigned short colorln_id;                  // palette index color for cell background
-    unsigned short colorln_cycle_id;            // color cycle index
+    unsigned short colorbg_cycle_id;            // color cycle index for cell background
+    unsigned short colorln_id;                  // palette index color for cell lines
+    unsigned short colorln_cycle_id;            // color cycle index for cell lines
     Vector2 offset;                             // displacement from top left (x,y)
     Vector2 displace[4];                        // cell corner displacement (x,y)
     Vector2 scale;                              // (x,y) cell scale
@@ -600,16 +600,22 @@ typedef struct EX_page {
     EX_cell* cell; // could be NULL
 } EX_page;
 
+typedef enum {
+    PGGP_DELETE              = 0b10000000000000000000000000000000,
+    PGGP_UPDATE              = 0b01000000000000000000000000000000,
+    PGGP_INITIALIZED         = 0b00000000000000000000000000000001,
+} pagegroup_states;
+
 typedef struct EX_pagegroup {
-    unsigned int state;
     char name[NAMELENGTH_MAX + 1];
+    unsigned int state;
     int page_count;                            // total number of pages
-    EX_page* page;                            // could be NULL
+    EX_page* page;                             // could be NULL (if not initialized)
 } EX_pagegroup;
 
 // **************************************************************************************** A S S E T   S T R U C T U R E S
-#define MAXASSETS 256
-#define MAXPALETTECOLORS 256
+#define MAXASSETS 1024
+#define MAXPALETTECOLORS 4096
 
 typedef struct EX_tileset {
     Vector2 tilesize;                           // Tile size
@@ -650,7 +656,7 @@ typedef struct EX_asset {
 
 typedef struct EX_track {
     bool is_playing;
-    int state;
+    unsigned int state;
     int asset;
     int virtual_display;
     float volume;
@@ -678,10 +684,10 @@ typedef struct EX_audio {
 
 typedef struct EX_video {
     //unsigned int state;
-    Vector2 physical_res[MAXDISPLAYS];          // physical display resolution (x, y)
-    int refresh_rate[MAXDISPLAYS];              // physical display refresh rate
-    int state[MAXDISPLAYS];                     // virtual display state
-    int fps[MAXDISPLAYS];
+    unsigned int state[MAXDISPLAYS];            // virtual display state
+    Vector2 screen[MAXDISPLAYS];                // Windows Display Resolution (x, y)
+    int screen_rate[MAXDISPLAYS];               // screen refresh rate
+    int fps[MAXDISPLAYS];                       // frames per second
     int frames[MAXDISPLAYS];                    // number of game frame elasped since initialisation
     double prev_time[MAXDISPLAYS];              // keep track of time to grab delta
     double elapsed_time[MAXDISPLAYS];           // elapsed time in milliseconds since last frame refresh
@@ -691,30 +697,39 @@ typedef struct EX_video {
     float frame_time_inc[MAXDISPLAYS];
     float value_anim[MAXDISPLAYS];              // space for animated controls (to be elaborated)
     float elapsed_time_nofocus[MAXDISPLAYS];    // elapsed time since nofocus
-    Vector2 virtual_res[MAXDISPLAYS];           // virtual display resolution (x, y)
-    int virtual_asset[MAXDISPLAYS];             // virtual display asset number
+    Vector2 virtual_res[MAXDISPLAYS];           // framebuffer resolution (x, y)
+    int virtual_asset[MAXDISPLAYS];             // framebuffer asset number
 
-    EX_pagegroup pagegroup[MAXDISPLAYS];                  // pagegroup data
+    EX_pagegroup pagegroup[MAXDISPLAYS];        // pagegroup data
 
-    int windowstate_normal;                     // physical display window state in normal mode
-    int windowstate_paused;                     // physical display window state when game is paused
-    int current_physical;                       // physical display currently used
-    int next_physical_clear;
+    unsigned int windowstate_normal;            // screen window state in normal mode
+    unsigned int windowstate_paused;            // screen window state when game is paused
+    int current_physical;                       // screen currently used
+    bool screen_refresh;
     int current_virtual;                        // virtual display currently used
+    int previous_virtual;                       // virtual display previously used
 
-    bool window_focus;                          // last state of window focus
+    bool window_focus;                          // last state of window focus (true = in applicatioo, false = outside of application)
 } EX_video;
 
 
 // **************************************************************************************** T E R M I N A L   S T R U C T U R E S
 
+#define IOBUFFERSIZE 8192
+
 typedef struct EX_terminal {
     unsigned int state;
     unsigned short asset_id;
-    int pagegroup_id; // Where all terminal pagegroups reside
-    int page_id; // ALl terminal pagegroups are pages
+    unsigned short pagegroup_id; // Where all terminal pages reside
+    unsigned short current_page_id;
+    unsigned short previous_page_id;
+    Vector2 last_mouse_poll;
+    Vector2 last_cursor_poll;
+    unsigned char input_buffer[IOBUFFERSIZE];
+    unsigned char output_buffer[IOBUFFERSIZE];
+    unsigned int input_buffer_pos;
+    unsigned int output_buffer_pos;
     
-
 } EX_terminal;
 
 
@@ -730,39 +745,41 @@ typedef struct EX_game {
 } EX_game;
 
 typedef enum {
-    CTRL_DEINIT              = 0b10000000000000000000000000000000,
-    CTRL_INITIALIZE          = 0b01000000000000000000000000000000,
-    CTRL_INIT_TITLE          = 0b00100000000000000000000000000000,
-    CTRL_IN_TITLE            = 0b00010000000000000000000000000000,
-    CTRL_RESERVED1           = 0b00001000000000000000000000000000, // *********
-    CTRL_INIT_MENU1          = 0b00000100000000000000000000000000,
-    CTRL_IN_MENU1            = 0b00000010000000000000000000000000,
-    CTRL_INIT_MENU2          = 0b00000001000000000000000000000000,
-    CTRL_IN_MENU2            = 0b00000000100000000000000000000000,
-    CTRL_INIT_MENU3          = 0b00000000010000000000000000000000,
-    CTRL_IN_MENU3            = 0b00000000001000000000000000000000,
-    CTRL_INIT_MENU4          = 0b00000000000100000000000000000000,
-    CTRL_IN_MENU4            = 0b00000000000010000000000000000000,
-    CTRL_GAME_RESUME         = 0b00000000000001000000000000000000,
-    CTRL_GAME_PLAY           = 0b00000000000000100000000000000000,
-    CTRL_INIT_GAME           = 0b00000000000000010000000000000000,
-    CTRL_GAME_NEXT           = 0b00000000000000001000000000000000,
-    CTRL_GAMEOVER            = 0b00000000000000000100000000000000,
-    CTRL_GAME_DEATH          = 0b00000000000000000010000000000000,
-    CTRL_OFF_FOCUS           = 0b00000000000000000001000000000000,
-    CTRL_SWITCHBOARD         = 0b11111111111111111111000000000000, // to filter out base states
-    CTRL_EXIT                = 0b10000000000000000000100000000000,
-    CTRL_DEBUG               = 0b00000000000000000000010000000000,
-    CTRL_SHOW_TERMINAL       = 0b00000000000000000000001000000000,
-    CTRL_GAME_PAUSED         = 0b00000000000000000000000100000000,
-    CTRL_IN_GAME             = 0b00000000000000000000000001000000,
-    CTRL_RUNNING             = 0b00000000000000000000000000100000,
-    CTRL_AUDIO_INITIALIZED   = 0b00000000000000000000000000001000,
-    CTRL_TERMINAL_INITIALIZED= 0b00000000000000000000000000000100,
-    CTRL_ASSETS_INITIALIZED  = 0b00000000000000000000000000000010,
-    CTRL_VIDEO_INITIALIZED   = 0b00000000000000000000000000000001,
-    CTRL_SERVICES            = 0b00000000000000000000111111111111, // to filter out switchboard states
-    CTRL_NULL                = 0b00000000000000000000000000000000  // in case that happens... (should never)
+    CTRL_DEINIT                 = 0b10000000000000000000000000000000,
+    CTRL_INITIALIZE             = 0b01000000000000000000000000000000,
+    CTRL_EXIT                   = 0b00100000000000000000000000000000,
+    CTRL_INIT_TITLE             = 0b00010000000000000000000000000000,
+    CTRL_IN_TITLE               = 0b00001000000000000000000000000000,
+    CTRL_INIT_MENU1             = 0b00000100000000000000000000000000,
+    CTRL_IN_MENU1               = 0b00000010000000000000000000000000,
+    CTRL_INIT_MENU2             = 0b00000001000000000000000000000000,
+    CTRL_IN_MENU2               = 0b00000000100000000000000000000000,
+    CTRL_INIT_MENU3             = 0b00000000010000000000000000000000,
+    CTRL_IN_MENU3               = 0b00000000001000000000000000000000,
+    CTRL_INIT_MENU4             = 0b00000000000100000000000000000000,
+    CTRL_IN_MENU4               = 0b00000000000010000000000000000000,
+    CTRL_GAME_RESUME            = 0b00000000000001000000000000000000,
+    CTRL_GAME_PLAY              = 0b00000000000000100000000000000000,
+    CTRL_INIT_GAME              = 0b00000000000000010000000000000000,
+    CTRL_GAME_NEXT              = 0b00000000000000001000000000000000,
+    CTRL_GAMEOVER               = 0b00000000000000000100000000000000,
+    CTRL_GAME_DEATH             = 0b00000000000000000010000000000000,
+    CTRL_OFF_FOCUS              = 0b00000000000000000001000000000000,
+    CTRL_SWITCHBOARD            = 0b11111111111111111111000000000000, // to filter out base states
+    CTRL_R12                    = 0b00000000000000000000100000000000,
+    CTRL_DEBUG                  = 0b00000000000000000000010000000000,
+    CTRL_SHOW_TERMINAL          = 0b00000000000000000000001000000000,
+    CTRL_GAME_PAUSED            = 0b00000000000000000000000100000000,
+    CTRL_R8                     = 0b00000000000000000000000010000000,
+    CTRL_IN_GAME                = 0b00000000000000000000000001000000,
+    CTRL_RUNNING                = 0b00000000000000000000000000100000,
+    CTRL_R5                     = 0b00000000000000000000000000010000,
+    CTRL_AUDIO_INITIALIZED      = 0b00000000000000000000000000001000,
+    CTRL_TERMINAL_INITIALIZED   = 0b00000000000000000000000000000100,
+    CTRL_ASSETS_INITIALIZED     = 0b00000000000000000000000000000010,
+    CTRL_VIDEO_INITIALIZED      = 0b00000000000000000000000000000001,
+    CTRL_SERVICES               = 0b00000000000000000000111111111111, // to filter out switchboard states
+    CTRL_NULL                   = 0b00000000000000000000000000000000  // in case that happens... (should never)
 } control_state;
 
 const char* control_state_literal(unsigned int state) {
@@ -802,24 +819,37 @@ const char* control_state_literal(unsigned int state) {
 }
 
 typedef enum {
-    PMSN_INFINITE_LIVES      = 0b10000000000000000000000000000000,
-    PMSN_INFINITE_POWER      = 0b01000000000000000000000000000000,
-    PMSN_INFINITE_TIME       = 0b00100000000000000000000000000000,
-    PMSN_NO_COLLISION        = 0b00010000000000000000000000000000,
-    PMSN_POWERUPS            = 0b00001000000000000000000000000000,
-    PMSN_NAVIGATE_LEVELS     = 0b00000100000000000000000000000000,
-    PMSN_DEATH               = 0b00000010000000000000000000000000,
-    PMSN_SUMMON              = 0b00000001000000000000000000000000,
-    PMSN_END_GAME            = 0b00000000100000000000000000000000,
-    PMSN_TRACE               = 0b00000000000001000000000000000000,
-    PMSN_EDITOR_ADVANCED     = 0b00000000000000000000000000100000,
-    PMSN_EDITOR_BASIC        = 0b00000000000000000000000000010000,
-    PMSN_TERMINAL_ADVANCED   = 0b00000000000000000000000000001000,
-    PMSN_TERMINAL_BASIC      = 0b00000000000000000000000000000100,
-    PMSN_DEBUG_ADVANCED      = 0b00000000000000000000000000000010,
-    PMSN_DEBUG_BASIC         = 0b00000000000000000000000000000001,
-    PMSN_OFF                 = 0b00000000000000000000000000000000,
-    PMSN_GODMODE             = 0b11111111111111111111111111111111
+    PMSN_INFINITE_LIVES     = 0b10000000000000000000000000000000,
+    PMSN_INFINITE_POWER     = 0b01000000000000000000000000000000,
+    PMSN_INFINITE_TIME      = 0b00100000000000000000000000000000,
+    PMSN_NO_COLLISION       = 0b00010000000000000000000000000000,
+    PMSN_POWERUPS           = 0b00001000000000000000000000000000,
+    PMSN_NAVIGATE_LEVELS    = 0b00000100000000000000000000000000,
+    PMSN_DEATH              = 0b00000010000000000000000000000000,
+    PMSN_SUMMON             = 0b00000001000000000000000000000000,
+    PMSN_END_GAME           = 0b00000000100000000000000000000000,
+    PMSN_BENCHMARK          = 0b00000000000001000000000000000000,
+    PMSN_ATTRACT            = 0b00000000000000100000000000000000,
+    PMSN_R17                = 0b00000000000000010000000000000000,
+    PMSN_INGAME             = 0b11111111111111110000000000000000,
+    PMSN_TRACE              = 0b00000000000000001000000000000000,
+    PMSN_R15                = 0b00000000000000000100000000000000,
+    PMSN_R14                = 0b00000000000000000010000000000000,
+    PMSN_R13                = 0b00000000000000000001000000000000,
+    PMSN_R12                = 0b00000000000000000000100000000000,
+    PMSN_R11                = 0b00000000000000000000010000000000,
+    PMSN_R10                = 0b00000000000000000000001000000000,
+    PMSN_R9                 = 0b00000000000000000000000100000000,
+    PMSN_R8                 = 0b00000000000000000000000010000000,
+    PMSN_R7                 = 0b00000000000000000000000001000000,
+    PMSN_EDITOR_ADMIN       = 0b00000000000000000000000000100000,
+    PMSN_EDITOR_USER        = 0b00000000000000000000000000010000,
+    PMSN_TERMINAL_ADMIN     = 0b00000000000000000000000000001000,
+    PMSN_TERMINAL_USER      = 0b00000000000000000000000000000100,
+    PMSN_DEBUG_ADMIN        = 0b00000000000000000000000000000010,
+    PMSN_DEBUG_USER         = 0b00000000000000000000000000000001,
+    PMSN_OFF                = 0b00000000000000000000000000000000,
+    PMSN_GODMODE            = 0b11111111111111111111111111111111
 } permission_state;
 
 const char* permission_state_literal(unsigned int state) {
@@ -833,13 +863,15 @@ const char* permission_state_literal(unsigned int state) {
     case PMSN_DEATH:            return "PMSN_DEATH";
     case PMSN_SUMMON:           return "PMSN_SUMMON";
     case PMSN_END_GAME:         return "PMSN_END_GAME";
+    case PMSN_BENCHMARK:        return "PMSN_BENCHMARK";
+    case PMSN_ATTRACT:          return "PMSN_ATTRACT";
     case PMSN_TRACE:            return "PMSN_TRACE";
-    case PMSN_EDITOR_ADVANCED:  return "PMSN_EDITOR_ADVANCED";
-    case PMSN_EDITOR_BASIC:     return "PMSN_EDITOR_BASIC";
-    case PMSN_TERMINAL_ADVANCED:return "PMSN_TERMINAL_ADVANCED";
-    case PMSN_TERMINAL_BASIC:   return "PMSN_TERMINAL_BASIC";
-    case PMSN_DEBUG_ADVANCED:   return "PMSN_DEBUG_ADVANCED";
-    case PMSN_DEBUG_BASIC:      return "PMSN_DEBUG_BASIC";
+    case PMSN_EDITOR_ADMIN:     return "PMSN_EDITOR_ADMIN";
+    case PMSN_EDITOR_USER:      return "PMSN_EDITOR_USER";
+    case PMSN_TERMINAL_ADMIN:   return "PMSN_TERMINAL_ADMIN";
+    case PMSN_TERMINAL_USER:    return "PMSN_TERMINAL_USER";
+    case PMSN_DEBUG_ADMIN:      return "PMSN_DEBUG_ADMIN";
+    case PMSN_DEBUG_USER:       return "PMSN_DEBUG_USER";
     case PMSN_OFF:              return "PMSN_OFF";
     case PMSN_GODMODE:          return "PMSN_GODMODE";
     default: return NULL;
@@ -882,7 +914,7 @@ void commute_to(unsigned int state) {
     BITS_OFF(sys.program.ctrlstate, CTRL_SWITCHBOARD);
     BITS_ON(sys.program.ctrlstate, state);
 
-    debug_console_out(control_state_literal(state));
+    debug_console_out(">>>> commute_to", state);
 };
 
 
@@ -901,54 +933,78 @@ Color get_palette_color_pro(int palette_id, unsigned short id, float alpha) {
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
 
 typedef enum {
-    GRID_BGBLEND_LLEFT      = 0b10000000000000000000000000000000, // background vertex color blend lower left
-    GRID_BGBLEND_LRIGHT     = 0b01000000000000000000000000000000, // background vertex color blend lower right
-    GRID_BGBLEND_URIGHT     = 0b00100000000000000000000000000000, // background vertex color blend upper right
-    GRID_BGBLEND_ULEFT      = 0b00010000000000000000000000000000, // background vertex color blend upper left
-    GRID_FGBLEND_LLEFT      = 0b00001000000000000000000000000000, // foreground vertex color blend lower left
-    GRID_FGBLEND_LRIGHT     = 0b00000100000000000000000000000000, // foreground vertex color blend lower right
-    GRID_FGBLEND_URIGHT     = 0b00000010000000000000000000000000, // foreground vertex color blend upper right
-    GRID_FGBLEND_ULEFT      = 0b00000001000000000000000000000000, // foreground vertex color blend upper left
-    GRID_PROTECTED          = 0b00000000100000000000000000000000, // protect value from being changed
-    GRID_RESERVED           = 0b00000000010000000000000000000000, // RESERVED ********************************************* 
-    GRID_CELLDIS            = 0b00000000001000000000000000000000, // turn on cell corners C1 to C4 displacements
-    GRID_LINESSEQ           = 0b00000000000100000000000000000000, // turn on lines sequencing
-    GRID_COLORSEQ           = 0b00000000000010000000000000000000, // turn on color sequencing
-    GRID_VALUESEQ           = 0b00000000000001000000000000000000, // turn on cell value sequencing
-    GRID_AUTOSCRX           = 0b00000000000000100000000000000000, // turn on automatic scrolling on x axis
-    GRID_AUTOSCRY           = 0b00000000000000010000000000000000, // turn on automatic scrolling on y axis
-    GRID_ROTATION           = 0b00000000000000001000000000000000, // turn on rotation 
-    GRID_SKEW               = 0b00000000000000000100000000000000, // turn on cell skewing
-    GRID_WRAP_X             = 0b00000000000000000010000000000000, // turn on wrap around on x axis
-    GRID_WRAP_Y             = 0b00000000000000000001000000000000, // turn on wrap around on y axis
-    GRID_SCALE_X            = 0b00000000000000000000100000000000, // turn on cell scaling on x axis
-    GRID_SCALE_Y            = 0b00000000000000000000010000000000, // turn on cell scaling on y axis
-    GRID_FLIPH              = 0b00000000000000000000001000000000, // flip cell(s) horizontally
-    GRID_FLIPV              = 0b00000000000000000000000100000000, // flip cell(s) vertically
-    GRID_RED                = 0b00000000000000000000000010000000, // turn on red channel
-    GRID_GREEN              = 0b00000000000000000000000001000000, // turn on green channel
-    GRID_BLUE               = 0b00000000000000000000000000100000, // turn on blue channel
-    GRID_ALPHA              = 0b00000000000000000000000000010000, // turn on transparency
-    GRID_LINES              = 0b00000000000000000000000000001000, // turn on lines tiles
-    GRID_BACKGROUND         = 0b00000000000000000000000000000100, // turn on cell background (tile rectangle fill)
-    GRID_SHADOW             = 0b00000000000000000000000000000010, // turn on shadow cell
-    GRID_FOREGROUND         = 0b00000000000000000000000000000001, // turn on cell foreground (value) (used for hidden mode)
-    GRID_DEFAULT1           = 0b00000000011100000000000011111101, // DEFAULT STATE :HEAVY PROCESSING
-    GRID_DEFAULT2           = 0b00000000000000001100000011111111, // DEFAULT STATE :SCROLLTEXT
-    GRID_DEFAULT3           = 0b00000000000000000000000000000000, // DEFAULT STATE :GAME page
-    GRID_DEFAULT4           = 0b00000000000000000000000000000000  // DEFAULT STATE :TERMINAL DISPLAY
+    GRFE_LINE_TOP           = 0b1000000000000000000000000000000000000000000000000000000000000000, // turn on line top
+    GRFE_LINE_BOT           = 0b0100000000000000000000000000000000000000000000000000000000000000, // turn on line bottom
+    GRFE_LINE_LEF           = 0b0010000000000000000000000000000000000000000000000000000000000000, // turn on line left
+    GRFE_LINE_RIG           = 0b0001000000000000000000000000000000000000000000000000000000000000, // turn on line right
+    GRFE_LINE_HOR           = 0b0000100000000000000000000000000000000000000000000000000000000000, // turn on line center horizontal
+    GRFE_LINE_VER           = 0b0000010000000000000000000000000000000000000000000000000000000000, // turn on line center vertical
+    GRFE_LINE_DOW           = 0b0000001000000000000000000000000000000000000000000000000000000000, // turn on line angle down
+    GRFE_LINE_UP            = 0b0000000100000000000000000000000000000000000000000000000000000000, // turn on line angle up
+    GRFE_LIABLEND_LL        = 0b0000000010000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend lower left
+    GRFE_LIABLEND_LR        = 0b0000000001000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend lower right
+    GRFE_LIABLEND_UR        = 0b0000000000100000000000000000000000000000000000000000000000000000, // lines vertex alpha blend upper right
+    GRFE_LIABLEND_UL        = 0b0000000000010000000000000000000000000000000000000000000000000000, // lines vertex alpha blend upper left
+    GRFE_LICBLEND_LL        = 0b0000000000001000000000000000000000000000000000000000000000000000, // lines vertex color blend lower left
+    GRFE_LICBLEND_LR        = 0b0000000000000100000000000000000000000000000000000000000000000000, // lines vertex color blend lower right
+    GRFE_LICBLEND_UR        = 0b0000000000000010000000000000000000000000000000000000000000000000, // lines vertex color blend upper right
+    GRFE_LICBLEND_UL        = 0b0000000000000001000000000000000000000000000000000000000000000000, // lines vertex color blend upper left
+    GRFE_BGABLEND_LL        = 0b0000000000000000100000000000000000000000000000000000000000000000, // background vertex alpha blend lower left
+    GRFE_BGABLEND_LR        = 0b0000000000000000010000000000000000000000000000000000000000000000, // background vertex alpha blend lower right
+    GRFE_BGABLEND_UR        = 0b0000000000000000001000000000000000000000000000000000000000000000, // background vertex alpha blend upper right
+    GRFE_BGABLEND_UL        = 0b0000000000000000000100000000000000000000000000000000000000000000, // background vertex alpha blend upper left
+    GRFE_BGCBLEND_LL        = 0b0000000000000000000010000000000000000000000000000000000000000000, // background vertex color blend lower left
+    GRFE_BGCBLEND_LR        = 0b0000000000000000000001000000000000000000000000000000000000000000, // background vertex color blend lower right
+    GRFE_BGCBLEND_UR        = 0b0000000000000000000000100000000000000000000000000000000000000000, // background vertex color blend upper right
+    GRFE_BGCBLEND_UL        = 0b0000000000000000000000010000000000000000000000000000000000000000, // background vertex color blend upper left
+    GRFE_FGABLEND_LL        = 0b0000000000000000000000001000000000000000000000000000000000000000, // foreground vertex alpha blend lower left
+    GRFE_FGABLEND_LR        = 0b0000000000000000000000000100000000000000000000000000000000000000, // foreground vertex alpha blend lower right
+    GRFE_FGABLEND_UR        = 0b0000000000000000000000000010000000000000000000000000000000000000, // foreground vertex alpha blend upper right
+    GRFE_FGABLEND_UL        = 0b0000000000000000000000000001000000000000000000000000000000000000, // foreground vertex alpha blend upper left
+    GRFE_FGCBLEND_LL        = 0b0000000000000000000000000000100000000000000000000000000000000000, // foreground vertex color blend lower left
+    GRFE_FGCBLEND_LR        = 0b0000000000000000000000000000010000000000000000000000000000000000, // foreground vertex color blend lower right
+    GRFE_FGCBLEND_UR        = 0b0000000000000000000000000000001000000000000000000000000000000000, // foreground vertex color blend upper right
+    GRFE_FGCBLEND_UL        = 0b0000000000000000000000000000000100000000000000000000000000000000, // foreground vertex color blend upper left
+    GRFE_R31                = 0b0000000000000000000000000000000010000000000000000000000000000000, // 
+    GRFE_R30                = 0b0000000000000000000000000000000001000000000000000000000000000000, // 
+    GRFE_R29                = 0b0000000000000000000000000000000000100000000000000000000000000000, // 
+    GRFE_DOUBLEHEIGHT       = 0b0000000000000000000000000000000000010000000000000000000000000000, // double height content
+    GRFE_DOUBLEWIDTH        = 0b0000000000000000000000000000000000001000000000000000000000000000, // double width content
+    GRFE_BLINK2             = 0b0000000000000000000000000000000000000100000000000000000000000000, // turn on fast blink (combined with slow = really fast)
+    GRFE_BLINK1             = 0b0000000000000000000000000000000000000010000000000000000000000000, // turn on slow blink
+    GRFE_R24                = 0b0000000000000000000000000000000000000001000000000000000000000000, // 
+    GRFE_PROTECTED          = 0b0000000000000000000000000000000000000000100000000000000000000000, // protect value from being changed
+    GRFE_R22                = 0b0000000000000000000000000000000000000000010000000000000000000000, // 
+    GRFE_CELLDIS            = 0b0000000000000000000000000000000000000000001000000000000000000000, // turn on cell corners C1 to C4 displacements
+    GRFE_LINESSEQ           = 0b0000000000000000000000000000000000000000000100000000000000000000, // turn on lines sequencing
+    GRFE_COLORSEQ           = 0b0000000000000000000000000000000000000000000010000000000000000000, // turn on color sequencing
+    GRFE_VALUESEQ           = 0b0000000000000000000000000000000000000000000001000000000000000000, // turn on cell value sequencing
+    GRFE_AUTOSCRX           = 0b0000000000000000000000000000000000000000000000100000000000000000, // turn on automatic scrolling on x axis
+    GRFE_AUTOSCRY           = 0b0000000000000000000000000000000000000000000000010000000000000000, // turn on automatic scrolling on y axis
+    GRFE_ROTATION           = 0b0000000000000000000000000000000000000000000000001000000000000000, // turn on rotation 
+    GRFE_SKEW               = 0b0000000000000000000000000000000000000000000000000100000000000000, // turn on cell skewing
+    GRFE_WRAP_X             = 0b0000000000000000000000000000000000000000000000000010000000000000, // turn on wrap around on x axis
+    GRFE_WRAP_Y             = 0b0000000000000000000000000000000000000000000000000001000000000000, // turn on wrap around on y axis
+    GRFE_SCALE_X            = 0b0000000000000000000000000000000000000000000000000000100000000000, // turn on cell scaling on x axis
+    GRFE_SCALE_Y            = 0b0000000000000000000000000000000000000000000000000000010000000000, // turn on cell scaling on y axis
+    GRFE_FLIPH              = 0b0000000000000000000000000000000000000000000000000000001000000000, // flip cell(s) horizontally
+    GRFE_FLIPV              = 0b0000000000000000000000000000000000000000000000000000000100000000, // flip cell(s) vertically
+    GRFE_RED                = 0b0000000000000000000000000000000000000000000000000000000010000000, // turn on red channel
+    GRFE_GREEN              = 0b0000000000000000000000000000000000000000000000000000000001000000, // turn on green channel
+    GRFE_BLUE               = 0b0000000000000000000000000000000000000000000000000000000000100000, // turn on blue channel
+    GRFE_ALPHA              = 0b0000000000000000000000000000000000000000000000000000000000010000, // turn on transparency
+    GRFE_R3                 = 0b0000000000000000000000000000000000000000000000000000000000001000, // 
+    GRFE_BACKGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000100, // turn on cell background (tile rectangle fill)
+    GRFE_SHADOW             = 0b0000000000000000000000000000000000000000000000000000000000000010, // turn on shadow cell
+    GRFE_FOREGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000001, // turn on cell foreground (value) (used for hidden mode)
+    GRFE_LINES_ONLY         = 0b1111111100000000000000000000000000000000000000000000000000000000, 
+    GRFE_BLENDING_ONLY      = 0b0000000011111111111111111111111100000000000000000000000000000000, 
+    GRFE_DEFAULT1           = 0b0000000000000000000000000000000000000000011100000000000011110101, // DEFAULT STATE :HEAVY PROCESSING
+    GRFE_DEFAULT2           = 0b0000000000000000000000000000000000000000000000001100000011110111, // DEFAULT STATE :SCROLLTEXT
+    GRFE_DEFAULT3           = 0b0000000000000000000000000000000000000000000000000000000000000000, // DEFAULT STATE :GAME page
+    GRFE_DEFAULT4           = 0b0000000000000000000000000000000000000000000000000100000011110101  // DEFAULT STATE :TERMINAL DISPLAY
 } grid_features;
 
-typedef enum {
-    LINE_TOP                = 0b10000000, // turn on line top
-    LINE_BOT                = 0b01000000, // turn on line bottom
-    LINE_LEF                = 0b00100000, // turn on line left
-    LINE_RIG                = 0b00010000, // turn on line right
-    LINE_HOR                = 0b00001000, // turn on line center horizontal
-    LINE_VER                = 0b00000100, // turn on line center vertical
-    LINE_DOW                = 0b00000010, // turn on line angle down
-    LINE_UP                 = 0b00000001, // turn on line angle up
-} lines_features;
 
 Rectangle get_tilezone_from_position(unsigned short asset_id, Vector2 position) {
     EX_tileset *tileset = &sys.asset.tileset[asset_id];
@@ -970,16 +1026,16 @@ Rectangle get_tilezone_from_code(unsigned short asset_id, int code) {
     return (Rectangle) {px * tilesize->x, py * tilesize->y,  tilesize->x, tilesize->y};
 }
 
-//        plot_character(ex_scrolltext[s].font, ch, lines, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].colorbg, colorln, state);
-void plot_character(unsigned short asset_id, int palette_id, unsigned short code, unsigned char lines, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, unsigned int state) {
+//        plot_character(ex_scrolltext[s].font, ch, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].colorbg, colorln, state);
+void plot_character(unsigned short asset_id, int palette_id, unsigned short code, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, unsigned long state) {
     Color vertex_colors[4];
-    if (!(state & GRID_ROTATION)) angle = 0.f;
+    if (!(state & GRFE_ROTATION)) angle = 0.f;
 
-    if (state & GRID_BACKGROUND) {
-        if (state & GRID_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
-        if (state & GRID_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
-        if (state & GRID_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
-        if (state & GRID_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
+    if (state & GRFE_BACKGROUND) {
+        if (state & GRFE_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
+        if (state & GRFE_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
+        if (state & GRFE_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
+        if (state & GRFE_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
         vertex_colors[1] = vertex_colors[0];
         vertex_colors[2] = vertex_colors[0];
         vertex_colors[3] = vertex_colors[0];
@@ -987,8 +1043,8 @@ void plot_character(unsigned short asset_id, int palette_id, unsigned short code
             (Rectangle) { position.x, position.y, scale.x, scale.y },
             (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
     }
-    if (state & GRID_FOREGROUND) {
-            if (state & GRID_SHADOW) {
+    if (state & GRFE_FOREGROUND) {
+            if (state & GRFE_SHADOW) {
                 vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
                 vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
                 vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
@@ -998,10 +1054,10 @@ void plot_character(unsigned short asset_id, int palette_id, unsigned short code
                     (Rectangle) { position.x + shadow.x, position.y + shadow.y, scale.x, scale.y },
                     (Vector2) {0,0}, skew, angle, vertex_colors);
             };
-            if (state & GRID_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
-            if (state & GRID_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
-            if (state & GRID_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
-            if (state & GRID_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
+            if (state & GRFE_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
+            if (state & GRFE_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
+            if (state & GRFE_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
+            if (state & GRFE_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
             vertex_colors[1] = vertex_colors[0];
             vertex_colors[2] = vertex_colors[0];
             vertex_colors[3] = vertex_colors[0];
@@ -1011,11 +1067,12 @@ void plot_character(unsigned short asset_id, int palette_id, unsigned short code
                 (Vector2) {0,0}, skew, angle, vertex_colors);
     }
 
-    if ((state & GRID_LINES) && lines) {
-            if (state & GRID_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
-            if (state & GRID_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
-            if (state & GRID_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
-            if (state & GRID_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
+    unsigned char lines = (state >> 56);
+    if (lines) {
+            if (state & GRFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
+            if (state & GRFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
+            if (state & GRFE_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
+            if (state & GRFE_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
             vertex_colors[1] = vertex_colors[0];
             vertex_colors[2] = vertex_colors[0];
             vertex_colors[3] = vertex_colors[0];
@@ -1026,7 +1083,7 @@ void plot_character(unsigned short asset_id, int palette_id, unsigned short code
     }
 }
 
-bool init_cell_linear(EX_cell *cell, unsigned int cell_state, unsigned int color_id, unsigned int colorbg_id) {
+bool init_cell_linear(EX_cell *cell, unsigned long cell_state, unsigned int color_id, unsigned int colorbg_id) {
     cell->state = cell_state;
     cell->value = 0;
     cell->colorfg_id = color_id;
@@ -1036,11 +1093,10 @@ bool init_cell_linear(EX_cell *cell, unsigned int cell_state, unsigned int color
     cell->angle = 0;
     cell->fg_brightness = 1.f;
     cell->bg_brightness = 1.f;
-
     return 0;
 }
 
-bool init_page(int pagegroup_id, int page_id, Vector2 size, unsigned int page_state, unsigned int cell_state, unsigned short asset_id) {
+int init_page(int pagegroup_id, int page_id, Vector2 size, unsigned long page_state, unsigned long cell_state, unsigned short asset_id) {
     int cell_count = (int)size.x * (int)size.y;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     page->size = size;
@@ -1058,16 +1114,18 @@ bool init_page(int pagegroup_id, int page_id, Vector2 size, unsigned int page_st
         init_cell_linear(&cell[i], cell_state, 0, 0);
     }
     sys.video.pagegroup[pagegroup_id].page[page_id].asset_id = asset_id;
-    
-    return 0;
+    return 1;
 }
 
-bool init_pagegroup(unsigned int pagegroup_id, Vector2 size, unsigned int pagegroup_state, unsigned int page_state, unsigned int cell_state, unsigned short asset_id) {
+int init_pagegroup(unsigned int pagegroup_id, Vector2 size, int page_count, unsigned int pagegroup_state, unsigned long page_state, unsigned long cell_state, unsigned short asset_id) {
+    int pages = 0;
     sys.video.pagegroup[pagegroup_id].state = pagegroup_state;
-    sys.video.pagegroup[pagegroup_id].page_count = 1;
+    sys.video.pagegroup[pagegroup_id].page_count = page_count;
     sys.video.pagegroup[pagegroup_id].page = calloc(sys.video.pagegroup[pagegroup_id].page_count, sizeof(EX_page));
-    init_page(pagegroup_id, 0, size, page_state, cell_state, asset_id);
-    return 0;
+    for (int page_id = 0; page_id < page_count; page_id++) {
+        pages += init_page(pagegroup_id, page_id, size, page_state, cell_state, asset_id);
+    }
+    return pages;
 }
 
 // *************** REFERENCING SHORTCUTS TO USE *****************
@@ -1077,17 +1135,49 @@ bool init_pagegroup(unsigned int pagegroup_id, Vector2 size, unsigned int pagegr
 // This functionality requires setting a bunch of stuff afterwards;
 // - per cell states
 // - per page asset
-bool init_pagegroup_multipage(Vector2 size, unsigned int pagegroup_state, unsigned int page_state[]) {
+bool init_pagegroup_multipage(Vector2 size, unsigned int pagegroup_state, unsigned long page_state[]) {
     int pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
 
     sys.video.pagegroup[pagegroup_id].state = pagegroup_state;
-    sys.video.pagegroup[pagegroup_id].page_count = sizeof(page_state) / sizeof_member(EX_cell, state);
+    sys.video.pagegroup[pagegroup_id].page_count = sizeof(page_state) / sizeof_member(EX_page, state);
 
     sys.video.pagegroup[pagegroup_id].page = calloc(sys.video.pagegroup[pagegroup_id].page_count, sizeof(EX_page));
     for (int i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
         init_page(pagegroup_id, i, size, page_state[i], 0, 0);
     }
     return 0;
+}
+
+int unload_page(int pagegroup_id, int page_id) {
+    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+    if (page->cell_count > 0) {
+        page->size = (Vector2){0};
+        page->state = 0;
+        page->cell_count = 0;
+        free(page->cell);
+        return 1;
+    } else {
+        return 0; // was an empty page
+    }
+}
+
+int unload_pagegroup(int pagegroup_id) {
+    int pages = 0;
+    EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
+    for (int page_id = 0; page_id < (pagegroup->page_count); page_id++) {
+        pages += unload_page(pagegroup_id, page_id);
+    }
+    if (pages) free(sys.video.pagegroup[pagegroup_id].page);
+    return pages;
+}
+
+int unload_all_pagegroups() {
+    int pagegroups = 0, pages = 0;
+    for (int pagegroup_id = 0; pagegroup_id < GRID_MAX_PAGEGROUPS; pagegroup_id++) {
+        pages += unload_pagegroup(pagegroup_id);
+        if (pages) ++pagegroups;
+    }
+    return pages;
 }
 
 void page_set_mouse_position(int pagegroup_id, int page_id, Vector2 target) {
@@ -1106,7 +1196,7 @@ void page_set_keyboard_position(int pagegroup_id, int page_id, Vector2 target) {
     page->keyboard.offset = target;
 }
 
-void set_cell_state(int pagegroup_id, int page_id, Rectangle target, unsigned int state) {
+void set_cell_state(int pagegroup_id, int page_id, Rectangle target, unsigned long state) {
     int linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     int lsx = page->size.x, lsy = page->size.y;
@@ -1124,7 +1214,7 @@ void set_cell_state(int pagegroup_id, int page_id, Rectangle target, unsigned in
     }
 }
 
-void clear_cell_state(int pagegroup_id, int page_id, Rectangle target, unsigned int state) {
+void clear_cell_state(int pagegroup_id, int page_id, Rectangle target, unsigned long state) {
     int linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     int lsx = page->size.x, lsy = page->size.y;
@@ -1287,7 +1377,7 @@ void set_cell_scale(int pagegroup_id, int page_id, Rectangle target, Vector2 sca
 }
 
 // iterate through charracter ascii codes, if font pixels then copy desired source_cell information to the page
-void plot_big_characters(int pagegroup_id, int page_id, Vector2 target, unsigned int state, int font_id, unsigned char *ch) {
+void plot_big_characters(int pagegroup_id, int page_id, Vector2 target, unsigned long state, int font_id, unsigned char *ch) {
     int linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     int lsx = page->size.x, lsy = page->size.y;
@@ -1326,7 +1416,7 @@ typedef enum {
     GFLD_ALL_BUT_STATE        = 0b00111111111111111111111111111111    // all fields except the state of the cell
 } gridfield_features;
 
-void init_cell (int pagegroup_id, int page_id, Rectangle target, EX_cell info_cell, unsigned int state) {
+void init_cell (int pagegroup_id, int page_id, Rectangle target, EX_cell info_cell, unsigned long state) {
     int target_offset, source_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     int lsx = page->size.x, lsy = page->size.y;
@@ -1368,12 +1458,12 @@ void init_cell (int pagegroup_id, int page_id, Rectangle target, EX_cell info_ce
     }
 }
 
-void clear_cell (int pagegroup_id, int page_id, Rectangle target, unsigned int state) {
+void clear_cell (int pagegroup_id, int page_id, Rectangle target, unsigned long state) {
     static inline EX_cell blank_cell;
     init_cell(pagegroup_id, page_id, target, blank_cell, state);
 }
 
-void shift_cell_field_rectangle(int pagegroup_id, int page_id, Rectangle target, float shift, unsigned int state) {
+void shift_cell_field_rectangle(int pagegroup_id, int page_id, Rectangle target, float shift, unsigned long state) {
     int target_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     int lsx = page->size.x, lsy = page->size.y;
@@ -1410,7 +1500,7 @@ void shift_cell_field_rectangle(int pagegroup_id, int page_id, Rectangle target,
     }
 }
 
-void shift_cell_field_circle(int pagegroup_id, int page_id, Rectangle target, float shift, unsigned int state) {
+void shift_cell_field_circle(int pagegroup_id, int page_id, Rectangle target, float shift, unsigned long state) {
     int linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     int lsx = page->size.x, lsy = page->size.y;
@@ -1442,7 +1532,7 @@ typedef enum {
     GRIDSHIFT_DOWNRIGHT = 8
 } cell_direction;
 
-void copy_cell_in_page(int pagegroup_id, int page_id, Rectangle source, Vector2 target, unsigned int state) {
+void copy_cell_in_page(int pagegroup_id, int page_id, Rectangle source, Vector2 target, unsigned long state) {
     int source_offset, target_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     int lsx = page->size.x, lsy = page->size.y;
@@ -1497,7 +1587,7 @@ void copy_cell_in_page(int pagegroup_id, int page_id, Rectangle source, Vector2 
 }
 
 // Move cell content to any of 8 directions
-void shift_cell (int pagegroup_id, int page_id, Rectangle source, unsigned char shift_method, bool cycle, unsigned int state) {
+void shift_cell (int pagegroup_id, int page_id, Rectangle source, unsigned char shift_method, bool cycle, unsigned long state) {
     int source_offset, target_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     int lsx = page->size.x, lsy = page->size.y;
@@ -1510,7 +1600,7 @@ void shift_cell (int pagegroup_id, int page_id, Rectangle source, unsigned char 
 
 }
 
-void copy_cell_to_page(int source_pagegroup_id, int source_page_id, Rectangle source, int target_pagegroup_id, int target_page_id, Vector2 target, unsigned int state) {
+void copy_cell_to_page(int source_pagegroup_id, int source_page_id, Rectangle source, int target_pagegroup_id, int target_page_id, Vector2 target, unsigned long state) {
     int source_offset, target_offset;
 
     EX_page *source_page = &sys.video.pagegroup[source_pagegroup_id].page[source_page_id];
@@ -1535,7 +1625,7 @@ void copy_cell_to_page(int source_pagegroup_id, int source_page_id, Rectangle so
                     source_offset = lsx * y + x;
                     target_offset = ltx * (y + ty) + (x + tx);
 
-//    if (!(state & GRID_PROTECTED))   // if not protected destination field, then you can write
+//    if (!(state & GRFE_PROTECTED))   // if not protected destination field, then you can write
 
                     if (state & GFLD_ALL)                   target_cell[target_offset]                       = source_cell[source_offset];
                     else {
@@ -1581,8 +1671,8 @@ void render_page(int page_id) {
         for (int y = 0; y < lsy; y++) {
             offset = lsx * y + x;
             EX_cell *c = &cell[offset];
-            unsigned int state = c->state;
-            unsigned char lines = c->lines;
+            unsigned long state = c->state;
+            unsigned char lines = c->state >> 56;
             Color colorfg = get_palette_color(palette_id, c->colorfg_id);
             Color colorbg = get_palette_color(palette_id, c->colorbg_id);
             Color colorln = get_palette_color(palette_id, c->colorln_id);
@@ -1590,7 +1680,7 @@ void render_page(int page_id) {
             Vector2 scale = c->scale;
             Vector2 skew = c->skew;
             float angle = c->angle;
-            if (!(state & GRID_ROTATION)) angle = 0.f;
+            if (!(state & GRFE_ROTATION)) angle = 0.f;
             
             // we have the cell data we can use it to draw our background, foreground and shadow
             // calculate position x,y
@@ -1598,57 +1688,57 @@ void render_page(int page_id) {
             // reading color from palette get_palette_color(palette,id);
 
     // background set color of corner to color of next tile 
-//    GRID_BGBLEND_LLEFT       // background vertex color blend lower left
-//    GRID_BGBLEND_LRIGHT      // background vertex color blend lower right
-//    GRID_BGBLEND_URIGHT      // background vertex color blend upper right
-//    GRID_BGBLEND_ULEFT       // background vertex color blend upper left
+//    GRFE_BGBLEND_LL       // background vertex color blend lower left
+//    GRFE_BGBLEND_LR       // background vertex color blend lower right
+//    GRFE_BGBLEND_UR       // background vertex color blend upper right
+//    GRFE_BGBLEND_UL       // background vertex color blend upper left
 
     // foreground set color of corner to color of next tile 
-//    GRID_FGBLEND_LLEFT       // foreground vertex color blend lower left
-//    GRID_FGBLEND_LRIGHT      // foreground vertex color blend lower right
-//    GRID_FGBLEND_URIGHT      // foreground vertex color blend upper right
-//    GRID_FGBLEND_ULEFT       // foreground vertex color blend upper left
+//    GRFE_FGBLEND_LL       // foreground vertex color blend lower left
+//    GRFE_FGBLEND_LR       // foreground vertex color blend lower right
+//    GRFE_FGBLEND_UR       // foreground vertex color blend upper right
+//    GRFE_FGBLEND_UL       // foreground vertex color blend upper left
 
 /*  All STATES (exhaustive logic) and LINES (just a DrawTexture) to consider
 
     // This is a different beast and not sure yet how to handle sequences
-    GRID_LINESSEQ            // turn on lines sequencing
-    GRID_COLORSEQ            // turn on color sequencing
-    GRID_VALUESEQ            // turn on cell value sequencing
+    GRFE_LINESSEQ            // turn on lines sequencing
+    GRFE_COLORSEQ            // turn on color sequencing
+    GRFE_VALUESEQ            // turn on cell value sequencing
 
     // This is a different beast and not sure yet how to handle scrolling of tiles
-    GRID_AUTOSCRX            // turn on automatic scrolling on x axis
-    GRID_AUTOSCRY            // turn on automatic scrolling on y axis
+    GRFE_AUTOSCRX            // turn on automatic scrolling on x axis
+    GRFE_AUTOSCRY            // turn on automatic scrolling on y axis
 
-    if (state & GRID_ROTATION) // then allow using the rotation value else use 0 
-    if (state & GRID_SKEW)   // then allow using the skew value else use 0
-    if (state & GRID_CELLDIS)  // then allow corner displacements
+    if (state & GRFE_ROTATION) // then allow using the rotation value else use 0 
+    if (state & GRFE_SKEW)   // then allow using the skew value else use 0
+    if (state & GRFE_CELLDIS)  // then allow corner displacements
 
-    GRID_SCALE_X             // turn on cell scaling on x axis
-    GRID_SCALE_Y             // turn on cell scaling on y axis
+    GRFE_SCALE_X             // turn on cell scaling on x axis
+    GRFE_SCALE_Y             // turn on cell scaling on y axis
 
-    GRID_WRAP_X              // turn on wrap around on x axis
-    GRID_WRAP_Y              // turn on wrap around on y axis
+    GRFE_WRAP_X              // turn on wrap around on x axis
+    GRFE_WRAP_Y              // turn on wrap around on y axis
 
-    GRID_FLIPH               // flip cell(s) horizontally
-    GRID_FLIPV               // flip cell(s) vertically
+    GRFE_FLIPH               // flip cell(s) horizontally
+    GRFE_FLIPV               // flip cell(s) vertically
 
     // a simple & of each Color value with the flag @ true
-    GRID_RED                 // turn on red channel
-    GRID_GREEN               // turn on green channel
-    GRID_BLUE                // turn on blue channel
-    GRID_ALPHA               // turn on transparency
+    GRFE_RED                 // turn on red channel
+    GRFE_GREEN               // turn on green channel
+    GRFE_BLUE                // turn on blue channel
+    GRFE_ALPHA               // turn on transparency
 
     DrawTexturePro2(
     );
 */
             {
                 // to elaborate color blending between tiles... (will involve snooping all 4 directions for color depend on blending options)
-                if (state & GRID_BACKGROUND) {
-                    if (state & GRID_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
-                    if (state & GRID_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
-                    if (state & GRID_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
-                    if (state & GRID_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
+                if (state & GRFE_BACKGROUND) {
+                    if (state & GRFE_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
+                    if (state & GRFE_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
+                    if (state & GRFE_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
+                    if (state & GRFE_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
                     vertex_colors[1] = vertex_colors[0];
                     vertex_colors[2] = vertex_colors[0];
                     vertex_colors[3] = vertex_colors[0];
@@ -1656,9 +1746,9 @@ void render_page(int page_id) {
                         (Rectangle) { x, y, scale.x, scale.y },
                         (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
                 }
-                if (state & GRID_FOREGROUND) {
+                if (state & GRFE_FOREGROUND) {
                         unsigned short value = c->value;
-                        if (state & GRID_SHADOW) {
+                        if (state & GRFE_SHADOW) {
                             vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
                             vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
                             vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
@@ -1668,10 +1758,10 @@ void render_page(int page_id) {
                                 (Rectangle) { x + shadow.x, y + shadow.y, scale.x, scale.y },
                                 (Vector2) {0,0}, skew, angle, vertex_colors);
                         };
-                        if (state & GRID_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
-                        if (state & GRID_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
-                        if (state & GRID_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
-                        if (state & GRID_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
+                        if (state & GRFE_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
+                        if (state & GRFE_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
+                        if (state & GRFE_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
+                        if (state & GRFE_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
                         vertex_colors[1] = vertex_colors[0];
                         vertex_colors[2] = vertex_colors[0];
                         vertex_colors[3] = vertex_colors[0];
@@ -1681,11 +1771,12 @@ void render_page(int page_id) {
                             (Vector2) {0,0}, skew, angle, vertex_colors);
                 }
 
-                if ((state & GRID_LINES) && lines) {
-                    if (state & GRID_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
-                    if (state & GRID_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
-                    if (state & GRID_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
-                    if (state & GRID_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
+                unsigned char lines = state >> 56;
+                if (lines) {
+                    if (state & GRFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
+                    if (state & GRFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
+                    if (state & GRFE_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
+                    if (state & GRFE_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
                     vertex_colors[1] = vertex_colors[0];
                     vertex_colors[2] = vertex_colors[0];
                     vertex_colors[3] = vertex_colors[0];
@@ -1715,7 +1806,6 @@ void render_pagegroup() {
 // end draw here
 }
 
-
 // does the execution of the modifiers
 void process_page(int page_id) {
 }
@@ -1732,9 +1822,6 @@ void load_page() {
 void save_page() {
 }
 
-void deinit_page(int id) {
-    
-}
 
 
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** E N D
@@ -1842,8 +1929,8 @@ void update_assets(void) {
 }
 
 int load_asset (unsigned int assettype, const char* fileName, const char* fileType, const unsigned char* fileData, int dataSize, int pak) {
-    debug_console_out("int load_asset");
     int id = sys.asset.total_assets;
+    debug_console_out("int load_asset", id);
 
     BITS_INIT(sys.asset.state[id], ASSET_INITIALIZED | assettype);
 
@@ -2031,7 +2118,8 @@ int load_tileset(Vector2 count, const char* fileName, const char* fileType, cons
     return asset_id;
 }
 
-static void unload_asset(unsigned int id) {
+static int unload_asset(unsigned int id) {
+    int status = 0;
     if (BITS_TEST(sys.asset.state[id], ASSET_ACTIVE)) {
         sys.asset.state[id] |= ASSET_EXPIRED;
         int assettype = asset_type(sys.asset.asset_type[id]);
@@ -2041,7 +2129,7 @@ static void unload_asset(unsigned int id) {
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_PALETTE :
             UnloadImage(sys.asset.img[id]);
@@ -2050,7 +2138,7 @@ static void unload_asset(unsigned int id) {
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_TEXTURE :
             UnloadImage(sys.asset.img[id]);
@@ -2058,7 +2146,7 @@ static void unload_asset(unsigned int id) {
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_FONT :
             UnloadImage(sys.asset.img[id]);
@@ -2066,7 +2154,7 @@ static void unload_asset(unsigned int id) {
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_TILESET :
             UnloadImage(sys.asset.img[id]);
@@ -2074,21 +2162,21 @@ static void unload_asset(unsigned int id) {
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_FRAMEBUFFER :
             UnloadRenderTexture(sys.asset.framebuffer[id]);
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_SHADER :
             UnloadShader(sys.asset.shader[id]);
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_XM :
             StopMusicStream(sys.asset.music[id]); // in case it is still playing
@@ -2096,49 +2184,52 @@ static void unload_asset(unsigned int id) {
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_WAV : // incomplete*********************************** get raylib functionality
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_MP3 : // incomplete*********************************** get raylib functionality
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_AUDIOSTREAM :
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_TEXT :
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             case ASSET_DATA :
             sys.asset.asset_type[id] = NULL;
             BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
             BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            break;
+            ++status; break;
 
             default :
             BITS_ON(sys.asset.state[id], ASSET_ISSUE); // unknown asset, trigger issue
         };
         sys.asset.total_assets -= 1;
     };
+    return status;
 }
 
-void unload_all_assets(void) {
+int unload_all_assets(void) {
+    int count = 0;
     for(int asset = 0; asset < MAXASSETS; asset++) {
-        unload_asset(asset);
+        count += unload_asset(asset);
     };
+    return count;
 }
 
 
@@ -2218,11 +2309,13 @@ static void change_music_stream(int track_id, int order_id, bool immediate) {
     int asset = sys.audio.track[track_id].asset;
     sys.audio.track[track_id].order_playing = order_id;
     
-    if (!immediate) { // switches at end of pattern
-        jar_xm_pattern_jump(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id]);
-    } else { // switches immediately
-        jar_xm_pattern_jump_immediate(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id], true);
-    };
+    if (order_id < sys.audio.track[track_id].total_orders) {
+        if (!immediate) { // switches at end of pattern
+            jar_xm_pattern_jump(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id]);
+        } else { // switches immediately
+            jar_xm_pattern_jump_immediate(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id], true);
+        };
+    }
 }
 
 static void hint_restart_track(int immediate) {
@@ -2237,17 +2330,17 @@ static void hint_restart_track(int immediate) {
     }
 }
 
-static void play_track(int track, int order, int immediate) {
-    sys.audio.track[track].is_playing = true;
-    int asset = sys.audio.track[track].asset;
+static void play_track(int track_id, int order_id, int immediate) {
+    sys.audio.track[track_id].is_playing = true;
+    int asset = sys.audio.track[track_id].asset;
 	PlayMusicStream(sys.asset.music[asset]);
-    change_music_stream(track, order, immediate);
+    change_music_stream(track_id, order_id, immediate);
 }
 
-static void change_track_playing(int track, int order) {
-    sys.audio.track[track].is_playing = true;
- //   if (sys.audio.track[track].orderlist >= sys.audio.total_tracks) sys.audio.track_playing = (sys.audio.total_tracks - 1); else if (sys.audio.track_playing < 0) sys.audio.track_playing = 0;
-    //change_music_stream(tracksys.audio.track_playing, true);
+static void change_track_playing(int track_id, int value) {
+    sys.audio.track[track_id].is_playing = true;
+    int proposed_order = (sys.audio.track[track_id].order_playing + value) % sys.audio.track[track_id].total_orders;
+    change_music_stream(track_id, proposed_order, true);
 }
 
 //    jar_xm_change_all_channel_volumes(sys.asset.music[asset].ctxData, (int) amount); // DO NOT USE, INSTEAD REVAMP TRACKER MIXER
@@ -2286,26 +2379,28 @@ typedef enum {
 // SET buffer aspect ratio
 // RLAPI void rlOrtho(double left, double right, double bottom, double top, double znear, double zfar);
 
-static int init_frame_buffer(int display, Vector2 resolution) {
+void flip_frame_buffer(int display, bool clear) {
+    sys.video.previous_virtual = sys.video.current_virtual;
     sys.video.current_virtual = display;
+    if (clear) sys.video.screen_refresh = true;
+}
+
+static int init_frame_buffer(int display, Vector2 resolution) {
     flip_frame_buffer(display, true);
     sys.video.virtual_res[sys.video.current_virtual] = resolution;
     sys.video.frames[sys.video.current_virtual] = 0;
     sys.video.elapsed_time_var_ratio[sys.video.current_virtual] = 5.f;
     sys.video.frame_time_inc[sys.video.current_virtual] = 0;
-	return load_asset(ASSET_FRAMEBUFFER, NULL, NULL, NULL, NULL, 0);
+	int asset_id = load_asset(ASSET_FRAMEBUFFER, NULL, NULL, NULL, NULL, 0);
+    flip_frame_buffer(sys.video.previous_virtual, true);
+    return asset_id;
 }
 
 static void draw_frame_buffer(RenderTexture renderer) {
 	DrawTexturePro (renderer.texture,
     (Rectangle) {0.0f, 0.0f, (float)renderer.texture.width, (float)-renderer.texture.height},
-    (Rectangle) {0.0, 0.0, sys.video.physical_res[sys.video.current_physical].x, sys.video.physical_res[sys.video.current_physical].y},
+    (Rectangle) {0.0, 0.0, sys.video.screen[sys.video.current_physical].x, sys.video.screen[sys.video.current_physical].y},
     (Vector2)   {0.0, 0.0}, 0.0f, WHITE);
-}
-
-void flip_frame_buffer(int display, bool clear) {
-    sys.video.current_virtual = display;
-    if (clear) sys.video.next_physical_clear = true;
 }
 
 static Vector2 ratio_info(int x, int y) {
@@ -2325,7 +2420,7 @@ bool init_display_properties(bool hide_mouse) {
     BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_ALWAYS_RUN);
     BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_TOPMOST);
     BITS_ON(sys.video.windowstate_normal, FLAG_MSAA_4X_HINT);
-    //BITS_ON(sys.video.windowstate_normal, FLAG_VSYNC_HINT);
+    BITS_ON(sys.video.windowstate_normal, FLAG_VSYNC_HINT);
 
     BITS_INIT(sys.video.windowstate_paused, 0);
     BITS_ON(sys.video.windowstate_paused, FLAG_FULLSCREEN_MODE);
@@ -2338,18 +2433,31 @@ bool init_display_properties(bool hide_mouse) {
     InitWindow(0, 0, sys.program.name);
     sys.video.current_physical = GetCurrentMonitor();
     if (hide_mouse) HideCursor();
-    sys.video.physical_res[sys.video.current_physical] = (Vector2) {GetMonitorWidth(sys.video.current_physical), GetMonitorHeight(sys.video.current_physical)};
-    sys.video.refresh_rate[sys.video.current_physical] = GetMonitorRefreshRate(sys.video.current_physical);
+    sys.video.screen[sys.video.current_physical] = (Vector2) {GetScreenWidth(), GetScreenHeight()};
+    sys.video.screen_rate[sys.video.current_physical] = GetMonitorRefreshRate(sys.video.current_physical);
 
     if (IsWindowReady()) return status; else return 1;
+}
+
+void flip_display_state(unsigned int state) {
+    if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS)) {
+        BITS_FLIP(sys.video.windowstate_normal, state);
+    } else {
+        BITS_FLIP(sys.video.windowstate_paused, state);
+    }
+    if (IsWindowState(state)) { 
+        ClearWindowState(state);
+    } else {
+        SetWindowState(state);
+    }
 }
 
 void update_display(void) {
     int display = sys.video.current_virtual;
 	BeginDrawing();
-        if (sys.video.next_physical_clear) {
+        if (sys.video.screen_refresh) {
             ClearBackground(BLACK);
-            sys.video.next_physical_clear = false;
+            sys.video.screen_refresh = false;
         };
         draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[display]]);
 
@@ -2362,7 +2470,7 @@ void update_display(void) {
 
     sys.video.window_focus = IsWindowFocused();
 
-    double next_frame = sys.video.prev_time[display] + (double)(1 / sys.video.refresh_rate[sys.video.current_physical]);
+    double next_frame = sys.video.prev_time[display] + (double)(1 / sys.video.screen_rate[sys.video.current_physical]);
     float wait = (next_frame - GetTime());
     if (wait < 0) wait = 0;
     WaitTime(wait * 1000.f);
@@ -2394,7 +2502,7 @@ void update_display(void) {
         };
     };
 
-    sys.video.frame_time[display] = (float)sys.video.elapsed_time[display] * (float)sys.video.refresh_rate[sys.video.current_physical];
+    sys.video.frame_time[display] = (float)sys.video.elapsed_time[display] * (float)sys.video.screen_rate[sys.video.current_physical];
     sys.video.frame_time_inc[display] += (float)sys.video.elapsed_time[display];
     sys.video.elapsed_time_var[display] += (float)sys.video.elapsed_time[display] * sys.video.elapsed_time_var_ratio[display];
     sys.video.value_anim[display] = fast_sin(fast_cos(fast_sin(sys.video.frame_time_inc[display]) * fast_sin(sys.video.elapsed_time_var[display] * 0.1) * 0.1) * fast_cos(sys.video.elapsed_time_var[display] * 0.015) * 0.1 ) * 0.05 + 0.001;
@@ -2904,7 +3012,7 @@ static void update_scrolltext(int s, float text_scale) {
                     if (ex_scrolltext[s].pause_found != (i - 1)) {
                         ex_scrolltext[s].pause_found = i - 1;
                         if (ex_scrolltext[s].text_pause <= 0.0) {
-                            ex_scrolltext[s].text_pause = sys.video.refresh_rate[sys.video.current_physical] * (float)(sys.asset.data[ex_scrolltext[s].asset_id][i] - 96); // set pause for x secs (a-z=1-26)
+                            ex_scrolltext[s].text_pause = sys.video.screen_rate[sys.video.current_physical] * (float)(sys.asset.data[ex_scrolltext[s].asset_id][i] - 96); // set pause for x secs (a-z=1-26)
                         };
                     }
                 } else if (ch == SCROLL_TEXTSPEED) { // set the speed of the scrolling text (a-z = slow to very fast)
@@ -2936,14 +3044,14 @@ static void update_scrolltext(int s, float text_scale) {
                         ex_scrolltext[s].text_angle = displacement.y;
                     };
 
-                    unsigned int state = 0;
-                    BITS_ON(state, GRID_DEFAULT2);
-                    if (ex_scrolltext[s].colorbg_flag == 0) BITS_OFF(state, GRID_BACKGROUND);
-                    if (!(ex_scrolltext[s].text_angle))     BITS_OFF(state, GRID_ROTATION);
-                    if (ex_scrolltext[s].text_shadow == 0.0) BITS_OFF(state, GRID_SHADOW);
-                    if (ex_scrolltext[s].text_angle)        BITS_OFF(state, GRID_SKEW);
+                    unsigned long state = 0;
+                    BITS_ON(state, GRFE_DEFAULT2);
+                    if (ex_scrolltext[s].colorbg_flag == 0) BITS_OFF(state, GRFE_BACKGROUND);
+                    if (!(ex_scrolltext[s].text_angle))     BITS_OFF(state, GRFE_ROTATION);
+                    if (ex_scrolltext[s].text_shadow == 0.0) BITS_OFF(state, GRFE_SHADOW);
+                    if (ex_scrolltext[s].text_angle)        BITS_OFF(state, GRFE_SKEW);
 
-                    plot_character(ex_scrolltext[s].font_id, ex_scrolltext[s].palette_id, ch, 0, 
+                    plot_character(ex_scrolltext[s].font_id, ex_scrolltext[s].palette_id, ch, 
                         (Vector2) {(ex_scrolltext[s].position.x +  i_x) * text_scale, (ex_scrolltext[s].position.y * text_scale) + ex_scrolltext[s].text_wave}, 
                         (Vector2) {text_scale, text_scale}, 
                         ex_scrolltext[s].skew,
@@ -3042,14 +3150,13 @@ static const kbmap_ascii[] = {
     0, 0, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 48, 48, 46, 13
 };
 
+
 //  Note for ANSi, colors expected are 0: black, 1: red, 2: green, 3: yellow, 4: blue, 5: magenta, 6: cyan, 7: white
 // CSI introduces a Control Sequence, which continues until an alphabetic character is received (general rule).
 // EXCELLENT REFERENCE OF USAGE: https://handwiki.org/wiki/ANSI_escape_code
 // https://vt100.net/emu/dec_ansi_parser
 typedef enum {
-
-//
-    CMD_CSI     = 155,  // Control Sequence Introducer, 0x9b or 0x1b + [, 0x5b ( [ ) is necessary when 7-bit (0x1b) CSI used
+    CMD_CSI     = 155,  // Control Sequence Introducer, 0x9b ( ¢ ) or 0x1b ( ← ) + [, 0x5b ( [ ) is necessary when 7-bit (0x1b) CSI used
     CMD_SEP     = 59,   // Value separator for numeric parameter characters ( ; ) 
     CMD_ST      = 92,   // String Terminator ( \ )
     CMD_OSC     = 93,   // Operating System Command ( ] )
@@ -3292,17 +3399,19 @@ typedef enum {
 } ansi_commands;
 
 // TERMINALDISPLAY (ie. 4)
+#define TERM_TOTALPAGES  8
 
-bool init_terminal(tileset_id) {
+static int init_terminal(tileset_id) {
+    int status;
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
     int display = sys.video.current_virtual;
     unsigned int pagegroup_state = 0;
-    unsigned int page_state = 0;
-    unsigned int cell_state = 0;
+    unsigned long page_state = GRFE_DEFAULT4;
+    unsigned long cell_state = GRFE_DEFAULT4;
     unsigned int pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
 
-    init_pagegroup(pagegroup_id, (Vector2){40, 24}, pagegroup_state, page_state, cell_state, tileset_id);
-    return 0;
+    status = init_pagegroup(pagegroup_id, (Vector2){64, 28}, TERM_TOTALPAGES, pagegroup_state, page_state, cell_state, tileset_id);
+    return status;
 }
 
 // Establish keyboard management / buffer
@@ -3318,11 +3427,12 @@ void update_terminal(void) {
 
 }
 
-
 void show_terminal(void) {
     // aimed at displaying the terminal pagegroup only
 }
 
+void shutdown_terminal(void) {
+}
 
 // ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
 // ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
@@ -3398,7 +3508,7 @@ void display_all_res(void) {
         int bits = modes[i].redBits + modes[i].greenBits + modes[i].blueBits;
         DrawText( TextFormat("%ix%i - %ibit - %ifps - %i:%i", (int)modes[i].width, (int)modes[i].height, bits, (int)modes[i].refreshRate, (int)ratio.x, (int)ratio.y ),
         x, y, size, DARKGRAY);
-        y += size; if (y > (sys.video.physical_res[sys.video.current_physical].y - size)) {x+=768; y=0; };
+        y += size; if (y > (sys.video.screen[sys.video.current_physical].y - size)) {x+=768; y=0; };
     };
 }
 
@@ -3407,7 +3517,7 @@ void update_debug(bool show_options) {
     int x = 0, y = 0;
 
     if (debug.audio) {
-        sys.video.next_physical_clear = true;
+        sys.video.screen_refresh = true;
         if (IsKeyPressed(KEY_ZERO)) change_music_stream(0, 11, true);
         if (IsKeyPressed(KEY_ONE)) change_music_stream(0, 0, true);
         if (IsKeyPressed(KEY_TWO)) change_music_stream(0, 1, true);
@@ -3447,15 +3557,15 @@ void update_debug(bool show_options) {
 	}
 
     if (debug.video) {
-        sys.video.next_physical_clear = true;
-        if (IsKeyPressed(KEY_F10)) debug_fps_flip(&debug);
-        if (IsKeyDown(KEY_F8))  display_all_res();
-        //if (IsKeyPressed(KEY_F11)) FlipConfigFlags(FLAG_VSYNC_HINT);
+        sys.video.screen_refresh = true;
+        if (IsKeyPressed(KEY_F10))  debug_fps_flip(&debug);
+        if (IsKeyDown(KEY_F9))      display_all_res();
+        if (IsKeyPressed(KEY_F11))  flip_display_state(FLAG_VSYNC_HINT);
         show_options = false;
     }
 
     if (debug.game_data) {
-        sys.video.next_physical_clear = true;
+        sys.video.screen_refresh = true;
         if (IsKeyPressed(KEY_KP_1)) {ex_canopy.adjustment.y -= 0.002;};
         if (IsKeyPressed(KEY_KP_2)) {ex_canopy.adjustment.y += 0.002;};
         if (IsKeyPressed(KEY_KP_3)) {ex_canopy.pal_idx_cells -= 16; if(ex_canopy.pal_idx_cells < 0) {ex_canopy.pal_idx_cells +=256;};};
@@ -3463,12 +3573,11 @@ void update_debug(bool show_options) {
         if (IsKeyPressed(KEY_KP_5)) {ex_canopy.pal_idx_text -= 16; if(ex_canopy.pal_idx_text < 0) {ex_canopy.pal_idx_text +=256;};};
         if (IsKeyPressed(KEY_KP_6)) {ex_canopy.pal_idx_text += 16; if(ex_canopy.pal_idx_text > 255) {ex_canopy.pal_idx_text -=256;};};
 
-        DrawText(TextFormat("%s", time_stamp()), 1600, 0, 40, DARKGRAY);
+        DrawText(TextFormat("%s", time_stamp()), 1400, 0, 40, DARKGRAY);
         DrawText(TextFormat("FRAMES=%i", (int)sys.video.frames[sys.video.current_physical]), 0, 0, 20, DARKGRAY);
         DrawText(TextFormat("prev_time = %f", (float)sys.video.prev_time[sys.video.current_physical]), 0, 0, 40, DARKGRAY);
-        DrawText(TextFormat("monitors = %i, current = %i", (int)GetMonitorCount(), (int)sys.video.current_physical), 0, 60, 20, DARKGRAY);
-        DrawText(GetMonitorName(sys.video.current_physical), 0, 80, 20, DARKGRAY);
-        DrawText(TextFormat("screen is %ix%i at %i fps", (int)sys.video.physical_res[sys.video.current_physical].x, (int)sys.video.physical_res[sys.video.current_physical].y, (int)sys.video.refresh_rate[sys.video.current_physical]), 0, 100, 20, DARKGRAY);
+        DrawText(TextFormat("monitors = %i, current = %i, %s", (int)GetMonitorCount(), (int)sys.video.current_physical, GetMonitorName(sys.video.current_physical)), 0, 60, 20, DARKGRAY);
+        DrawText(TextFormat("screen is %ix%i at %i fps", (int)sys.video.screen[sys.video.current_physical].x, (int)sys.video.screen[sys.video.current_physical].y, (int)sys.video.screen_rate[sys.video.current_physical]), 0, 100, 20, DARKGRAY);
         DrawText(TextFormat("screen is %ix%i mm", (int)GetMonitorPhysicalWidth(sys.video.current_physical), (int)GetMonitorPhysicalHeight(sys.video.current_physical)), 0, 120, 20, DARKGRAY);
         DrawText(TextFormat("ex_canopy.adjustment.y = %f", (float)ex_canopy.adjustment.y), 0, 140, 20, DARKGRAY);
         DrawText(TextFormat("ftime = %f and sys.video.frame_time_inc = %f",  (float)sys.video.elapsed_time[sys.video.current_physical], (float)sys.video.frame_time_inc[sys.video.current_physical]), 0, 160, 20, DARKGRAY);
@@ -3482,41 +3591,44 @@ void update_debug(bool show_options) {
     }
 
     if (debug.controls) {
-        sys.video.next_physical_clear = true;
+        sys.video.screen_refresh = true;
         display_keybed();
         show_options = false;
     }
 
     if (debug.fps) {
-        sys.video.next_physical_clear = true;
-        DrawFPS(GetMonitorWidth(sys.video.current_physical) - 100, 10);
+        sys.video.screen_refresh = true;
+        DrawFPS(sys.video.screen[sys.video.current_physical].x - 100, 0);
     }
 
     if (IsKeyDown(KEY_LEFT_CONTROL)) {
-        x = (GetMonitorWidth(sys.video.current_physical) - 12 * size) * 0.5;
-        y = (GetMonitorHeight(sys.video.current_physical) - 6 * size) * 0.5;
-        if (show_options || debug.audio)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug.audio, x, y, size, "F1 -> AUDIO");};
-        if (show_options || debug.video)     { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug.video, x, y, size, "F2 -> VIDEO");};
-        if (show_options || debug.game_data) { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug.game_data, x, y, size, "F3 -> DATA");};
-        if (show_options || debug.controls)  { sys.video.next_physical_clear = true; y += size; debug_display_option(!debug.controls, x, y, size, "F4 -> CONTROLS");};
-        if (permission_valid(PMSN_TRACE))     { sys.video.next_physical_clear = true; y += size; debug_display_option(!permission_valid(PMSN_TRACE), x, y, size, "F5 -> TRACE");};
+        x = (sys.video.screen[sys.video.current_physical].x - 12 * size) * 0.5;
+        y = (sys.video.screen[sys.video.current_physical].y - 6 * size) * 0.5;
+        if (show_options || debug.audio)     { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.audio, x, y, size, "F1 -> AUDIO");};
+        if (show_options || debug.video)     { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.video, x, y, size, "F2 -> VIDEO");};
+        if (show_options || debug.game_data) { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.game_data, x, y, size, "F3 -> DATA");};
+        if (show_options || debug.controls)  { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.controls, x, y, size, "F4 -> CONTROLS");};
+        if (permission_valid(PMSN_TRACE))    { sys.video.screen_refresh = true; y += size; debug_display_option(!permission_valid(PMSN_TRACE), x, y, size, "F5 -> TRACE");};
+        if (show_options)                    { sys.video.screen_refresh = true; y += size; debug_display_option(0, x, y, size, "F8 -> EXIT");};
         if (IsKeyPressed(KEY_F1)) debug_audio_flip();
         if (IsKeyPressed(KEY_F2)) debug_video_flip();
         if (IsKeyPressed(KEY_F3)) debug_game_data_flip();
         if (IsKeyPressed(KEY_F4)) debug_controls_flip();
         if (IsKeyPressed(KEY_F5)) flip_permission(PMSN_TRACE);
+        if (IsKeyPressed(KEY_F8)) commute_to(CTRL_DEINIT);
     }
 }
 
-
-void debug_console_out(const char* message) {
+void debug_console_out(const char* message, unsigned int status) {
     if (BITS_TEST(sys.program.pmsnstate, PMSN_TRACE)) {
-        TRACELOG(LOG_INFO, "%s | %s | CTRL = %i PMSN = %i >>>>>%s",
+        TRACELOG(LOG_INFO, "%s | %s | CTRL = 0x%000000008X | PMSN = 0x%000000008X >>>>>%s, status = 0x%000000008X",
         SOFTWARE,
         time_stamp(),
         sys.program.ctrlstate,
         sys.program.pmsnstate,
-        message);
+        message,
+        status
+        );
     }
 }
 
@@ -3655,7 +3767,7 @@ int init_default_assets() {
 	sys.asset.basefont_id = load_tileset((Vector2){64,1}, FONT_JJ_FILENAME, FONT_JJ_FILEEXT, FONT_JJ_DATA, FONT_JJ_FILESIZE, FONT_JJ_PAK, 32);
 	id = load_tileset((Vector2){96,1}, FONT_OSD_FILENAME, FONT_OSD_FILEEXT, FONT_OSD_DATA, FONT_OSD_FILESIZE, FONT_OSD_PAK, 32);
 	sys.asset.lines_id = load_tileset((Vector2){256,1}, LINES_FILENAME, LINES_FILEEXT, LINES_DATA, LINES_FILESIZE, LINES_PAK, 0);
-    
+    status = id + 1;
     return status;
 }
 
@@ -3664,18 +3776,48 @@ int init_default_assets() {
 //RLAPI void SetExitKey(false);
 
 int init_system(void) {
-    debug_console_out("//////// init_system");
-
+    debug_console_out("//////// init_system", 0);
     unsigned int status = 0;
 
-    bool display_status = init_display_properties(true);    if (!display_status) {add_service(CTRL_VIDEO_INITIALIZED); debug_console_out("----------> VIDEO_INITIALIZED");}
-    bool assets_status = init_default_assets();             if (!assets_status) {add_service(CTRL_ASSETS_INITIALIZED); debug_console_out("----------> ASSETS_INITIALIZED");}
-    bool terminal_status = init_terminal(8);                if (!terminal_status) {add_service(CTRL_TERMINAL_INITIALIZED); debug_console_out("----------> TERMINAL_INITIALIZED");}
-    bool audio_status = init_audio_properties();            if (!audio_status) {add_service(CTRL_AUDIO_INITIALIZED); debug_console_out("----------> AUDIO_INITIALIZED");}
+    int display_status = init_display_properties(true);
+    if (!display_status) add_service(CTRL_VIDEO_INITIALIZED); 
+    debug_console_out("----------> VIDEO_INITIALISATION", display_status);
+    
+    int assets_status = init_default_assets();
+    if (!assets_status) add_service(CTRL_ASSETS_INITIALIZED);
+    debug_console_out("----------> ASSETS_INITIALISATION", assets_status);
+    
+    int terminal_status = init_terminal(8);
+    if (!terminal_status) add_service(CTRL_TERMINAL_INITIALIZED);
+    debug_console_out("----------> TERMINAL_INITIALISATION", terminal_status);
+    
+    int audio_status = init_audio_properties();
+    if (!audio_status) add_service(CTRL_AUDIO_INITIALIZED);
+    debug_console_out("----------> AUDIO_INITIALISATION", audio_status);
 
     // TODO: init bootstrap script
 
-    status = display_status | (assets_status << 1) | (terminal_status << 2) | (audio_status << 3);
+    //status = display_status | (assets_status << 1) | (terminal_status << 2) | (audio_status << 3);
+
+    return status;
+}
+
+static int deinit_system(void) {
+    debug_console_out("//////// deinit_system", 0);
+    int status = 0;
+
+    status = unload_all_assets();
+    remove_service(CTRL_ASSETS_INITIALIZED);
+    debug_console_out("----------> ASSETS_UNLOADED", status);
+
+    status = unload_all_pagegroups();
+    debug_console_out("----------> PAGES_UNLOADED", status);
+
+    shutdown_terminal();
+    remove_service(CTRL_TERMINAL_INITIALIZED);
+
+    deinit_display();
+    remove_service(CTRL_VIDEO_INITIALIZED);
 
     return status;
 }
@@ -3701,16 +3843,6 @@ static int update_system(void) {
     return status;
 }
 
-static int deinit_system(void) {
-    int status = 0;
-    unload_all_assets();
-    remove_service(CTRL_ASSETS_INITIALIZED);
-// implement unload pagegroups pages and cells
-    deinit_display();
-    remove_service(CTRL_VIDEO_INITIALIZED);
-    return status;
-}
-
 void display_initialize_splash(void) {
 //    if (sys.program.ctrlstate & CTRL_INITIALIZE) display_initialize_splash();
 
@@ -3718,7 +3850,7 @@ void display_initialize_splash(void) {
 }
 
 void manage_program() {
-    debug_console_out( control_state_literal(sys.program.ctrlstate & CTRL_SWITCHBOARD) );
+    debug_console_out( control_state_literal(sys.program.ctrlstate & CTRL_SWITCHBOARD) , 0);
 
     if (sys.program.ctrlstate & CTRL_OFF_FOCUS)
         game_off_focus_scene();
@@ -3736,6 +3868,9 @@ void manage_program() {
             case CTRL_DEINIT:
                 deinit_system();
                 commute_to(CTRL_EXIT);
+                break;
+            case CTRL_EXIT:
+                remove_service(CTRL_RUNNING);
                 break;
             case CTRL_INIT_TITLE:
                 game_init_title();
@@ -3787,13 +3922,12 @@ int process_system(unsigned int ctrlstate, unsigned int pmsnstate, const char* n
     set_permission(pmsnstate);
     add_service(ctrlstate);
 
-    debug_console_out(">>>~~~>>> START <<<~~~<<<");
-
-    add_service(CTRL_RUNNING);
+    debug_console_out(">>>~~~>>> START <<<~~~<<<", 0);
 
     commute_to(CTRL_INITIALIZE);
+    add_service(CTRL_RUNNING);
     while (service_active(CTRL_RUNNING)) {
-        debug_console_out("_______MAIN LOOP_______BEGIN");
+        //debug_console_out("_______MAIN LOOP_______BEGIN", 0);
 
         if (service_active(CTRL_VIDEO_INITIALIZED)) {
             BeginTextureMode(sys.asset.framebuffer[sys.video.virtual_asset[sys.video.current_virtual]]);
@@ -3815,10 +3949,7 @@ int process_system(unsigned int ctrlstate, unsigned int pmsnstate, const char* n
             EndTextureMode();
             update_system();
         }
-        if (service_active(CTRL_EXIT))     remove_service(CTRL_RUNNING);
-
-        if (IsKeyPressed(KEY_ESCAPE)) commute_to(CTRL_DEINIT);
-        debug_console_out("_______MAIN LOOP_______END");
+        //debug_console_out("_______MAIN LOOP_______END", 0);
 
     }
     return sys.program.status;
