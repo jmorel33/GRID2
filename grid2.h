@@ -178,7 +178,7 @@ static inline float Rand(float a) {	return (float)rand()/(float)(RAND_MAX/a);}
 
 static inline float fast_sin(double x) {
     x *= DIVIDEH_PI;
-    x -= (int) x;
+    x -= (int32_t) x;
     if (x <= 0.5) {
         double t = 2 * x * (2 * x - 1);
         return (TAU_OVER2 * t) / ((TAU_OVER2 - 4) * t - 1);
@@ -194,7 +194,7 @@ static inline float fast_cos(double x) {
 
 static inline double dfast_sin(double x) {
     x *= DIVIDEH_PI;
-    x -= (int) x;
+    x -= (int32_t) x;
     if (x <= 0.5) {
         double t = 2 * x * (2 * x - 1);
         return (TAU_OVER2 * t) / ((TAU_OVER2 - 4) * t - 1);
@@ -209,7 +209,7 @@ static inline double dfast_cos(double x) {
 }
 
 float ffast_rsqrt(float value) {  /* PULLED FROM QUAKE SOURCE */
-	union { int i; float f; } t;
+	union { int32_t i; float f; } t;
 	float half = value * 0.5f;
 	t.f = value;
 	t.i = 0x5f375a86 - (t.i >> 1);
@@ -218,14 +218,14 @@ float ffast_rsqrt(float value) {  /* PULLED FROM QUAKE SOURCE */
 	return t.f;
 }
 
-static inline float ffast_ceil(float x)  { return (float)((x < 0) ? (int)x : ((int)x)+1); }
-static inline float ffast_floor(float x) { return (float)((x >= 0.0f) ? (int)x : (int)(x-0.9999999999999999f)); }
+static inline float ffast_ceil(float x)  { return (float)((x < 0) ? (int32_t)x : ((int32_t)x)+1); }
+static inline float ffast_floor(float x) { return (float)((x >= 0.0f) ? (int32_t)x : (int32_t)(x-0.9999999999999999f)); }
 static inline float ffast_round(float x) { return (float)((x >= 0.0f) ? ffast_floor(x + 0.5f) : ffast_ceil(x - 0.5f)); }
 static inline float ffast_remainder(float x, float y) {	return x - (ffast_round(x/y)*y);}
 static inline float ffast_copysign(float x, float y) {
-	int ix, iy;
-	ix = *(int *)&x;
-	iy = *(int *)&y;
+	int32_t ix, iy;
+	ix = *(int32_t *)&x;
+	iy = *(int32_t *)&y;
 	ix &= 0x7fffffff;
 	ix |= iy & 0x80000000;
 	return *(float *)&ix;
@@ -274,13 +274,13 @@ static inline float absf(float f) {
     return fabsf(f);
 }
 
-static long gcdl(long a, long b) {
+static int32_t gcdl(int32_t a, int32_t b) {
     if (a == 0) return b; else if (b == 0) return a;
     if (a < b) return gcd_l(a, b % a); else return gcd_l(b, a % b);
 }
 
-static int gcdi(int a, int b) {
-    int res = a%b;
+static int32_t gcdi(int32_t a, int32_t b) {
+    int32_t res = a%b;
     while (res > 0) { a = b; b = res; res = a % b; }
     return b;
 }
@@ -294,10 +294,10 @@ static int gcdi(int a, int b) {
 // https://atariage.com/forums/topic/107853-need-the-256-colors/page/2/#comments
 // The following routine is currently dead code as I personally do not like the resulting colors...  Something is wrong in the translation from YIQ
 // separate in tywo functions; one that takes a value and returns RGB, and one that takes YIQ and returns RGB
-Color gtia_ntsc_to_rgb(int val) {
-    int chroma = (val >> 4) & 15;
-    int luminence = val & 15;
-    int crlv = chroma ? 50 : 0;
+Color gtia_ntsc_to_rgb(int16_t val) {
+    int16_t chroma = (val >> 4) & 15;
+    int16_t luminence = val & 15;
+    int16_t crlv = chroma ? 50 : 0;
  
     float phase = ((chroma - 1.) * 25. - 58.) * (2. * PI / 360.);
 
@@ -317,7 +317,7 @@ Color gtia_ntsc_to_rgb(int val) {
     g = pow(g, 0.9);
 	b = pow(b, 0.9);
 
-    Color col={(unsigned char)r, (unsigned char)g, (unsigned char)b, 255};
+    Color col={(uint8_t)r, (uint8_t)g, (uint8_t)b, 255};
     return col;
 }
 
@@ -398,7 +398,7 @@ typedef union Vector4 {
 */
 // **************************************************************************************** R A Y L I B   E X T E N S I O N S
 
-void DrawTextImage(Texture texture, char* txt, Vector2 position) {
+void DrawTextImage(Texture texture, uint8_t* txt, Vector2 position) {
 	DrawTexturePro(texture,
     (Rectangle) { (txt[0] - 32) * 24, 0, 24, 24 } ,
     (Rectangle) { position.x , position.y, 64, 64 },
@@ -530,13 +530,13 @@ void DrawTexturePro2 (Texture texture, Rectangle source, Rectangle dest, Vector2
 Color get_pixel_color(Image *image, Vector2 position) {
     //check for out of bound
 
-    unsigned int offset = (position.y * image->width + position.x) * 4;
+    uint32_t offset = (position.y * image->width + position.x) * 4;
     Color *data = &image->data;
     return data[offset];
-//    unsigned char r = data[offset];
-//    unsigned char g = data[offset + 1];
-//    unsigned char b = data[offset + 2];
-//    unsigned char a = data[offset + 3];
+//    uint8_t r = data[offset];
+//    uint8_t g = data[offset + 1];
+//    uint8_t b = data[offset + 2];
+//    uint8_t a = data[offset + 3];
 //    return (Color){r, g, b, a};
 }
 
@@ -551,18 +551,18 @@ Color get_pixel_color(Image *image, Vector2 position) {
 
 
 typedef struct EX_cell {
-    unsigned long state;                        // all flags for cell
-    unsigned short value;                       // value of cell
-    unsigned char lines;                        // lines feature
-    unsigned short asset_id;                    // Each cell can point to a different tileset
-    unsigned short cycle_id;                    // cell animation sequence number
-    unsigned short palette_id;                  // color palette used for whole page
-    unsigned short colorfg_id;                  // palette index color for cell
-    unsigned short colorfg_cycle_id;            // color cycle index for cell
-    unsigned short colorbg_id;                  // palette index color for cell background
-    unsigned short colorbg_cycle_id;            // color cycle index for cell background
-    unsigned short colorln_id;                  // palette index color for cell lines
-    unsigned short colorln_cycle_id;            // color cycle index for cell lines
+    uint64_t state;                        // all flags for cell
+    uint16_t value;                       // value of cell
+    uint8_t lines;                        // lines feature
+    uint16_t asset_id;                    // Each cell can point to a different tileset
+    uint16_t cycle_id;                    // cell animation sequence number
+    uint16_t palette_id;                  // color palette used for whole page
+    uint16_t colorfg_id;                  // palette index color for cell
+    uint16_t colorfg_cycle_id;            // color cycle index for cell
+    uint16_t colorbg_id;                  // palette index color for cell background
+    uint16_t colorbg_cycle_id;            // color cycle index for cell background
+    uint16_t colorln_id;                  // palette index color for cell lines
+    uint16_t colorln_cycle_id;            // color cycle index for cell lines
     Vector2 offset;                             // displacement from top left (x,y)
     Vector2 skew;                               // horizontal and vertical skew
     Vector2 scale;                              // (x,y) cell scale
@@ -571,22 +571,22 @@ typedef struct EX_cell {
     float angle;                                // degree of angle used to rotate the cell
     float fg_brightness;                        // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
     float bg_brightness;                        // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    unsigned char alpha;                        // transparency
+    uint8_t alpha;                        // transparency
     Color color_mask;                           // RGBA color mask of cell
     Color shadow_mask;                          // shadow RGBA mask
 } EX_cell;
 
 typedef struct EX_page {
     char name[NAMELENGTH_MAX + 1];
-    unsigned long state;                        // all flags for grid
-    unsigned short asset_id[PAGE_MAX_PALETTES];  // tilset used for this page
-    unsigned short default_asset_id;
+    uint64_t state;                        // all flags for grid
+    uint16_t asset_id[PAGE_MAX_PALETTES];  // tilset used for this page
+    uint16_t default_asset_id;
     Vector2 size;                               // total cells x and y
-    unsigned short palette_id[PAGE_MAX_PALETTES]; // color palette used for whole page
-    unsigned short default_palette_id;          // color palette used for whole page
-    unsigned short default_colorfg_id;          // palette index color for cell
-    unsigned short default_colorbg_id;          // palette index color for cell background
-    unsigned short default_colorln_id;          // palette index color for cell lines
+    uint16_t palette_id[PAGE_MAX_PALETTES]; // color palette used for whole page
+    uint16_t default_palette_id;          // color palette used for whole page
+    uint16_t default_colorfg_id;          // palette index color for cell
+    uint16_t default_colorbg_id;          // palette index color for cell background
+    uint16_t default_colorln_id;          // palette index color for cell lines
     Vector2 offset;                             // displacement from top left (x,y)
     Vector2 displace[4];                        // cell corner displacement (x,y)
     Vector2 scale;                              // (x,y) cell scale
@@ -595,7 +595,7 @@ typedef struct EX_page {
     float angle;                                // degree of angle to rotate page
     float fg_brightness;                        // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
     float bg_brightness;                        // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    unsigned char alpha;                        // transparency
+    uint8_t alpha;                        // transparency
     Vector2 shadow;                             // shadow corner displacement (x,y)
     Vector2 shadow_displace[4];                 // shadow corners displacement (x,y)
     Color   color_mask;                         // RGBA color mask of page
@@ -603,7 +603,7 @@ typedef struct EX_page {
     EX_cell mouse;                              // mouse cursor
     EX_cell keyboard;                           // key cursor
     EX_cell mask;                               // used for when replicating
-    unsigned int cell_count;
+    uint32_t cell_count;
     EX_cell* cell; // could be NULL
 } EX_page;
 
@@ -615,13 +615,13 @@ typedef enum {
 
 typedef struct EX_pagegroup {
     char name[NAMELENGTH_MAX + 1];
-    unsigned int state;
+    uint32_t state;
     int page_count;                            // total number of pages
-    unsigned short default_asset_id;
-    unsigned short default_palette_id;          // color palette used for whole page
-    unsigned short default_colorfg_id;          // palette index color for cell
-    unsigned short default_colorbg_id;          // palette index color for cell background
-    unsigned short default_colorln_id;          // palette index color for cell lines
+    uint16_t default_asset_id;
+    uint16_t default_palette_id;          // color palette used for whole page
+    uint16_t default_colorfg_id;          // palette index color for cell
+    uint16_t default_colorbg_id;          // palette index color for cell background
+    uint16_t default_colorln_id;          // palette index color for cell lines
     EX_page* page;                             // could be NULL (if not initialized)
 } EX_pagegroup;
 
@@ -633,32 +633,32 @@ typedef struct EX_tileset {
     Vector2 tilesize;                           // Tile size
     Vector2 count;                              // number of tiles (x, y)
     Texture tex;                                // Characters texture atlas
-    unsigned int total;                         // Number of Tiles
+    uint32_t total;                         // Number of Tiles
     int ascii_start;                            // if tileset if character font, identifies ascii code first tile
 } EX_tileset;
 
 typedef struct EX_asset {
     char name[NAMELENGTH_MAX + 1];
-    unsigned int total_assets;
-    unsigned short lines_id;
-    unsigned short basefont_id;
+    uint32_t total_assets;
+    uint16_t lines_id;
+    uint16_t basefont_id;
 
-    unsigned int dead_assets[MAXASSETS];
+    uint32_t dead_assets[MAXASSETS];
 
-    unsigned int asset_type[MAXASSETS];
-    unsigned int state[MAXASSETS];
+    uint32_t asset_type[MAXASSETS];
+    uint32_t state[MAXASSETS];
     int data_size[MAXASSETS];                   // storage space size in bytes
 
     Image img[MAXASSETS];                       // storage space for unpacked images
     Texture tex[MAXASSETS];                     // storage space for textures
     Color *palette[MAXASSETS];                  // storage space for indexed colors
-    unsigned int palette_colors[MAXASSETS];     // total number of colors in palette
+    uint32_t palette_colors[MAXASSETS];     // total number of colors in palette
     EX_tileset tileset[MAXASSETS];              // storage space for texture based fonts
     RenderTexture framebuffer[MAXASSETS];       // storage space for frame buffer
     Font font[MAXASSETS];                       // storage space for texture based fonts
     Music music[MAXASSETS];                     // storage space for unpacked music
     Shader shader[MAXASSETS];                   // storage space for shaders
-    unsigned char *data[MAXASSETS];             // storage space for any text, data, JSON, LUA ...
+    uint8_t *data[MAXASSETS];             // storage space for any text, data, JSON, LUA ...
 } EX_asset;
 
 // **************************************************************************************** A U D I O   S T R U C T U R E S
@@ -668,7 +668,7 @@ typedef struct EX_asset {
 
 typedef struct EX_track {
     bool is_playing;
-    unsigned int state;
+    uint32_t state;
     int asset;
     int virtual_display;
     float volume;
@@ -695,31 +695,31 @@ typedef struct EX_audio {
 #define TERMINALDISPLAY 4
 
 typedef struct EX_video {
-    //unsigned int state;
-    unsigned int state[MAXDISPLAYS];            // virtual display state
+    //uint32_t state;
+    uint32_t state[MAXDISPLAYS];            // virtual display state
     Vector2 screen[MAXDISPLAYS];                // Windows Display Resolution (x, y)
-    int screen_rate[MAXDISPLAYS];               // screen refresh rate
-    int fps[MAXDISPLAYS];                       // frames per second
-    int frames[MAXDISPLAYS];                    // number of game frame elasped since initialisation
+    uint32_t screen_rate[MAXDISPLAYS];               // screen refresh rate
+    uint32_t fps[MAXDISPLAYS];                       // frames per second
+    uint32_t frames[MAXDISPLAYS];                    // number of game frame elasped since initialisation
     double prev_time[MAXDISPLAYS];              // keep track of time to grab delta
+    double elapsed_time_nofocus[MAXDISPLAYS];   // elapsed time since nofocus
     double elapsed_time[MAXDISPLAYS];           // elapsed time in milliseconds since last frame refresh
     float elapsed_time_var[MAXDISPLAYS];        // elapsed time in milliseconds since last frame refresh (with ratio)
     float elapsed_time_var_ratio[MAXDISPLAYS];  // multiplication factor
+    float value_anim[MAXDISPLAYS];              // space for animated controls (to be elaborated)
     float frame_time[MAXDISPLAYS];
     float frame_time_inc[MAXDISPLAYS];
-    float value_anim[MAXDISPLAYS];              // space for animated controls (to be elaborated)
-    float elapsed_time_nofocus[MAXDISPLAYS];    // elapsed time since nofocus
     Vector2 virtual_res[MAXDISPLAYS];           // framebuffer resolution (x, y)
-    int virtual_asset[MAXDISPLAYS];             // framebuffer asset number
+    uint16_t virtual_asset[MAXDISPLAYS];             // framebuffer asset number
 
     EX_pagegroup pagegroup[MAXDISPLAYS];        // pagegroup data
 
-    unsigned int windowstate_normal;            // screen window state in normal mode
-    unsigned int windowstate_paused;            // screen window state when game is paused
-    int current_physical;                       // screen currently used
+    uint32_t windowstate_normal;            // screen window state in normal mode
+    uint32_t windowstate_paused;            // screen window state when game is paused
+    uint16_t display_id;                             // screen currently used
     bool screen_refresh;
-    int current_virtual;                        // virtual display currently used
-    int previous_virtual;                       // virtual display previously used
+    uint16_t current_virtual;                        // virtual display currently used
+    uint16_t previous_virtual;                       // virtual display previously used
 
     bool window_focus;                          // last state of window focus (true = in applicatioo, false = outside of application)
 } EX_video;
@@ -730,22 +730,33 @@ typedef struct EX_video {
 #define IOBUFFERSIZE 8192
 
 typedef struct EX_terminal {
-    unsigned int state;
-    unsigned short asset_id;
-    unsigned short pagegroup_id; // Where all terminal pages reside
-    unsigned short current_page_id;
-    unsigned short previous_page_id;
+    uint32_t state;
+    uint16_t asset_id;
+    uint16_t pagegroup_id; // Where all terminal pages reside
+    uint16_t current_page_id;
+    uint16_t previous_page_id;
     Vector2 last_mouse_poll;
     Vector2 last_cursor_poll;
-    unsigned char input_buffer[IOBUFFERSIZE];
-    unsigned char output_buffer[IOBUFFERSIZE];
-    unsigned int input_buffer_pos;
-    unsigned int output_buffer_pos;
+    uint8_t input_buffer[IOBUFFERSIZE];
+    uint8_t output_buffer[IOBUFFERSIZE];
+    uint32_t input_buffer_pos;
+    uint32_t output_buffer_pos;
     
 } EX_terminal;
 
 
 // **************************************************************************************** A P P L I C A T I O N   S T R U C T U R E S
+
+// The heartbeat of the system flows through these 64 oscillator states
+// With this comes a period table spanning from slow 8 second up to fast millisecond level state changes
+// With this a function to poll oscillator states
+typedef struct EX_temporal {
+    double period_table[64];
+    uint64_t prev_osc;
+    uint64_t osc;
+    uint64_t osc_count[64];         // counts are on full cycles
+    double osc_next_frame[64];  // calculated following frame to trigger a state change
+} EX_temporal;
 
 typedef struct EX_player {
 
@@ -776,15 +787,15 @@ typedef enum {
     CTRL_GAME_NEXT              = 0b00000000000000001000000000000000,
     CTRL_GAMEOVER               = 0b00000000000000000100000000000000,
     CTRL_GAME_DEATH             = 0b00000000000000000010000000000000,
-    CTRL_OFF_FOCUS              = 0b00000000000000000001000000000000,
-    CTRL_R12                    = 0b00000000000000000000100000000000,
+    CTRL_R13                    = 0b00000000000000000001000000000000,
+    CTRL_OFF_FOCUS              = 0b00000000000000000000100000000000,
     CTRL_DEBUG                  = 0b00000000000000000000010000000000,
     CTRL_SHOW_TERMINAL          = 0b00000000000000000000001000000000,
     CTRL_GAME_PAUSED            = 0b00000000000000000000000100000000,
     CTRL_R8                     = 0b00000000000000000000000010000000,
     CTRL_IN_GAME                = 0b00000000000000000000000001000000,
     CTRL_RUNNING                = 0b00000000000000000000000000100000,
-    CTRL_R5                     = 0b00000000000000000000000000010000,
+    CTRL_TEMPORAL_INITIALIZED   = 0b00000000000000000000000000010000,
     CTRL_AUDIO_INITIALIZED      = 0b00000000000000000000000000001000,
     CTRL_TERMINAL_INITIALIZED   = 0b00000000000000000000000000000100,
     CTRL_ASSETS_INITIALIZED     = 0b00000000000000000000000000000010,
@@ -794,10 +805,11 @@ typedef enum {
     CTRL_NULL                   = 0b00000000000000000000000000000000  // in case that happens... (should never)
 } control_state;
 
-const char* control_state_literal(unsigned int state) {
+const char* control_state_literal(uint32_t state) {
     switch (state) {
     case CTRL_DEINIT:              return "SWITCHBOARD: CTRL_DEINIT";
     case CTRL_INITIALIZE:          return "SWITCHBOARD: CTRL_INITIALIZE";
+    case CTRL_EXIT:                return "SWITCHBOARD: CTRL_EXIT";
     case CTRL_INIT_TITLE:          return "SWITCHBOARD: CTRL_INIT_TITLE";
     case CTRL_IN_TITLE:            return "SWITCHBOARD: CTRL_IN_TITLE";
     case CTRL_INIT_MENU1:          return "SWITCHBOARD: CTRL_INIT_MENU1";
@@ -814,18 +826,16 @@ const char* control_state_literal(unsigned int state) {
     case CTRL_GAME_NEXT:           return "SWITCHBOARD: CTRL_GAME_NEXT";
     case CTRL_GAMEOVER:            return "SWITCHBOARD: CTRL_GAMEOVER";
     case CTRL_GAME_DEATH:          return "SWITCHBOARD: CTRL_GAME_DEATH";
-    case CTRL_EXIT:                return "BASE STATES: CTRL_EXIT";
+    case CTRL_OFF_FOCUS:           return "BASE STATES: CTRL_OFF_FOCUS";
     case CTRL_DEBUG:               return "BASE STATES: CTRL_DEBUG";
     case CTRL_SHOW_TERMINAL:       return "BASE STATES: CTRL_SHOW_TERMINAL";
     case CTRL_GAME_PAUSED:         return "BASE STATES: CTRL_GAME_PAUSED";
     case CTRL_IN_GAME:             return "BASE STATES: CTRL_IN_GAME";
     case CTRL_RUNNING:             return "BASE STATES: CTRL_RUNNING";
-    case CTRL_OFF_FOCUS:           return "BASE STATES: CTRL_OFF_FOCUS";
     case CTRL_AUDIO_INITIALIZED:   return "BASE STATES: CTRL_AUDIO_INITIALIZED";
     case CTRL_TERMINAL_INITIALIZED:return "BASE STATES: CTRL_TERMINAL_INITIALIZED";
     case CTRL_ASSETS_INITIALIZED:  return "BASE STATES: CTRL_ASSETS_INITIALIZED";
     case CTRL_VIDEO_INITIALIZED:   return "BASE STATES: CTRL_VIDEO_INITIALIZED";
-    case CTRL_NULL:                return "BASE STATES: CTRL_NULL";
     default: return NULL;
     }
 }
@@ -864,7 +874,7 @@ typedef enum {
     PMSN_GODMODE_MASK       = 0b11111111111111111111111111111111
 } permission_state;
 
-const char* permission_state_literal(unsigned int state) {
+const char* permission_state_literal(uint32_t state) {
     switch (state) {
     case PMSN_INFINITE_LIVES:   return "PMSN_INFINITE_LIVES";
     case PMSN_INFINITE_POWER:   return "PMSN_INFINITE_POWER";
@@ -884,24 +894,23 @@ const char* permission_state_literal(unsigned int state) {
     case PMSN_TERMINAL_USER:    return "PMSN_TERMINAL_USER";
     case PMSN_DEBUG_ADMIN:      return "PMSN_DEBUG_ADMIN";
     case PMSN_DEBUG_USER:       return "PMSN_DEBUG_USER";
-    case PMSN_OFF:              return "PMSN_OFF";
-    case PMSN_GODMODE_MASK:          return "PMSN_GODMODE_MASK";
     default: return NULL;
     }
 }
 
 typedef struct EX_program {
-        unsigned int ctrlstate;
-        unsigned int ctrlstate_prev;
-        unsigned int pmsnstate;
+        uint32_t ctrlstate;
+        uint32_t ctrlstate_prev;
+        uint32_t pmsnstate;
         char name[NAMELENGTH_MAX + 1];
-        unsigned int status;
+        uint32_t status;
 } EX_program;
 
 
 // **************************************************************************************** S Y S T E M   S T R U C T U R E S
 
 typedef struct EX_system {
+    EX_temporal     temporal;
     EX_terminal     terminal;
     EX_asset        asset;
     EX_audio        audio;
@@ -911,16 +920,16 @@ typedef struct EX_system {
 
 EX_system sys;
 
-void set_permission(unsigned int state)     {BITS_ON(sys.program.pmsnstate, state);}
-void unset_permission(unsigned int state)   {BITS_OFF(sys.program.pmsnstate, state);}
-void flip_permission(unsigned int state)    {BITS_FLIP(sys.program.pmsnstate, state);}
-unsigned int permission_valid(unsigned int state)   {return BITS_TEST(sys.program.pmsnstate, state);}
+void set_permission(uint32_t state)     {BITS_ON(sys.program.pmsnstate, state);}
+void unset_permission(uint32_t state)   {BITS_OFF(sys.program.pmsnstate, state);}
+void flip_permission(uint32_t state)    {BITS_FLIP(sys.program.pmsnstate, state);}
+uint32_t permission_valid(uint32_t state)   {return BITS_TEST(sys.program.pmsnstate, state);}
 
-void add_service(unsigned int state)        {BITS_ON(sys.program.ctrlstate, state);}
-void remove_service(unsigned int state)     {BITS_OFF(sys.program.ctrlstate, state);}
-unsigned int service_active(unsigned int state)     {return BITS_TEST(sys.program.ctrlstate, state);}
+void add_service(uint32_t state)        {BITS_ON(sys.program.ctrlstate, state);}
+void remove_service(uint32_t state)     {BITS_OFF(sys.program.ctrlstate, state);}
+uint32_t service_active(uint32_t state)     {return BITS_TEST(sys.program.ctrlstate, state);}
 
-void commute_to(unsigned int state) {
+void commute_to(uint32_t state) {
     BITS_OFF(sys.program.ctrlstate_prev, CTRL_SWITCHBOARD_MASK);
     BITS_ON(sys.program.ctrlstate_prev, sys.program.ctrlstate & CTRL_SWITCHBOARD_MASK);
     BITS_OFF(sys.program.ctrlstate, CTRL_SWITCHBOARD_MASK);
@@ -930,21 +939,66 @@ void commute_to(unsigned int state) {
 };
 
 
-Color get_palette_color(int palette_id, unsigned short id) {
+Color get_palette_color(uint16_t palette_id, uint16_t id) {
     Color *color = sys.asset.palette[palette_id];
     return color[id];
 }
 
-Color get_palette_color2(int palette_id, unsigned short id, unsigned char alpha) {
+Color get_palette_color2(uint16_t palette_id, uint16_t id, uint8_t alpha) {
     Color *color = sys.asset.palette[palette_id];
     return (Color){color[id].r, color[id].g, color[id].b, alpha};
 }
 
-Color get_palette_color_pro(int palette_id, unsigned short id, unsigned char alpha, float brightness) {
+Color get_palette_color_pro(uint16_t palette_id, uint16_t id, uint8_t alpha, float brightness) {
     Color *color = sys.asset.palette[palette_id];
     return (Color){color[id].r * brightness, color[id].g * brightness, color[id].b * brightness, 255};
 }
 
+
+#define GRIDILON     1.182940076
+
+int init_temporal() {
+    uint64_t osc;
+    
+    double range_high = 60.;
+    double range_low = 1. / range_high;
+    uint64_t steps = 64;
+
+    double ratio =  range_low;
+    double value = range_low;
+
+    double t = GetTime();
+    for (osc = 0; osc < steps; osc++) {
+//        printf (" %i = %lf\n", osc, value);
+        sys.temporal.period_table[osc] = value;
+        sys.temporal.osc_count[osc] = 0;
+        sys.temporal.osc_next_frame[osc] = sys.temporal.period_table[osc];
+
+        value += range_low * ratio;
+        ratio *= GRIDILON;
+    }
+    sys.temporal.prev_osc = 0; //
+    sys.temporal.osc = 0; // oscillator states
+    
+    return osc;
+}
+
+void update_temporal() {
+    uint64_t steps = 64;
+
+    sys.temporal.prev_osc = sys.temporal.osc;
+    double t = GetTime();
+    for (uint64_t osc = 0; osc < steps; osc++) {
+        if (t > sys.temporal.osc_next_frame[osc]) {
+            while (1) {
+                sys.temporal.osc_next_frame[osc] += sys.temporal.period_table[osc];
+                sys.temporal.osc ^= ((uint64_t)1 << osc);
+                sys.temporal.osc_count[osc] += 1;
+                if (sys.temporal.osc_next_frame[osc] > t) break;
+            }
+        }
+    }
+}
 
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
@@ -983,17 +1037,17 @@ typedef enum {
     GRFE_FGCBLEND_LR        = 0b0000000000000000000000000000010000000000000000000000000000000000, // foreground vertex color blend lower right
     GRFE_FGCBLEND_UR        = 0b0000000000000000000000000000001000000000000000000000000000000000, // foreground vertex color blend upper right
     GRFE_FGCBLEND_UL        = 0b0000000000000000000000000000000100000000000000000000000000000000, // foreground vertex color blend upper left
-    GRFE_BLINK4             = 0b0000000000000000000000000000000010000000000000000000000000000000, // blinking speed (0...15) 0 = no blink
-    GRFE_BLINK3             = 0b0000000000000000000000000000000001000000000000000000000000000000, // blinking speed
-    GRFE_BLINK2             = 0b0000000000000000000000000000000000100000000000000000000000000000, // blinking speed
-    GRFE_BLINK1             = 0b0000000000000000000000000000000000010000000000000000000000000000, // blinking speed
-    GRFE_DOUBLEHEIGHT       = 0b0000000000000000000000000000000000001000000000000000000000000000, // double height content
-    GRFE_DOUBLEWIDTH        = 0b0000000000000000000000000000000000000100000000000000000000000000, // double width content
-    GRFE_R25                = 0b0000000000000000000000000000000000000010000000000000000000000000, // 
-    GRFE_R24                = 0b0000000000000000000000000000000000000001000000000000000000000000, // 
-    GRFE_PROTECTED          = 0b0000000000000000000000000000000000000000100000000000000000000000, // protect value from being changed
-    GRFE_R22                = 0b0000000000000000000000000000000000000000010000000000000000000000, // 
-    GRFE_CELLDIS            = 0b0000000000000000000000000000000000000000001000000000000000000000, // turn on cell corners C1 to C4 displacements
+    GRFE_LNBLINK3           = 0b0000000000000000000000000000000010000000000000000000000000000000, // lines blinking speed (0...7) 0 = no blink
+    GRFE_LNBLINK2           = 0b0000000000000000000000000000000001000000000000000000000000000000, // lines blinking speed
+    GRFE_LNBLINK1           = 0b0000000000000000000000000000000000100000000000000000000000000000, // lines blinking speed
+    GRFE_BGBLINK3           = 0b0000000000000000000000000000000000010000000000000000000000000000, // background blinking speed (0...7) 0 = no blink
+    GRFE_BGBLINK2           = 0b0000000000000000000000000000000000001000000000000000000000000000, // background blinking speed
+    GRFE_BGBLINK1           = 0b0000000000000000000000000000000000000100000000000000000000000000, // background blinking speed
+    GRFE_FGBLINK3           = 0b0000000000000000000000000000000000000010000000000000000000000000, // foreground blinking speed (0...7) 0 = no blink
+    GRFE_FGBLINK2           = 0b0000000000000000000000000000000000000001000000000000000000000000, // foreground blinking speed
+    GRFE_FGBLINK1           = 0b0000000000000000000000000000000000000000100000000000000000000000, // foreground blinking speed
+    GRFE_DOUBLEHEIGHT       = 0b0000000000000000000000000000000000000000010000000000000000000000, // double height content
+    GRFE_DOUBLEWIDTH        = 0b0000000000000000000000000000000000000000001000000000000000000000, // double width content
     GRFE_LINESSEQ           = 0b0000000000000000000000000000000000000000000100000000000000000000, // turn on lines sequencing
     GRFE_COLORSEQ           = 0b0000000000000000000000000000000000000000000010000000000000000000, // turn on color sequencing
     GRFE_VALUESEQ           = 0b0000000000000000000000000000000000000000000001000000000000000000, // turn on cell value sequencing
@@ -1011,13 +1065,15 @@ typedef enum {
     GRFE_GREEN              = 0b0000000000000000000000000000000000000000000000000000000001000000, // turn on green channel
     GRFE_BLUE               = 0b0000000000000000000000000000000000000000000000000000000000100000, // turn on blue channel
     GRFE_ALPHA              = 0b0000000000000000000000000000000000000000000000000000000000010000, // turn on transparency
-    GRFE_R3                 = 0b0000000000000000000000000000000000000000000000000000000000001000, // 
-    GRFE_BACKGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000100, // turn on cell background (tile rectangle fill)
-    GRFE_SHADOW             = 0b0000000000000000000000000000000000000000000000000000000000000010, // turn on shadow cell
+    GRFE_PROTECTED          = 0b0000000000000000000000000000000000000000000000000000000000001000, // protect value from being changed
+    GRFE_SHADOW             = 0b0000000000000000000000000000000000000000000000000000000000000100, // turn on shadow cell
+    GRFE_BACKGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000010, // turn on cell background (tile rectangle fill)
     GRFE_FOREGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000001, // turn on cell foreground (value) (used for hidden mode)
     GRFE_LINES_MASK         = 0b1111111100000000000000000000000000000000000000000000000000000000, 
     GRFE_BLENDING_MASK      = 0b0000000011111111111111111111111100000000000000000000000000000000, 
-    GRFE_BLINK_MASK         = 0b0000000000000000000000000000000011110000000000000000000000000000,
+    GRFE_LNBLINK_MASK       = 0b0000000000000000000000000000000011100000000000000000000000000000,
+    GRFE_BGBLINK_MASK       = 0b0000000000000000000000000000000000011100000000000000000000000000,
+    GRFE_FGBLINK_MASK       = 0b0000000000000000000000000000000000000011100000000000000000000000,
     GRFE_DEFAULT1           = 0b0000000000000000000000000000000000000000011100000000000011110101, // DEFAULT STATE :HEAVY PROCESSING
     GRFE_DEFAULT2           = 0b0000000000000000000000000000000000000000000000001100000011110111, // DEFAULT STATE :SCROLLTEXT
     GRFE_DEFAULT3           = 0b0000000000000000000000000000000000000000000000000000000000000000, // DEFAULT STATE :GAME page
@@ -1025,10 +1081,12 @@ typedef enum {
 } grid_features;
 
 #define GRFE_LINES_BITS 56
-#define GRFE_BLINK_BITS 28
+#define GRFE_LNBLINK_BITS 29
+#define GRFE_BGBLINK_BITS 26
+#define GRFE_FGBLINK_BITS 23
 #define GET_FROM_STATE(state, mask, shift) ((state & mask) >> shift)
 
-Rectangle get_tilezone_from_position(unsigned short asset_id, Vector2 position) {
+Rectangle get_tilezone_from_position(uint16_t asset_id, Vector2 position) {
     EX_tileset *tileset = &sys.asset.tileset[asset_id];
     if ((position.x >= tileset->count.x) || position.x < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.x, tileset->tilesize.y};
     if ((position.y >= tileset->count.y) || position.y < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.y, tileset->tilesize.y};
@@ -1036,7 +1094,7 @@ Rectangle get_tilezone_from_position(unsigned short asset_id, Vector2 position) 
     return (Rectangle) {position.x * tilesize->x, position.y * tilesize->y,  tilesize->x, tilesize->y};
 }
 
-Rectangle get_tilezone_from_code(unsigned short asset_id, int code) {
+Rectangle get_tilezone_from_code(uint16_t asset_id, uint16_t code) {
     EX_tileset *tileset = &sys.asset.tileset[asset_id];
 
     code -= sys.asset.tileset[asset_id].ascii_start;
@@ -1049,7 +1107,7 @@ Rectangle get_tilezone_from_code(unsigned short asset_id, int code) {
 }
 
 //        plot_character(ex_scrolltext[s].font, ch, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].colorbg, colorln, state);
-void plot_character(unsigned short asset_id, int palette_id, unsigned short code, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, unsigned long state) {
+void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, uint64_t state) {
     Color vertex_colors[4];
     if (!(state & GRFE_ROTATION)) angle = 0.f;
 
@@ -1089,7 +1147,7 @@ void plot_character(unsigned short asset_id, int palette_id, unsigned short code
                 (Vector2) {0,0}, skew, angle, vertex_colors);
     }
 
-    unsigned char lines = GET_FROM_STATE(state, GRFE_LINES_MASK, GRFE_LINES_BITS);
+    uint8_t lines = GET_FROM_STATE(state, GRFE_LINES_MASK, GRFE_LINES_BITS);
     if (lines) {
             if (state & GRFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
             if (state & GRFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
@@ -1105,7 +1163,7 @@ void plot_character(unsigned short asset_id, int palette_id, unsigned short code
     }
 }
 
-bool init_cell_linear(EX_cell *cell, unsigned long cell_state, unsigned int color_id, unsigned int colorbg_id) {
+bool init_cell_linear(EX_cell *cell, uint64_t cell_state, uint32_t color_id, uint32_t colorbg_id) {
     cell->state = cell_state;
     cell->value = 0;
     cell->colorfg_id = color_id;
@@ -1120,20 +1178,20 @@ bool init_cell_linear(EX_cell *cell, unsigned long cell_state, unsigned int colo
 }
 
 
-void set_page_default_palette(int pagegroup_id, int page_id, unsigned short palette_id) {
+void set_page_default_palette(uint16_t pagegroup_id, uint16_t page_id, uint16_t palette_id) {
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     page->default_palette_id = palette_id;
 }
 
-void set_page_default_asset(int pagegroup_id, int page_id, unsigned short asset_id) {
+void set_page_default_asset(uint16_t pagegroup_id, uint16_t page_id, uint16_t asset_id) {
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     page->default_asset_id = asset_id;
 }
 
-int init_page(int pagegroup_id, int page_id, Vector2 size, unsigned long page_state, unsigned long cell_state, unsigned short asset_id, unsigned short palette_id) {
+uint16_t init_page(uint16_t pagegroup_id, uint16_t page_id, Vector2 size, uint64_t page_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
     EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int cell_count = (int)size.x * (int)size.y;
+    uint32_t cell_count = (uint16_t)size.x * (uint16_t)size.y;
     page->size = size;
     page->state = page_state;
     set_page_default_palette(pagegroup_id, page_id, palette_id);
@@ -1148,30 +1206,30 @@ int init_page(int pagegroup_id, int page_id, Vector2 size, unsigned long page_st
     page->alpha = 255;
 
     EX_cell *cell = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
-    for (int i = 0; i < cell_count; i++) {
+    for (uint32_t i = 0; i < cell_count; i++) {
         init_cell_linear(&cell[i], cell_state, 0, 0);
     }
     return 1;
 }
 
-void set_pagegroup_default_palette(int pagegroup_id, unsigned short palette_id) {
+void set_pagegroup_default_palette(uint16_t pagegroup_id, uint16_t palette_id) {
     EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
     pagegroup->default_palette_id = palette_id;
 }
 
-void set_pagegroup_default_asset(int pagegroup_id, unsigned short asset_id) {
+void set_pagegroup_default_asset(uint16_t pagegroup_id, uint16_t asset_id) {
     EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
     pagegroup->default_asset_id = asset_id;
 }
 
-int init_pagegroup(unsigned int pagegroup_id, Vector2 size, int page_count, unsigned int pagegroup_state, unsigned long page_state, unsigned long cell_state, unsigned short asset_id, unsigned short palette_id) {
-    int pages = 0;
+uint16_t init_pagegroup(uint32_t pagegroup_id, Vector2 size, uint16_t page_count, uint32_t pagegroup_state, uint64_t page_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
+    uint16_t pages = 0;
     sys.video.pagegroup[pagegroup_id].state = pagegroup_state;
     sys.video.pagegroup[pagegroup_id].page_count = page_count;
     set_pagegroup_default_palette(pagegroup_id, palette_id);
     set_pagegroup_default_asset(pagegroup_id, asset_id);
     sys.video.pagegroup[pagegroup_id].page = calloc(sys.video.pagegroup[pagegroup_id].page_count, sizeof(EX_page));
-    for (int page_id = 0; page_id < page_count; page_id++) {
+    for (uint16_t page_id = 0; page_id < page_count; page_id++) {
         pages += init_page(pagegroup_id, page_id, size, page_state, cell_state, asset_id, palette_id);
     }
     return pages;
@@ -1184,20 +1242,20 @@ int init_pagegroup(unsigned int pagegroup_id, Vector2 size, int page_count, unsi
 // This functionality requires setting a bunch of stuff afterwards;
 // - per cell states
 // - per page asset
-bool init_pagegroup_multipage(Vector2 size, unsigned int pagegroup_state, unsigned long page_state[]) {
-    int pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
+bool init_pagegroup_multipage(Vector2 size, uint32_t pagegroup_state, uint64_t page_state[]) {
+    uint16_t pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
 
     sys.video.pagegroup[pagegroup_id].state = pagegroup_state;
     sys.video.pagegroup[pagegroup_id].page_count = sizeof(page_state) / sizeof_member(EX_page, state);
 
     sys.video.pagegroup[pagegroup_id].page = calloc(sys.video.pagegroup[pagegroup_id].page_count, sizeof(EX_page));
-    for (int i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
+    for (uint16_t i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
         init_page(pagegroup_id, i, size, page_state[i], 0, 0, 0);
     }
     return 0;
 }
 
-int unload_page(int pagegroup_id, int page_id) {
+uint16_t unload_page(uint16_t pagegroup_id, uint16_t page_id) {
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     if (page->cell_count > 0) {
         page->size = (Vector2){0};
@@ -1210,215 +1268,215 @@ int unload_page(int pagegroup_id, int page_id) {
     }
 }
 
-int unload_pagegroup(int pagegroup_id) {
-    int pages = 0;
+uint16_t unload_pagegroup(uint16_t pagegroup_id) {
+    uint16_t pages = 0;
     EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
-    for (int page_id = 0; page_id < (pagegroup->page_count); page_id++) {
+    for (uint16_t page_id = 0; page_id < (pagegroup->page_count); page_id++) {
         pages += unload_page(pagegroup_id, page_id);
     }
     if (pages) free(sys.video.pagegroup[pagegroup_id].page);
     return pages;
 }
 
-int unload_all_pagegroups() {
-    int pagegroups = 0, pages = 0;
-    for (int pagegroup_id = 0; pagegroup_id < GRID_MAX_PAGEGROUPS; pagegroup_id++) {
+uint16_t unload_all_pagegroups() {
+    uint16_t pagegroups = 0, pages = 0;
+    for (uint16_t pagegroup_id = 0; pagegroup_id < GRID_MAX_PAGEGROUPS; pagegroup_id++) {
         pages += unload_pagegroup(pagegroup_id);
         if (pages) ++pagegroups;
     }
     return pages;
 }
 
-void page_set_mouse_position(int pagegroup_id, int page_id, Vector2 target) {
+void page_set_mouse_position(uint16_t pagegroup_id, uint16_t page_id, Vector2 target) {
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
     page->mouse.offset = target;
 }
 
-void page_set_keyboard_position(int pagegroup_id, int page_id, Vector2 target) {
+void page_set_keyboard_position(uint16_t pagegroup_id, uint16_t page_id, Vector2 target) {
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
     page->keyboard.offset = target;
 }
 
-void set_cell_state(int pagegroup_id, int page_id, Rectangle target, unsigned long state) {
-    int linear_offset;
+void set_cell_state(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint64_t state) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             BITS_ON(target_cell[linear_offset].state, state);
         }
     }
 }
 
-void clear_cell_state(int pagegroup_id, int page_id, Rectangle target, unsigned long state) {
-    int linear_offset;
+void clear_cell_state(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint64_t state) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             BITS_OFF(target_cell[linear_offset].state, state);
         }
     }
 }
 
-void set_cell_colorfg(int pagegroup_id, int page_id, Rectangle target, int color_id) {
-    int linear_offset;
+void set_cell_colorfg(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint16_t color_id) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             target_cell[linear_offset].colorfg_id = color_id;
         }
     }
 }
 
-void set_cell_colorbg(int pagegroup_id, int page_id, Rectangle target, int color_id) {
-    int linear_offset;
+void set_cell_colorbg(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint16_t color_id) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             target_cell[linear_offset].colorbg_id = color_id;
         }
     }
 }
 
-void set_cell_colorln(int pagegroup_id, int page_id, Rectangle target, int color_id) {
-    int linear_offset;
+void set_cell_colorln(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint16_t color_id) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             target_cell[linear_offset].colorln_id = color_id;
         }
     }
 }
 
-void set_cell_color_mask(int pagegroup_id, int page_id, Rectangle target, Color color) {
-    int linear_offset;
+void set_cell_color_mask(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, Color color) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             target_cell[linear_offset].color_mask = color;
         }
     }
 }
 
-void set_cell_color_shadow_mask(int pagegroup_id, int page_id, Rectangle target, Color color) {
-    int linear_offset;
+void set_cell_color_shadow_mask(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, Color color) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             target_cell[linear_offset].shadow_mask = color;
         }
     }
 }
 
-void set_cell_offset(int pagegroup_id, int page_id, Rectangle target, Vector2 offset) {
-    int linear_offset;
+void set_cell_offset(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, Vector2 offset) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             target_cell[linear_offset].offset = offset;
         }
     }
 }
 
-void set_cell_angle(int pagegroup_id, int page_id, Rectangle target, float angle) {
-    int linear_offset;
+void set_cell_angle(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, float angle) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             target_cell[linear_offset].angle = angle;
         }
     }
 }
 
-void set_cell_scale(int pagegroup_id, int page_id, Rectangle target, Vector2 scale) {
-    int linear_offset;
+void set_cell_scale(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, Vector2 scale) {
+    uint16_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
             target_cell[linear_offset].scale = scale;
         }
@@ -1426,15 +1484,15 @@ void set_cell_scale(int pagegroup_id, int page_id, Rectangle target, Vector2 sca
 }
 
 // iterate through charracter ascii codes, if font pixels then copy desired source_cell information to the page
-void plot_big_characters(int pagegroup_id, int page_id, Vector2 target, unsigned long state, int font_id, unsigned char *ch) {
-    int linear_offset;
+void plot_big_characters(uint16_t pagegroup_id, uint16_t page_id, Vector2 target, uint64_t state, uint16_t font_id, uint8_t *ch) {
+    uint32_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
-    int length = sizeof(ch);
+    uint32_t length = sizeof(ch);
 
-    for (int i= 0; i++; i<length) {
+    for (uint32_t i= 0; i++; i<length) {
 // to complete
     }    
 }
@@ -1467,17 +1525,17 @@ typedef enum {
 } gridfield_features;
 
 // init every cell using a prototype cell and based on a stat system
-void init_cell (int pagegroup_id, int page_id, Rectangle target, EX_cell info_cell, unsigned long state) {
-    int target_offset, source_offset;
+void init_cell (uint16_t pagegroup_id, uint16_t page_id, Rectangle target, EX_cell info_cell, uint64_t state) {
+    uint32_t target_offset, source_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         if (x >=0 && x < lsx ) {
-            for (int y = target.y; y++; y < (target.y + target.height)) {
+            for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
                 if (y >= 0 && y < lsy) {
                     target_offset = lsx * y + x;
                     if (state & GFLD_ALL)                   target_cell[target_offset]                      = info_cell;
@@ -1510,23 +1568,23 @@ void init_cell (int pagegroup_id, int page_id, Rectangle target, EX_cell info_ce
     }
 }
 
-void clear_cell (int pagegroup_id, int page_id, Rectangle target, unsigned long state) {
+void clear_cell (uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint64_t state) {
     static inline EX_cell blank_cell;
     init_cell(pagegroup_id, page_id, target, blank_cell, state);
 }
 
-void shift_cell_field_rectangle(int pagegroup_id, int page_id, Rectangle target, float shift, unsigned long state) {
-    int target_offset;
+void shift_cell_field_rectangle(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, float shift, uint64_t state) {
+    uint16_t target_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             target_offset = lsx * y + x;
                         if (state & GFLD_STATE)             {target_cell[target_offset].state               += shift;} // 0xffffffff
                         if (state & GFLD_VALUE)             {target_cell[target_offset].value               += shift;} // determined by texture # tiles
@@ -1552,18 +1610,18 @@ void shift_cell_field_rectangle(int pagegroup_id, int page_id, Rectangle target,
     }
 }
 
-void shift_cell_field_circle(int pagegroup_id, int page_id, Rectangle target, float shift, unsigned long state) {
-    int linear_offset;
+void shift_cell_field_circle(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, float shift, uint64_t state) {
+    uint32_t linear_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
-    for (int x = target.x; x++; x < (target.x + target.width)) {
-        for (int y = target.y; y++; y < (target.y + target.height)) {
+    for (int16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (int16_t y = target.y; y++; y < (target.y + target.height)) {
             // determine if circle border or full and if inside then modify
             // The same logic as rectangle
             linear_offset = lsx * y + x;
@@ -1584,25 +1642,25 @@ typedef enum {
     GRIDSHIFT_DOWNRIGHT = 8
 } cell_direction;
 
-void copy_cell_in_page(int pagegroup_id, int page_id, Rectangle source, Vector2 target, unsigned long state) {
-    int source_offset, target_offset;
+void copy_cell_in_page(uint16_t pagegroup_id, uint16_t page_id, Rectangle source, Vector2 target, uint64_t state) {
+    uint32_t source_offset, target_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
     
     if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
     if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.y + source.height) < 0) return;
     if ((source.x + source.width) > lsx) source.width = lsx - source.x;
     if ((source.y + source.width) > lsy) source.width = lsy - source.y;
-    int tx = target.x - source.x; // horizontal target displacement (can be positive or negative depending if target is left or right of source)
-    int ty = target.y - source.y; // vertical target displacement (can be positive or negative depending if target is above or below of source)
-    int xa, xb, xi, ya, yb, yi;
+    int16_t tx = target.x - source.x; // horizontal target displacement (can be positive or negative depending if target is left or right of source)
+    int16_t ty = target.y - source.y; // vertical target displacement (can be positive or negative depending if target is above or below of source)
+    int16_t xa, xb, xi, ya, yb, yi;
     if (tx <= 0) {xa = source.x; xb = (source.x + source.width); xi = 1;} else {xa = (source.x + source.width); xb = source.x; xi = -1;} // horizontal scanning parameters
     if (ty <= 0) {ya = source.y; yb = (source.y + source.height); yi = 1;} else {ya = (source.y + source.height); yb = source.y; yi = -1;} // vertical scanning parameters
-    int y = ya;
+    int16_t y = ya;
     while (1) {
         if (y >=0 && (y + ty) < lsy && (y + ty) >= 0) {
-            int x = xa;
+            int16_t x = xa;
             while (1) {
                 if (x >= 0 && ((x + tx) < lsx) && (x + tx) >= 0) {
                     source_offset = lsx * y + x;
@@ -1639,10 +1697,10 @@ void copy_cell_in_page(int pagegroup_id, int page_id, Rectangle source, Vector2 
 }
 
 // Move cell content to any of 8 directions
-void shift_cell (int pagegroup_id, int page_id, Rectangle source, unsigned char shift_method, bool cycle, unsigned long state) {
-    int source_offset, target_offset;
+void shift_cell (uint16_t pagegroup_id, uint16_t page_id, Rectangle source, uint8_t shift_method, bool cycle, uint64_t state) {
+    uint32_t source_offset, target_offset;
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    int lsx = page->size.x, lsy = page->size.y;
+    uint16_t lsx = page->size.x, lsy = page->size.y;
     EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
 
     //if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
@@ -1652,15 +1710,15 @@ void shift_cell (int pagegroup_id, int page_id, Rectangle source, unsigned char 
 
 }
 
-void copy_cell_to_page(int source_pagegroup_id, int source_page_id, Rectangle source, int target_pagegroup_id, int target_page_id, Vector2 target, unsigned long state) {
-    int source_offset, target_offset;
+void copy_cell_to_page(uint16_t source_pagegroup_id, uint16_t source_page_id, Rectangle source, uint16_t target_pagegroup_id, uint16_t target_page_id, Vector2 target, uint64_t state) {
+    uint32_t source_offset, target_offset;
 
     EX_page *source_page = &sys.video.pagegroup[source_pagegroup_id].page[source_page_id];
-    int lsx = source_page->size.x, lsy = source_page->size.y;
+    uint16_t lsx = source_page->size.x, lsy = source_page->size.y;
     EX_cell  *source_cell  = &sys.video.pagegroup[source_pagegroup_id].page[source_page_id].cell[0];
 
     EX_page *target_page = &sys.video.pagegroup[target_pagegroup_id].page[target_page_id];
-    int ltx = target_page->size.x, lty = target_page->size.y;
+    uint16_t ltx = target_page->size.x, lty = target_page->size.y;
     EX_cell  *target_cell  = &sys.video.pagegroup[target_pagegroup_id].page[target_page_id].cell[0];
 
     if (source.x >= lsx || source.y >= lsy || target.x >= ltx || target.y >= lty) return;
@@ -1668,11 +1726,11 @@ void copy_cell_to_page(int source_pagegroup_id, int source_page_id, Rectangle so
 
     if ((source.x + source.width) > lsx) source.width = lsx - source.x;
     if ((source.y + source.width) > lsy) source.width = lsy - source.y;
-    int tx = target.x - source.x; // horizontal target displacement (can be positive or negative depending if target is left or right of source)
-    int ty = target.y - source.y; // vertical target displacement (can be positive or negative depending if target is above or below of source)
-    for (int x = source.x; x++; x < (source.x + source.width)) {
+    int16_t tx = target.x - source.x; // horizontal target displacement (can be positive or negative depending if target is left or right of source)
+    int16_t ty = target.y - source.y; // vertical target displacement (can be positive or negative depending if target is above or below of source)
+    for (int16_t x = source.x; x++; x < (source.x + source.width)) {
         if ( (x + tx) < lsx && (x + tx) < ltx && (x + tx) >= 0 ) {
-            for (int y = source.y; y++; y < (source.y + source.height)) {
+            for (int16_t y = source.y; y++; y < (source.y + source.height)) {
                 if ( (y + ty) < lsy && (y + ty) < lty && (y + ty) >= 0 ) {
                     source_offset = lsx * y + x;
                     target_offset = ltx * (y + ty) + (x + tx);
@@ -1708,21 +1766,21 @@ void copy_cell_to_page(int source_pagegroup_id, int source_page_id, Rectangle so
     }
 }
 
-void render_page(int page_id) {
+void render_page(uint16_t page_id) {
     Color vertex_colors[4];
-    int pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
+    uint16_t pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
 
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
     EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
-    int cell_offset;
+    uint32_t cell_offset;
     Vector2 shadow = page->shadow;
-    int lsx = page->size.x, lsy = page->size.y;
-    for (int x = 0; x < lsx; x++) {
-        for (int y = 0; y < lsy; y++) {
+    uint16_t lsx = page->size.x, lsy = page->size.y;
+    for (uint16_t x = 0; x < lsx; x++) {
+        for (uint16_t y = 0; y < lsy; y++) {
             cell_offset = lsx * y + x;
             EX_cell *c = &cell[cell_offset];
-            unsigned long state = c->state;
-            unsigned short palette_id = c->palette_id;
+            uint64_t state = c->state;
+            uint16_t palette_id = c->palette_id;
             if (!palette_id) palette_id = page->default_palette_id;
             // for now only page alpha supported, per cell alpha will force to use float to combine page and cell alpha (potentially), or set the texture alpha as the page alpha
             Color colorfg = get_palette_color_pro(palette_id, c->colorfg_id, page->alpha, c->fg_brightness * page->fg_brightness);
@@ -1791,10 +1849,10 @@ void render_page(int page_id) {
                     (Rectangle) { cellpos.x, cellpos.y, scale.x, scale.y },
                     (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
             }
-            unsigned short asset_id = c->asset_id;
+            uint16_t asset_id = c->asset_id;
             if (!asset_id) asset_id = page->default_asset_id;
             if (state & GRFE_FOREGROUND) {
-                unsigned short value = c->value;
+                uint16_t value = c->value;
                 if (state & GRFE_SHADOW) {
                     vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
                     vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
@@ -1818,7 +1876,7 @@ void render_page(int page_id) {
                     (Vector2) {0,0}, skew, angle, vertex_colors);
             }
 
-            unsigned char lines = GET_FROM_STATE(state, GRFE_LINES_MASK, GRFE_LINES_BITS);
+            uint8_t lines = GET_FROM_STATE(state, GRFE_LINES_MASK, GRFE_LINES_BITS);
             if (lines) {
                 if (state & GRFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
                 if (state & GRFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
@@ -1840,12 +1898,12 @@ void render_page(int page_id) {
 }
 
 void render_pagegroup() {
-    int pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
+    uint16_t pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
     EX_pagegroup  *pagegroup  = &sys.video.pagegroup[pagegroup_id];
 
 //begin draw necessary here
 
-    for (int i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
+    for (uint16_t i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
         render_page(i);
     }
     return 0;
@@ -1857,7 +1915,7 @@ void process_page(int page_id) {
 }
 
 void process_pagegroup(int pagegroup_id) {
-    unsigned short page_id = 0;
+    uint16_t page_id = 0;
     process_page(page_id);
     render_page(page_id);
 }
@@ -1917,12 +1975,12 @@ typedef enum {
     ASSET_NULL          = 0b00000000000000000000000000000000  
 } asset_state;
 
-unsigned int asset_type(unsigned int state) {
+uint32_t asset_type(uint32_t state) {
     return (state & ASSET_TYPE_MASK);
 }
 
 void update_assets(void) {
-    for (int id = 0; id < sys.asset.total_assets; id++) {
+    for (uint16_t id = 0; id < sys.asset.total_assets; id++) {
         if ((sys.asset.state[id] & ASSET_UPDATE) && (sys.asset.state[id] & ASSET_ACTIVE)) {
             switch (sys.asset.asset_type[id]) {
                 case ASSET_ICON : // assigns window icon for operating system
@@ -1973,16 +2031,16 @@ void update_assets(void) {
     }    
 }
 
-int load_asset (unsigned int assettype, const char* fileName, const char* fileType, const unsigned char* fileData, int dataSize, int pak) {
-    int id = sys.asset.total_assets;
+int load_asset (uint32_t assettype, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
+    uint16_t id = sys.asset.total_assets;
     debug_console_out("int load_asset", id);
 
     BITS_INIT(sys.asset.state[id], ASSET_INITIALIZED | assettype);
 
     if (fileName > NULL) strcpy(sys.asset.name, fileName);
 
-    int dataSize_decompressed = 0;
-    unsigned char *fileData_decompressed;
+    uint32_t dataSize_decompressed = 0;
+    uint8_t *fileData_decompressed;
     if (pak) {
         BITS_ON(sys.asset.state[id], ASSET_COMPRESSED);
         fileData_decompressed = DecompressData(fileData, dataSize, &dataSize_decompressed);
@@ -2131,8 +2189,8 @@ int load_asset (unsigned int assettype, const char* fileName, const char* fileTy
 }
 
 
-int load_palette(Vector2 count, const char* fileName, const char* fileType, const unsigned char* fileData, int dataSize, int pak) {
-    unsigned short asset_id = load_asset(ASSET_PALETTE, fileName, fileType, fileData, dataSize, pak);
+int load_palette(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
+    uint16_t asset_id = load_asset(ASSET_PALETTE, fileName, fileType, fileData, dataSize, pak);
     float width = (float)sys.asset.img[asset_id].width;
     float height = (float)sys.asset.img[asset_id].height;
 
@@ -2148,9 +2206,9 @@ int load_palette(Vector2 count, const char* fileName, const char* fileType, cons
 }
 
 
-int load_tileset(Vector2 count, const char* fileName, const char* fileType, const unsigned char* fileData, int dataSize, int pak, int ascii_start) {
+int load_tileset(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t ascii_start) {
 
-    unsigned short asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
+    uint16_t asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
     float width = (float)sys.asset.img[asset_id].width;
     float height = (float)sys.asset.img[asset_id].height;
 
@@ -2165,11 +2223,11 @@ int load_tileset(Vector2 count, const char* fileName, const char* fileType, cons
     return asset_id;
 }
 
-static int unload_asset(unsigned int id) {
-    int status = 0;
+static int16_t unload_asset(uint32_t id) {
+    int16_t status = 0;
     if (BITS_TEST(sys.asset.state[id], ASSET_ACTIVE)) {
         sys.asset.state[id] |= ASSET_EXPIRED;
-        int assettype = asset_type(sys.asset.asset_type[id]);
+        uint32_t assettype = asset_type(sys.asset.asset_type[id]);
         switch (assettype) {
             case ASSET_ICON :
             UnloadImage(sys.asset.img[id]);
@@ -2271,9 +2329,9 @@ static int unload_asset(unsigned int id) {
     return status;
 }
 
-int unload_all_assets(void) {
-    int count = 0;
-    for(int asset = 0; asset < MAXASSETS; asset++) {
+uint16_t unload_all_assets(void) {
+    uint16_t count = 0;
+    for(uint16_t asset = 0; asset < MAXASSETS; asset++) {
         count += unload_asset(asset);
     };
     return count;
@@ -2310,12 +2368,12 @@ bool init_audio_properties(void) {
     sys.audio.total_tracks = 0;
     sys.audio.global_volume = 1.0f;
     SetMasterVolume(sys.audio.global_volume); 
-    for (int id=0; id < MAXAUDIOTRACKS; id++) {
+    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
         sys.audio.track[id].is_playing = false;
         sys.audio.track[id].volume = 1.0f;
         sys.audio.track[id].order_playing = 0;
         sys.audio.track[id].total_orders = 0;
-        for (int j=0; j < MAXORDERS; j++) {
+        for (uint16_t j=0; j < MAXORDERS; j++) {
             sys.audio.track[id].order[j] = 0;
         }
     }
@@ -2324,7 +2382,7 @@ bool init_audio_properties(void) {
 }
 
 void update_audio(void) {
-    for (int id=0; id < MAXAUDIOTRACKS; id++) {
+    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
         if (sys.audio.track[id].is_playing) {
             if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
                 UpdateMusicStream(sys.asset.music[sys.audio.track[id].asset]);
@@ -2333,8 +2391,8 @@ void update_audio(void) {
     }
 }
 
-static int add_track(int display, int state, const char* fileName, const char* fileType, const unsigned char* fileData, int dataSize, int pak, int total_orders, int orderlist[]) {
-    int track_id = sys.audio.total_tracks;
+static int16_t add_track(uint16_t display, uint32_t state, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t total_orders, uint16_t orderlist[]) {
+    uint16_t track_id = sys.audio.total_tracks;
     sys.audio.track[track_id].virtual_display = display;
     sys.audio.track[track_id].state = state;
     sys.audio.track[track_id].asset = load_asset(ASSET_XM, fileName, fileType, fileData, dataSize, pak);
@@ -2342,7 +2400,7 @@ static int add_track(int display, int state, const char* fileName, const char* f
     //int asset = sys.audio.track[].asset_playing;
 
     //int total_orders = sizeof(orderlist[0]) / sizeof(int);
-    for (int i = 0; i < total_orders; i++) {
+    for (uint16_t i = 0; i < total_orders; i++) {
         sys.audio.track[track_id].order[i] = orderlist[i];
     }
     sys.audio.track[track_id].total_orders = total_orders;
@@ -2352,8 +2410,8 @@ static int add_track(int display, int state, const char* fileName, const char* f
 }
 
 //StopMusicStream(sys.asset.music[asset]);
-static void change_music_stream(int track_id, int order_id, bool immediate) {
-    int asset = sys.audio.track[track_id].asset;
+static void change_music_stream(uint16_t track_id, uint16_t order_id, bool immediate) {
+    uint16_t asset = sys.audio.track[track_id].asset;
     sys.audio.track[track_id].order_playing = order_id;
     
     if (order_id < sys.audio.track[track_id].total_orders) {
@@ -2365,35 +2423,35 @@ static void change_music_stream(int track_id, int order_id, bool immediate) {
     }
 }
 
-static void hint_restart_track(int immediate) {
-    for (int id=0; id < MAXAUDIOTRACKS; id++) {
+static void hint_restart_track(bool immediate) {
+    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
         if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
             if (sys.audio.track[id].state || TRACK_RESTART_ON_FOCUS) {
                 sys.audio.track[id].is_playing = true;
-                int order = sys.audio.track[id].order_playing;
+                uint16_t order = sys.audio.track[id].order_playing;
                 change_music_stream(id, order, immediate);
             }
         }
     }
 }
 
-static void play_track(int track_id, int order_id, int immediate) {
+static void play_track(uint16_t track_id, uint16_t order_id, bool immediate) {
     sys.audio.track[track_id].is_playing = true;
-    int asset = sys.audio.track[track_id].asset;
+    uint16_t asset = sys.audio.track[track_id].asset;
 	PlayMusicStream(sys.asset.music[asset]);
     change_music_stream(track_id, order_id, immediate);
 }
 
-static void change_track_playing(int track_id, int value) {
+static void change_track_playing(uint16_t track_id, uint16_t value) {
     sys.audio.track[track_id].is_playing = true;
-    int proposed_order = (sys.audio.track[track_id].order_playing + value) % sys.audio.track[track_id].total_orders;
+    uint16_t proposed_order = (sys.audio.track[track_id].order_playing + value) % sys.audio.track[track_id].total_orders;
     change_music_stream(track_id, proposed_order, true);
 }
 
 //    jar_xm_change_all_channel_volumes(sys.asset.music[asset].ctxData, (int) amount); // DO NOT USE, INSTEAD REVAMP TRACKER MIXER
-static void change_track_volume(int track, int volume) {
+static void change_track_volume(uint16_t track, float volume) {
     if (volume>=0.f && volume <=1.0f) sys.audio.track[track].volume = volume;
-    int asset = sys.audio.track[track].asset;
+    uint16_t asset = sys.audio.track[track].asset;
 	SetMusicVolume(sys.asset.music[asset], sys.audio.track[track].volume);
 }
 
@@ -2426,10 +2484,10 @@ typedef enum {
 // SET buffer aspect ratio
 // RLAPI void rlOrtho(double left, double right, double bottom, double top, double znear, double zfar);
 
-static Vector2 ratio_info(int x, int y) {
+static Vector2 ratio_info(float x, float y) {
     Vector2 p;
 
-    int gcd_res = gcdi(x,y);
+    float gcd_res = gcdi(x,y);
     p.x = x / gcd_res;
     p.y = y / gcd_res;
     return p;
@@ -2448,7 +2506,7 @@ void end_draw(void) {
     EndTextureMode();
 }
 
-void flip_frame_buffer(int display, bool clear) {
+void flip_frame_buffer(uint16_t display, bool clear) {
     sys.video.previous_virtual = sys.video.current_virtual;
     sys.video.current_virtual = display;
     if (clear) sys.video.screen_refresh = true;
@@ -2457,17 +2515,17 @@ void flip_frame_buffer(int display, bool clear) {
 static void draw_frame_buffer(RenderTexture renderer, Vector2 position) {
 	DrawTexturePro (renderer.texture,
     (Rectangle) {0.0, 0.0, (float)renderer.texture.width, (float)-renderer.texture.height},
-    (Rectangle) {position.x, position.y, sys.video.screen[sys.video.current_physical].x, sys.video.screen[sys.video.current_physical].y},
+    (Rectangle) {position.x, position.y, sys.video.screen[sys.video.display_id].x, sys.video.screen[sys.video.display_id].y},
     (Vector2)   {0.0, 0.0}, 0.0f, WHITE);
 }
 
-static int init_frame_buffer(int display, Vector2 resolution) {
+static uint16_t init_frame_buffer(uint16_t display, Vector2 resolution) {
     flip_frame_buffer(display, true);
     sys.video.virtual_res[sys.video.current_virtual] = resolution;
     sys.video.frames[sys.video.current_virtual] = 0;
     sys.video.elapsed_time_var_ratio[sys.video.current_virtual] = 5.f;
     sys.video.frame_time_inc[sys.video.current_virtual] = 0;
-	int asset_id = load_asset(ASSET_FRAMEBUFFER, NULL, NULL, NULL, NULL, 0);
+	uint16_t asset_id = load_asset(ASSET_FRAMEBUFFER, NULL, NULL, NULL, NULL, 0);
     flip_frame_buffer(sys.video.previous_virtual, true);
     return asset_id;
 }
@@ -2491,15 +2549,16 @@ bool init_display_properties(bool hide_mouse) {
 
     SetConfigFlags(sys.video.windowstate_normal);
     InitWindow(0, 0, sys.program.name);
-    sys.video.current_physical = GetCurrentMonitor();
+    sys.video.display_id = GetCurrentMonitor();
     if (hide_mouse) HideCursor();
-    sys.video.screen[sys.video.current_physical] = (Vector2) {GetScreenWidth(), GetScreenHeight()};
-    sys.video.screen_rate[sys.video.current_physical] = GetMonitorRefreshRate(sys.video.current_physical);
+    sys.video.screen[sys.video.display_id] = (Vector2) {GetScreenWidth(), GetScreenHeight()};
+    sys.video.screen_rate[sys.video.display_id] = GetMonitorRefreshRate(sys.video.display_id);
+    SetWindowSize(sys.video.screen[sys.video.display_id].x, sys.video.screen[sys.video.display_id].y);
 
     if (IsWindowReady()) return status; else return 1;
 }
 
-void flip_display_state(unsigned int state) {
+void flip_display_state(uint32_t state) {
     if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS)) {
         BITS_FLIP(sys.video.windowstate_normal, state);
     } else {
@@ -2509,6 +2568,8 @@ void flip_display_state(unsigned int state) {
         ClearWindowState(state);
     } else {
         SetWindowState(state);
+        // if (state & FLAG_VSYNC_HINT)  // ***GLFW issue with Refresh rate reset to 60 on VSYNC
+        // since this is an issue, if we really want to do this right, we would have to possibly reload all assets
     }
 }
 
@@ -2520,7 +2581,7 @@ void flip_display_state(unsigned int state) {
     // - Should they display
     // - And their alpha blending
 void update_display(void) {
-    int display = sys.video.current_virtual;
+    uint16_t display = sys.video.current_virtual;
 	BeginDrawing();
         if (sys.video.screen_refresh) {
             ClearBackground(BLACK);
@@ -2537,7 +2598,7 @@ void update_display(void) {
 
     sys.video.window_focus = IsWindowFocused();
 
-    double next_frame = sys.video.prev_time[display] + (double)(1 / sys.video.screen_rate[sys.video.current_physical]);
+    double next_frame = sys.video.prev_time[display] + (double)(1 / sys.video.screen_rate[sys.video.display_id]);
     float wait = (next_frame - GetTime());
     if (wait < 0) wait = 0;
     WaitTime(wait * 1000.f);
@@ -2569,7 +2630,7 @@ void update_display(void) {
         };
     };
 
-    sys.video.frame_time[display] = (float)sys.video.elapsed_time[display] * (float)sys.video.screen_rate[sys.video.current_physical];
+    sys.video.frame_time[display] = (float)sys.video.elapsed_time[display] * (float)sys.video.screen_rate[sys.video.display_id];
     sys.video.frame_time_inc[display] += (float)sys.video.elapsed_time[display];
     sys.video.elapsed_time_var[display] += (float)sys.video.elapsed_time[display] * sys.video.elapsed_time_var_ratio[display];
     sys.video.value_anim[display] = fast_sin(fast_cos(fast_sin(sys.video.frame_time_inc[display]) * fast_sin(sys.video.elapsed_time_var[display] * 0.1) * 0.1) * fast_cos(sys.video.elapsed_time_var[display] * 0.015) * 0.1 ) * 0.05 + 0.001;
@@ -2620,7 +2681,7 @@ typedef struct EX_sprite {
 	float speedY;
     float xsin;
     float ysin;
-    int   current_state;
+    uint32_t current_state;
     float current_state_timer;    // current state timer
     float state_default_time[10]; // per state countdown time
     float state_default_next[10]; // per state following particle state
@@ -2653,7 +2714,7 @@ particle init_particle(Texture texture, Vector2 r1, Vector2 speed) {
 	p.position = r1;
 	//p.size = sys.video.virtual_res[sys.video.current_virtual];
 	
-	for(int i = 0; i < MAXPARTICLES; i++) {
+	for(uint16_t i = 0; i < MAXPARTICLES; i++) {
 		p.unit[i].x = GetRandomValue(p.position.x ,res.x + 32);
 		p.unit[i].y = GetRandomValue(p.position.y ,res.y + 32);
 		p.unit[i].speedX = speed.x;
@@ -2668,7 +2729,7 @@ void update_particle(particle *particle, Vector2 velocity) {
 	Vector2 res = sys.video.virtual_res[sys.video.current_virtual];
     velocity.x *= sys.video.frame_time[sys.video.current_virtual];
     velocity.y *= sys.video.frame_time[sys.video.current_virtual];
-	for(int i = 0; i < MAXPARTICLES; i++) {
+	for(uint16_t i = 0; i < MAXPARTICLES; i++) {
 		particle->unit[i].x += particle->unit[i].speedX * velocity.x;
 		particle->unit[i].y += particle->unit[i].speedY * velocity.y;
 
@@ -2703,17 +2764,17 @@ typedef struct EX_copper {
 
 EX_copper ex_copper[MAXDISPLAYS];
 
-static void copper_animation(int direction, int asset, int segments, int coppers, int size_y, float rastoffset, Vector2 offset, Vector3 ratio, float scale) {
+static void copper_animation(int16_t direction, uint16_t asset, uint16_t segments, uint16_t coppers, uint16_t size_y, float rastoffset, Vector2 offset, Vector3 ratio, float scale) {
     static bool do_it;
     static float y_start;
-    static int copper;
-    int display = sys.video.current_virtual;
+    static uint16_t copper;
+    uint16_t display = sys.video.current_virtual;
     Vector2 vres = sys.video.virtual_res[sys.video.current_virtual];
 	float size_x = vres.x / (float)segments;
     float amp = (vres.y * scale) - (size_y * 0.5);
-    for(int y = 0; y < coppers; y++) {
+    for(uint16_t y = 0; y < coppers; y++) {
         copper = y % 16;
-        for(int x = 0; x < segments; x++) {
+        for(uint16_t x = 0; x < segments; x++) {
             y_start = amp + fast_sin((sys.video.frame_time_inc[sys.video.current_virtual]*ratio.x)-rastoffset*((float)y*ratio.y)-((float)x * sys.video.value_anim[sys.video.current_virtual]*ratio.z)) * amp + offset.y;
             do_it = true;
             if (direction > 0) {
@@ -2733,15 +2794,15 @@ static void copper_animation(int direction, int asset, int segments, int coppers
 }
 
 typedef struct EX_marquee {
-    int palette;
-    int palptr;
+    uint16_t palette;
+    int32_t palptr;
     float palptr_next_frame_time;
 } EX_marquee;
 
 EX_marquee ex_marquee[MAXDISPLAYS];
 
-static void update_marquee_animation(unsigned short asset_id, int palette_id, Vector2 logosize, float transparency, Vector2 offset, float speed, float shadow_transparency) {
-    int display = sys.video.current_virtual;
+static void update_marquee_animation(uint16_t asset_id, uint16_t palette_id, Vector2 logosize, float transparency, Vector2 offset, float speed, float shadow_transparency) {
+    uint16_t display = sys.video.current_virtual;
     if (ex_marquee[display].palptr_next_frame_time < sys.video.frame_time_inc[display]) {
         ex_marquee[display].palptr_next_frame_time = sys.video.frame_time_inc[display] + 1/absf(speed);
         if (speed > 0.0f) {
@@ -2751,12 +2812,12 @@ static void update_marquee_animation(unsigned short asset_id, int palette_id, Ve
         }
         if (ex_marquee[display].palptr > 255) {ex_marquee[display].palptr -= 256;} else if (ex_marquee[display].palptr < 0) {ex_marquee[display].palptr += 256;};
     };
-    int palptr_loop = ex_marquee[display].palptr;
+    int32_t palptr_loop = ex_marquee[display].palptr;
 
     if (transparency > 0.0f) {
         Vector2 scale = {(255.0f - transparency) * 0.01f + 1.0f, 1.0f};
         Vector2 final_offset = {offset.x + (sys.video.virtual_res[sys.video.current_virtual].x-(logosize.x * scale.x))/2.0, offset.y};
-        for(int i = 0; i < logosize.y; i++) {
+        for(uint16_t i = 0; i < logosize.y; i++) {
             if (palptr_loop > 255) {palptr_loop -= 256;} else if (palptr_loop < 0) {palptr_loop += 256;};
             
             Color rgba = get_palette_color(palette_id, palptr_loop);
@@ -2799,18 +2860,18 @@ typedef struct EX_canopy {
     Vector2 adjustment;
     float transparency;
     float transparency_mod;
-    int cells_x;
-    int cells_y;
-    int pal_idx_cells;
-    int pal_idx_text;
-    int font_id;
-    int palette_id;
+    uint16_t cells_x;
+    uint16_t cells_y;
+    int16_t pal_idx_cells;
+    int16_t pal_idx_text;
+    uint16_t font_id;
+    uint16_t palette_id;
     Vector2 grid[CANOPYMAXY][CANOPYMAXX]; // set to max capacity
 } EX_canopy;
 
 EX_canopy ex_canopy;
 
-static void init_canopy (int font_id, int palette_id, Vector2 cells, Vector2 cell_size, float transparency, float transparency_mod, Vector2 adjustment, int pal_idx_cells, int pal_idx_text) {
+static void init_canopy (uint16_t font_id, uint16_t palette_id, Vector2 cells, Vector2 cell_size, float transparency, float transparency_mod, Vector2 adjustment, int16_t pal_idx_cells, int16_t pal_idx_text) {
     ex_canopy.font_id = font_id;
     ex_canopy.palette_id = palette_id;
     ex_canopy.sin_value = (Vector2){0};
@@ -2825,25 +2886,25 @@ static void init_canopy (int font_id, int palette_id, Vector2 cells, Vector2 cel
     ex_canopy.transparency = transparency;
     ex_canopy.transparency_mod = transparency_mod;
     
-    for (int y = 0; y < ex_canopy.cells_y; y++) {
-        for (int x = 0; x < ex_canopy.cells_x; x++) {
+    for (uint16_t y = 0; y < ex_canopy.cells_y; y++) {
+        for (uint16_t x = 0; x < ex_canopy.cells_x; x++) {
             ex_canopy.grid[y][x] = (Vector2) {ex_canopy.cell_size.x, ex_canopy.cell_size.y};
         };
     };
 }
 
-static void update_canopy(unsigned short asset_id) {
+static void update_canopy(uint16_t asset_id) {
     ex_canopy.offset.x = (sys.video.virtual_res[sys.video.current_virtual].x-((ex_canopy.cells_x+1)*ex_canopy.cell_size.x))*0.5f;
     ex_canopy.offset.y = 7.0f * ex_canopy.cell_size.x + (255.f - ex_canopy.transparency);
     if ((ex_canopy.transparency > 0.0f) & (ex_canopy.offset.y <= sys.video.virtual_res[sys.video.current_virtual].y)) {
             
         Vector2 cell_size;
-        int col_idx;
+        int16_t col_idx;
         ex_canopy.sin_value_old.x = ex_canopy.sin_value.x;
         ex_canopy.sin_value_old.y = ex_canopy.sin_value.y;
         Color vertex_colors[4];
-        for(int y = (ex_canopy.cells_y - 1); y >= 0; y -= 1) {
-            for(int x = (ex_canopy.cells_x - 1); x >= 0; x -= 1) {
+        for(int16_t y = (ex_canopy.cells_y - 1); y >= 0; y -= 1) {
+            for(int16_t x = (ex_canopy.cells_x - 1); x >= 0; x -= 1) {
                 float x_sin = fast_sin(ex_canopy.sin_value.x);
                 float y_sin = fast_sin(ex_canopy.sin_value.y);
                 ex_canopy.grid[y][x].x = ((float)x+x_sin)*ex_canopy.cell_size.x + ex_canopy.offset.x;
@@ -2853,7 +2914,7 @@ static void update_canopy(unsigned short asset_id) {
                 if (y<(ex_canopy.cells_y-1)) {cell_size.y = ((ex_canopy.grid[y+1][x].y - ex_canopy.grid[y][x].y) + 1.f);} else {cell_size.y = ex_canopy.cell_size.y;};
                     
                 if (cell_size.x > 0 && cell_size.y > 0) {
-                    col_idx = (int)(y_sin * 4.0f); if (col_idx > 3) col_idx = 3;
+                    col_idx = (int16_t)(y_sin * 4.0f); if (col_idx > 3) col_idx = 3;
                     vertex_colors[0] = get_palette_color(ex_canopy.palette_id,-col_idx + ex_canopy.pal_idx_cells);
                     vertex_colors[1] = vertex_colors[0];
                     vertex_colors[2] = vertex_colors[0];
@@ -2864,7 +2925,7 @@ static void update_canopy(unsigned short asset_id) {
                     vertex_colors);
 
                     // draw text from a grid
-                    col_idx = (int)(y_sin * 7.0f); if (col_idx > 6) col_idx = 6;
+                    col_idx = (int16_t)(y_sin * 7.0f); if (col_idx > 6) col_idx = 6;
                     vertex_colors[0] = get_palette_color(ex_canopy.palette_id,-col_idx + ex_canopy.pal_idx_text);
                     vertex_colors[1] = vertex_colors[0];
                     vertex_colors[2] = vertex_colors[0];
@@ -2891,9 +2952,9 @@ static void update_canopy(unsigned short asset_id) {
 const Color colorbar[] = {{255,255,255,255}, {255,255,0,255}, {0,255,255,255}, {0,255,0,255}, {255,0,255,255}, {255,0,0,255}, {0,0,255,255}, {0,0,0,255}};
 
 static void draw_colorbar(void) {
-    int bar_count = sizeof(colorbar) / sizeof(Color);
+    uint16_t bar_count = sizeof(colorbar) / sizeof(Color);
     float x = sys.video.virtual_res[sys.video.current_virtual].x * 1/bar_count;
-    for (int i = 0; i<bar_count; i++) {
+    for (uint16_t i = 0; i < bar_count; i++) {
         DrawRectangle(i * x, 0, x, sys.video.virtual_res[sys.video.current_virtual].y, (Color) colorbar[i]);        
     }
 }
@@ -2908,28 +2969,28 @@ static void draw_colorbar(void) {
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** B E G I N
 
 typedef struct EX_scrolltext {
-    unsigned short asset_id;
-    int font_id;
-    int palette_id;
+    uint16_t asset_id;
+    uint16_t font_id;
+    uint16_t palette_id;
     Vector2 position;
     Vector2 skew;
     float alpha;
-    int text_wave_flag;
-    int text_angle;
-    int text_wave;
+    int16_t text_wave_flag;
+    int16_t text_angle;
+    int16_t text_wave;
     float pause_found;
     float text_pause;
     float text_scroll_speed;
     float text_shadow;
-    unsigned short colorfg;
-    unsigned short colorfg_flag;
-    unsigned short colorbg;
-    unsigned short colorbg_flag;
+    uint16_t colorfg;
+    uint16_t colorfg_flag;
+    uint16_t colorbg;
+    uint16_t colorbg_flag;
 } EX_scrolltext;
 
 EX_scrolltext ex_scrolltext[16];
 
-static void init_scrolltext(int s, unsigned short asset_id, int font_id, int palette_id, float speed, Vector2 position, Vector2 skew, float alpha) {
+static void init_scrolltext(uint16_t s, uint16_t asset_id, uint16_t font_id, uint16_t palette_id, float speed, Vector2 position, Vector2 skew, float alpha) {
     ex_scrolltext[s].asset_id = asset_id;
     ex_scrolltext[s].font_id = font_id;
     ex_scrolltext[s].palette_id = palette_id;
@@ -2949,7 +3010,7 @@ static void init_scrolltext(int s, unsigned short asset_id, int font_id, int pal
     ex_scrolltext[s].colorbg = 0;
 }
 
-const int scrolltext_color[] = {
+const uint16_t scrolltext_color[] = {
         33,   // BROWN
         41,   // BEIGE
         58,   // ORANGE
@@ -2971,8 +3032,8 @@ const int scrolltext_color[] = {
         15    // WHITE
 };
 
-int scrolltext_color_pick(int id) {
-    int colors = sizeof(scrolltext_color) / 4;
+uint16_t scrolltext_color_pick(int16_t id) {
+    int16_t colors = sizeof(scrolltext_color) / sizeof(uint16_t);
     if (id >= colors) id = (colors - 1); else if (id < 0) id = 0;
     return scrolltext_color[id];
 }
@@ -2995,8 +3056,8 @@ int scrolltext_color_pick(int id) {
 #define SCROLL_TEXTNOCOLOR  125 // sylbol }
 #define SCROLL_PAUSE        126 // symbol ~
 
-static void update_scrolltext(int s, float text_scale) {
-    unsigned short palette_id = ex_scrolltext[s].palette_id;
+static void update_scrolltext(uint16_t s, float text_scale) {
+    uint16_t palette_id = ex_scrolltext[s].palette_id;
     
     if (ex_scrolltext[s].text_pause <= 0.0) {
         ex_scrolltext[s].position.x -= (sys.video.frame_time[sys.video.current_virtual] * ex_scrolltext[s].text_scroll_speed) / text_scale;
@@ -3004,17 +3065,17 @@ static void update_scrolltext(int s, float text_scale) {
         ex_scrolltext[s].text_pause -= sys.video.frame_time[sys.video.current_virtual];
     };
 
-    int id;
+    uint16_t id;
     float et_var = sys.video.elapsed_time_var[sys.video.current_virtual];
     Vector2 displacement;
-    int i_x = 0;
+    int16_t i_x = 0;
 
-    unsigned char *text = &sys.asset.data[ex_scrolltext[s].asset_id];
-	for(int i=0; i < sys.asset.data_size[ex_scrolltext[s].asset_id]; i++) {
+    uint8_t *text = &sys.asset.data[ex_scrolltext[s].asset_id];
+	for(uint16_t i=0; i < sys.asset.data_size[ex_scrolltext[s].asset_id]; i++) {
         displacement.y = fast_sin(et_var) * text_scale;
         et_var += ((PI * 2) / 24);
 
-        int ch = sys.asset.data[ex_scrolltext[s].asset_id][i];
+        uint8_t ch = sys.asset.data[ex_scrolltext[s].asset_id][i];
         switch (ch) {
         case SCROLL_SHADOWDEPTH: // text shadow depth
             i++;
@@ -3061,10 +3122,10 @@ static void update_scrolltext(int s, float text_scale) {
         case SCROLL_BKGNDCOLORX: // background color extended chooser 
             i++;
             ex_scrolltext[s].colorbg_flag = 1;
-            int hue = (sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97;
+            uint8_t hue = (sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97;
             if (hue > 15) hue = 15; // can not test id
             i++;
-            int lum = (sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97;
+            uint8_t lum = (sys.asset.data[ex_scrolltext[s].asset_id][i]) - 97;
             if (lum > 15) lum = 15; // can not test id
             ex_scrolltext[s].colorbg = (hue * 16 + lum);
             break;
@@ -3079,7 +3140,7 @@ static void update_scrolltext(int s, float text_scale) {
                     if (ex_scrolltext[s].pause_found != (i - 1)) {
                         ex_scrolltext[s].pause_found = i - 1;
                         if (ex_scrolltext[s].text_pause <= 0.0) {
-                            ex_scrolltext[s].text_pause = sys.video.screen_rate[sys.video.current_physical] * (float)(sys.asset.data[ex_scrolltext[s].asset_id][i] - 96); // set pause for x secs (a-z=1-26)
+                            ex_scrolltext[s].text_pause = sys.video.screen_rate[sys.video.display_id] * (float)(sys.asset.data[ex_scrolltext[s].asset_id][i] - 96); // set pause for x secs (a-z=1-26)
                         };
                     }
                 } else if (ch == SCROLL_TEXTSPEED) { // set the speed of the scrolling text (a-z = slow to very fast)
@@ -3103,7 +3164,7 @@ static void update_scrolltext(int s, float text_scale) {
                         ex_scrolltext[s].text_wave = 0;
                     };
                     if (ex_scrolltext[s].colorfg_flag == 1) {
-                        ex_scrolltext[s].colorfg = (unsigned short)(displacement.y * 0.5f) + 7;
+                        ex_scrolltext[s].colorfg = (int16_t)(displacement.y * 0.5f) + 7;
                     };
                     if (ex_scrolltext[s].text_pause > 0.0 || ex_scrolltext[s].text_wave_flag == 0) {
                         ex_scrolltext[s].text_angle = 0;
@@ -3111,7 +3172,7 @@ static void update_scrolltext(int s, float text_scale) {
                         ex_scrolltext[s].text_angle = displacement.y;
                     };
 
-                    unsigned long state = 0;
+                    uint64_t state = 0;
                     BITS_ON(state, GRFE_DEFAULT2);
                     if (ex_scrolltext[s].colorbg_flag == 0) BITS_OFF(state, GRFE_BACKGROUND);
                     if (!(ex_scrolltext[s].text_angle))     BITS_OFF(state, GRFE_ROTATION);
@@ -3468,14 +3529,14 @@ typedef enum {
 
 #define TERM_TOTALPAGES  8
 
-static int init_terminal(int tileset_id, int palette_id) {
-    int status;
+static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
+    int16_t status;
     flip_frame_buffer(TERMINALDISPLAY, false);
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
-    int display = sys.video.current_virtual;
-    unsigned int pagegroup_state = 0;
-    unsigned long page_state = GRFE_DEFAULT4;
-    unsigned long cell_state = GRFE_DEFAULT4;
+    uint16_t display = sys.video.current_virtual;
+    uint32_t pagegroup_state = 0;
+    uint64_t page_state = GRFE_DEFAULT4;
+    uint64_t cell_state = GRFE_DEFAULT4;
     sys.terminal.pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
     status = init_pagegroup(sys.terminal.pagegroup_id, (Vector2){64, 28}, TERM_TOTALPAGES, pagegroup_state, page_state, cell_state, tileset_id, palette_id);
     sys.terminal.current_page_id = 0;
@@ -3543,26 +3604,26 @@ void debug_controls_flip()      {debug.controls = !debug.controls;}
 void debug_fps_flip()           {debug.fps = !debug.fps;}
 //void debug_trace_flip()         {debug.trace = !debug.trace;}
 
-debug_display_option(bool bit, int x, int y, int size, const char* text) {
+debug_display_option(bool bit, uint16_t x, uint16_t y, uint16_t size, const char* text) {
     if (bit) { DrawRectangle(x, y, size * 12, size, RED); } else { DrawRectangle(x, y, size * 12, size, GREEN); }
     DrawText(TextFormat("%s %s", text, BIT_LITERAL_ON_OFF(bit)), x, y, size, WHITE);
 }
 
 void display_keybed(void)  {
-    int keys_in_row = 24;
-    for (int j = 0; j < 7; j++) {
+    uint16_t keys_in_row = 24;
+    for (uint16_t j = 0; j < 7; j++) {
         for (int i = 0; i < keys_in_row; i++) {
-            int key = (j * keys_in_row) + i;
-            int code = kbmap_scancode[key];
+            uint16_t key = (j * keys_in_row) + i;
+            uint16_t code = kbmap_scancode[key];
             if (code) {
-                int ascii = kbmap_ascii[key];
+                uint8_t ascii = kbmap_ascii[key];
                 if (IsKeyDown(code)) {
                     DrawRectangle(i*64, 20 + j * 64, 64, 64, GREEN);
-                    DrawText(TextFormat("%c", (int)ascii), i * 64, 20 + j * 64, 64, WHITE);
+                    DrawText(TextFormat("%c", (uint8_t)ascii), i * 64, 20 + j * 64, 64, WHITE);
                 }
                 else {
                     DrawRectangle(i*64, 20 + j * 64, 64, 64, DARKGRAY);
-                    DrawText(TextFormat("%c", (int)ascii), i * 64, 20 + j * 64, 64, GRAY);
+                    DrawText(TextFormat("%c", (uint8_t)ascii), i * 64, 20 + j * 64, 64, GRAY);
                 };
             };
         
@@ -3571,24 +3632,24 @@ void display_keybed(void)  {
 }
 
 void display_all_res(void) {
-    int count = 0;
+    uint16_t count = 0;
     GLFWvidmode* modes = glfwGetVideoModes(glfwGetPrimaryMonitor(), &count);
-    int size = 40;
-    int x = 10;
-    int y = 0;
+    uint16_t size = 40;
+    uint16_t x = 10;
+    uint16_t y = 0;
     Vector2 ratio;
-    for (int i = 0; i < count; i++) {
-        ratio = ratio_info((int)modes[i].width, (int)modes[i].height);
-        int bits = modes[i].redBits + modes[i].greenBits + modes[i].blueBits;
-        DrawText( TextFormat("%ix%i - %ibit - %ifps - %i:%i", (int)modes[i].width, (int)modes[i].height, bits, (int)modes[i].refreshRate, (int)ratio.x, (int)ratio.y ),
+    for (uint16_t i = 0; i < count; i++) {
+        ratio = ratio_info((uint16_t)modes[i].width, (uint16_t)modes[i].height);
+        uint32_t bits = modes[i].redBits + modes[i].greenBits + modes[i].blueBits;
+        DrawText( TextFormat("%ix%i - %ibit - %ifps - %i:%i", (uint16_t)modes[i].width, (uint16_t)modes[i].height, bits, (uint16_t)modes[i].refreshRate, (uint16_t)ratio.x, (uint16_t)ratio.y ),
         x, y, size, DARKGRAY);
-        y += size; if (y > (sys.video.screen[sys.video.current_physical].y - size)) {x+=768; y=0; };
+        y += size; if (y > (sys.video.screen[sys.video.display_id].y - size)) {x+=768; y=0; };
     };
 }
 
 void update_debug(bool show_options) {
-    int size = 80;
-    int x = 0, y = 0;
+    uint16_t size = 80;
+    uint16_t x = 0, y = 0;
 
     if (debug.audio) {
         sys.video.screen_refresh = true;
@@ -3648,19 +3709,28 @@ void update_debug(bool show_options) {
         if (IsKeyPressed(KEY_KP_6)) {ex_canopy.pal_idx_text += 16; if(ex_canopy.pal_idx_text > 255) {ex_canopy.pal_idx_text -=256;};};
 
         DrawText(TextFormat("%s", time_stamp()), 1400, 0, 40, DARKGRAY);
-        DrawText(TextFormat("FRAMES=%i", (int)sys.video.frames[sys.video.current_physical]), 0, 0, 20, DARKGRAY);
-        DrawText(TextFormat("prev_time = %f", (float)sys.video.prev_time[sys.video.current_physical]), 0, 0, 40, DARKGRAY);
-        DrawText(TextFormat("monitors = %i, current = %i, %s", (int)GetMonitorCount(), (int)sys.video.current_physical, GetMonitorName(sys.video.current_physical)), 0, 60, 20, DARKGRAY);
-        DrawText(TextFormat("screen is %ix%i at %i fps", (int)sys.video.screen[sys.video.current_physical].x, (int)sys.video.screen[sys.video.current_physical].y, (int)sys.video.screen_rate[sys.video.current_physical]), 0, 100, 20, DARKGRAY);
-        DrawText(TextFormat("screen is %ix%i mm", (int)GetMonitorPhysicalWidth(sys.video.current_physical), (int)GetMonitorPhysicalHeight(sys.video.current_physical)), 0, 120, 20, DARKGRAY);
+        DrawText(TextFormat("FRAMES=%i", (uint32_t)sys.video.frames[sys.video.display_id]), 0, 0, 20, DARKGRAY);
+        DrawText(TextFormat("prev_time = %f", (float)sys.video.prev_time[sys.video.display_id]), 0, 0, 40, DARKGRAY);
+        DrawText(TextFormat("monitors = %i, current = %i, %s", (uint16_t)GetMonitorCount(), (uint16_t)sys.video.display_id, GetMonitorName(sys.video.display_id)), 0, 60, 20, DARKGRAY);
+        DrawText(TextFormat("screen is %ix%i at %i fps", (uint16_t)sys.video.screen[sys.video.display_id].x, (uint16_t)sys.video.screen[sys.video.display_id].y, (uint16_t)sys.video.screen_rate[sys.video.display_id]), 0, 100, 20, DARKGRAY);
+        DrawText(TextFormat("screen is %ix%i mm", (uint16_t)GetMonitorPhysicalWidth(sys.video.display_id), (uint16_t)GetMonitorPhysicalHeight(sys.video.display_id)), 0, 120, 20, DARKGRAY);
         DrawText(TextFormat("ex_canopy.adjustment.y = %f", (float)ex_canopy.adjustment.y), 0, 140, 20, DARKGRAY);
-        DrawText(TextFormat("ftime = %f and sys.video.frame_time_inc = %f",  (float)sys.video.elapsed_time[sys.video.current_physical], (float)sys.video.frame_time_inc[sys.video.current_physical]), 0, 160, 20, DARKGRAY);
+        DrawText(TextFormat("ftime = %f and sys.video.frame_time_inc = %f",  (float)sys.video.elapsed_time[sys.video.display_id], (float)sys.video.frame_time_inc[sys.video.display_id]), 0, 160, 20, DARKGRAY);
 //        DrawText(TextFormat("text_pause = %i, text_color_flag = %i, text_wave_flag = %i", (int)text_pause, (int)text_color_flag, (int)text_wave_flag), 0, 180, 20, DARKGRAY);
-        DrawText(TextFormat("value_anim %i", (float)sys.video.value_anim[sys.video.current_physical]), 0, 200, 20, DARKGRAY);
-        DrawText(TextFormat("fast_sin = %f", fast_sin(sys.video.frame_time_inc[sys.video.current_physical])), 0, 220, 20, DARKGRAY);
-        DrawText(TextFormat("     sin = %f", sin(sys.video.frame_time_inc[sys.video.current_physical])), 0, 240, 20, DARKGRAY);
-        DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.frame_time_inc[sys.video.current_physical])), 0, 260, 20, DARKGRAY);
-        DrawText(TextFormat("     cos = %f", cos(sys.video.frame_time_inc[sys.video.current_physical])), 0, 280, 20, DARKGRAY);
+        DrawText(TextFormat("value_anim %i", (float)sys.video.value_anim[sys.video.display_id]), 0, 200, 20, DARKGRAY);
+        DrawText(TextFormat("fast_sin = %f", fast_sin(sys.video.frame_time_inc[sys.video.display_id])), 0, 220, 20, DARKGRAY);
+        DrawText(TextFormat("     sin = %f", sin(sys.video.frame_time_inc[sys.video.display_id])), 0, 240, 20, DARKGRAY);
+        DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 260, 20, DARKGRAY);
+        DrawText(TextFormat("     cos = %f", cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 280, 20, DARKGRAY);
+
+        uint16_t ys = 20;
+        uint16_t y = sys.video.screen[sys.video.display_id].y - ys;
+        for (uint64_t i = 0; i < 64; i++) {
+            uint64_t bit = (sys.temporal.osc & (uint64_t)(1 <<i));
+            Color col;
+            if (bit) col = GREEN; else col = ORANGE;
+            DrawRectangle(1280 - (i * ys), y, ys, ys, col);
+        }
         show_options = false;
     }
 
@@ -3672,12 +3742,12 @@ void update_debug(bool show_options) {
 
     if (debug.fps) {
         sys.video.screen_refresh = true;
-        DrawFPS(sys.video.screen[sys.video.current_physical].x - 100, 0);
+        DrawFPS(sys.video.screen[sys.video.display_id].x - 100, 0);
     }
 
     if (IsKeyDown(KEY_LEFT_CONTROL)) {
-        x = (sys.video.screen[sys.video.current_physical].x - 12 * size) * 0.5;
-        y = (sys.video.screen[sys.video.current_physical].y - 6 * size) * 0.5;
+        x = (sys.video.screen[sys.video.display_id].x - 12 * size) * 0.5;
+        y = (sys.video.screen[sys.video.display_id].y - 6 * size) * 0.5;
         if (show_options || debug.audio)     { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.audio, x, y, size, "F1 -> AUDIO");};
         if (show_options || debug.video)     { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.video, x, y, size, "F2 -> VIDEO");};
         if (show_options || debug.game_data) { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.game_data, x, y, size, "F3 -> DATA");};
@@ -3693,7 +3763,7 @@ void update_debug(bool show_options) {
     }
 }
 
-void debug_console_out(const char* message, unsigned int status) {
+void debug_console_out(const char* message, uint32_t status) {
     if (BITS_TEST(sys.program.pmsnstate, PMSN_TRACE)) {
         TRACELOG(LOG_INFO, "%s | %s | CTRL = 0x%000000008X | PMSN = 0x%000000008X | status = 0x%000000008X <<<<< %s",
         SOFTWARE,
@@ -3718,7 +3788,7 @@ void debug_console_out(const char* message, unsigned int status) {
 // SCRIPTING GOAL: In the current form it is not but it is simplified in a way to make it mport to scripting in the simplest way possible.
 // SCRIPTING GOAL: Once the scripting is completed, we will see how to inject that into the dispatcher with hooks.
 void game_init_assets(void) {
-    int id;
+    uint16_t id;
 	id = load_asset(ASSET_TEXTURE, TITLE_FILENAME, TITLE_FILEEXT, TITLE_DATA, TITLE_FILESIZE, TITLE_PAK);
 
 	id = load_tileset((Vector2){32,32}, TL1_FILENAME, TL1_FILEEXT, TL1_DATA, TL1_FILESIZE, TL1_PAK, 0);
@@ -3739,7 +3809,7 @@ void game_init_assets(void) {
 	id = load_asset(ASSET_TEXT, NULL, NULL, text_yo2, strlen(text_yo2), 0);
 	id = load_asset(ASSET_TEXT, NULL, NULL, text_yo3, strlen(text_yo3), 0);
 
-    int orderlist[] = {0, 4, 5, 13, 35, 60, 62, 64, 69, 72, 80, 84, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249};
+    uint16_t orderlist[] = {0, 4, 5, 13, 35, 60, 62, 64, 69, 72, 80, 84, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249};
     id = add_track(PRIMARYDISPLAY, 0,                        MUSIC_ALL1_FILENAME, MUSIC_ALL1_FILEEXT, MUSIC_ALL1_DATA, MUSIC_ALL1_FILESIZE, MUSIC_ALL1_PAK, 25, orderlist);
     id = add_track(PRIMARYDISPLAY,   TRACK_SWITCH_IMMEDIATE, MUSIC_ALL1_FILENAME, MUSIC_ALL1_FILEEXT, MUSIC_ALL1_DATA, MUSIC_ALL1_FILESIZE, MUSIC_ALL1_PAK, 25, orderlist);
     id = add_track(UNFOCUSEDDISPLAY, TRACK_RESTART_ON_FOCUS, MUSIC_ALL1_FILENAME, MUSIC_ALL1_FILEEXT, MUSIC_ALL1_DATA, MUSIC_ALL1_FILESIZE, MUSIC_ALL1_PAK, 25, orderlist);
@@ -3819,12 +3889,12 @@ void game_off_focus_scene(void) {
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
 
-int init_default_assets() {
+int16_t init_default_assets() {
     bool status = 0;
     
     sys.asset.total_assets = 0;
 
-    int id; // when read, id returns -1 from total_assets
+    uint16_t id; // when read, id returns -1 from total_assets
     id = init_frame_buffer(TERMINALDISPLAY, (Vector2) {512, 224});
     id = init_frame_buffer(UNFOCUSEDDISPLAY, (Vector2) {512, 224});
     id = init_frame_buffer(MENUDISPLAY, (Vector2) {284, 192});
@@ -3849,26 +3919,30 @@ int init_default_assets() {
 
 //RLAPI void SetExitKey(false);
 
-int init_system(void) {
+int16_t init_system(void) {
     debug_console_out("//////// init_system", 0);
-    unsigned int status = 0;
+    uint32_t status = 0;
 
-    int display_status = init_display_properties(true);
+    int16_t display_status = init_display_properties(true);
     if (!display_status) add_service(CTRL_VIDEO_INITIALIZED); 
     debug_console_out("---------- VIDEO_INITIALISATION", display_status);
     
-    int assets_status = init_default_assets();
-    if (!assets_status) add_service(CTRL_ASSETS_INITIALIZED);
+    int16_t assets_status = init_default_assets();
+    if (assets_status) add_service(CTRL_ASSETS_INITIALIZED);
     debug_console_out("---------- ASSETS_INITIALISATION", assets_status);
     
-    int terminal_status = init_terminal(8, 5);
+    int16_t terminal_status = init_terminal(8, 5);
     if (!terminal_status) add_service(CTRL_TERMINAL_INITIALIZED);
     debug_console_out("---------- TERMINAL_INITIALISATION", terminal_status);
     
-    int audio_status = init_audio_properties();
+    int16_t audio_status = init_audio_properties();
     if (!audio_status) add_service(CTRL_AUDIO_INITIALIZED);
     debug_console_out("---------- AUDIO_INITIALISATION", audio_status);
 
+    int16_t temporal_status = init_temporal();
+    if (temporal_status) add_service(CTRL_TEMPORAL_INITIALIZED);
+    debug_console_out("---------- TEMPORAL_INITIALISATION", temporal_status);
+    
     // TODO: init bootstrap script
 
     //status = display_status | (assets_status << 1) | (terminal_status << 2) | (audio_status << 3);
@@ -3876,9 +3950,9 @@ int init_system(void) {
     return status;
 }
 
-static int deinit_system(void) {
+static int16_t deinit_system(void) {
     debug_console_out("//////// deinit_system", 0);
-    int status = 0;
+    int16_t status = 0;
 
     status = unload_all_assets();
     remove_service(CTRL_ASSETS_INITIALIZED);
@@ -3896,8 +3970,8 @@ static int deinit_system(void) {
     return status;
 }
 
-static int update_system(void) {
-    int status = 0;
+static int16_t update_system(void) {
+    int16_t status = 0;
     
     if (sys.program.ctrlstate & CTRL_ASSETS_INITIALIZED) {
         update_assets();
@@ -3910,6 +3984,9 @@ static int update_system(void) {
     }
     if (sys.program.ctrlstate & CTRL_AUDIO_INITIALIZED) {
         update_audio();
+    }
+    if (sys.program.ctrlstate & CTRL_TEMPORAL_INITIALIZED) {
+        update_temporal();
     }
     return status;
 }
@@ -3926,7 +4003,7 @@ void manage_program() {
     if (sys.program.ctrlstate & CTRL_OFF_FOCUS)
         game_off_focus_scene();
     else {
-//        unsigned int switchboard_state = service_active(CTRL_SWITCHBOARD_MASK);
+//        uint32_t switchboard_state = service_active(CTRL_SWITCHBOARD_MASK);
         switch (service_active(CTRL_SWITCHBOARD_MASK)) {   //(switchboard_state) {
             case CTRL_OFF_FOCUS:
                 begin_draw(true);
@@ -3992,7 +4069,7 @@ void manage_program() {
 
 ////////////// ENTRY POINT FROM RUNTIME //////////////
 // Once runtime heads here --> stuck till CTRL_END
-int process_system(unsigned int ctrlstate, unsigned int pmsnstate, const char* name) {
+int process_system(uint32_t ctrlstate, uint32_t pmsnstate, const char* name) {
     if (name > NULL) strcpy(sys.program.name, name); else strcpy(sys.program.name, "_o/");
     set_permission(pmsnstate);
     add_service(ctrlstate);
