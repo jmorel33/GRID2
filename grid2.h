@@ -10,13 +10,6 @@
 // GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][_GRID_][
 #pragma once
 
-#define SUPPORT_TRACELOG 1
-#include "utils.h"           // Required for: TRACELOG macros
-#include "raylib.h"          // works on version 3.8 development
-#include "raymath.h"
-#include "rlgl.h"            // raylib OpenGL abstraction to OpenGL 1.1, 3.3 or ES2
-#include <GLFW/glfw3.h>
-
 //#include <windows.h> 
 #include <stdlib.h>         // header of the general purpose standard library
 #include <stdio.h>
@@ -46,6 +39,13 @@
 #ifdef __cplusplus // Calling C code from C++
 extern "C" { 
 #endif
+
+#define SUPPORT_TRACELOG 1
+#include "raylib.h"          // works on version 3.8 development
+#include "utils.h"           // Required for: TRACELOG macros
+#include "raymath.h"
+#include "rlgl.h"            // raylib OpenGL abstraction to OpenGL 1.1, 3.3 or ES2
+#include <GLFW/glfw3.h>
 
 // **************************************************************************************** U T I L I T Y   M A C R O S   &   F U N C T I O N S
 
@@ -89,11 +89,11 @@ extern "C" {
 /*
 #define STDIO_BUFFER_SIZE 4000
 static char stdio_buffer[STDIO_BUFFER_SIZE + 1] = {0};
-static int stdio_pipe[2];
+static uint16_t stdio_pipe[2];
 */
 
 //void prepare_stdio(void) {
-//    long flags = fcntl(stdio_pipe[0], F_GETFL);
+//    uint32_t flags = fcntl(stdio_pipe[0], F_GETFL);
 //    flags |= O_NONBLOCK;
 //    fcntl(stdio_pipe[0], F_SETFL, flags);
 //};
@@ -103,7 +103,7 @@ static int stdio_pipe[2];
 //    enum { STATE_WAITING, STATE_LOADING, STATE_FINISHED } state = STATE_WAITING;
 
 // C11: Sets the first n bytes starting at dest to the specified value, but maximal dmax bytes.
-//#define EX_MEMSET(void *dest, rsize_t dmax, int value, rsize_t n)   memset_s(void *dest, rsize_t dmax, int value, rsize_t n)
+//#define EX_MEMSET(void *dest, rsize_t dmax, uint16_t value, rsize_t n)   memset_s(void *dest, rsize_t dmax, uint16_t value, rsize_t n)
 
 // C11: This function copies at most smax bytes from src to dest, up to dmax.
 //#define EX_MEMCPY(void *restrict dest, rsize_t dmax, const void *restrict src, rsize_t smax) memcpy_s(void *restrict dest, rsize_t dmax, const void *restrict src, rsize_t smax)
@@ -296,18 +296,18 @@ static int32_t gcdi(int32_t a, int32_t b) {
 // separate in tywo functions; one that takes a value and returns RGB, and one that takes YIQ and returns RGB
 Color gtia_ntsc_to_rgb(int16_t val) {
     int16_t chroma = (val >> 4) & 15;
-    int16_t luminence = val & 15;
+    int16_t luma = val & 15;
     int16_t crlv = chroma ? 50 : 0;
  
     float phase = ((chroma - 1.) * 25. - 58.) * (2. * PI / 360.);
 
-    float y = 255 * (luminence + 1.) / 16.;
+    float y = 255 * (luma + 1.) / 16.;
     float i = crlv * cos(phase);
     float q = crlv * sin(phase);
 
-    float r = y + 0.956294832320893995 * i + 0.621025125444728741 * q;
-    float g = y - 0.2721214740839773195 * i - 0.6473809535176157223 * q;
-    float b = y - 1.106989908567128216 * i + 1.704614975498829329 * q;
+    float r = (y + 0.956294832320893995 * i + 0.621025125444728741 * q);
+    float g = (y - 0.2721214740839773195 * i - 0.6473809535176157223 * q);
+    float b = (y - 1.106989908567128216 * i + 1.704614975498829329 * q);
 
 	if (r < 0) r = 0; else if (r > 255) r = 255;
 	if (g < 0) g = 0; else if (g > 255) g = 255;;
@@ -365,13 +365,13 @@ While Not KeyDown(1)
 Wend
 */
 
-char *time_stamp(){
-    char *timestamp = (char *)malloc(20);
+void datetime_literal(char *datetime) {
+//    char *datetime = (char *)malloc(20);
     time_t ltime = time(NULL);
     struct tm *tm;
     tm = localtime(&ltime);
-    sprintf(timestamp,"%04d/%02d/%02d-%02d:%02d:%02d", tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
-    return timestamp;
+    sprintf(datetime,"%04d/%02d/%02d-%02d:%02d:%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+//    return datetime;
 }
 
 // to be determined (need this to replace the RayLib basic Vector structs)
@@ -399,6 +399,8 @@ typedef union Vector4 {
 // **************************************************************************************** R A Y L I B   E X T E N S I O N S
 
 void DrawTextImage(Texture texture, uint8_t* txt, Vector2 position) {
+    // remove hardcoded values ************************************** (ie. -32, and sizes)
+    // expand concept
 	DrawTexturePro(texture,
     (Rectangle) { (txt[0] - 32) * 24, 0, 24, 24 } ,
     (Rectangle) { position.x , position.y, 64, 64 },
@@ -407,6 +409,7 @@ void DrawTextImage(Texture texture, uint8_t* txt, Vector2 position) {
 
 // draw Textured Quad
 void DrawQuadSprite ( Texture texture , Vector2 position, Vector2 scale, Color color) {
+    // expand concept, think about particles, player character, etc... color blending opotions, priority system... Use DrawTexturePro2 for skew, etc...
 	DrawTexturePro ( texture ,
     (Rectangle) { 0, 0, texture.width * scale.x, texture.height * scale.y },
     (Rectangle) { position.x, position.y, texture.width * scale.x, texture.height * scale.y },
@@ -472,12 +475,14 @@ void DrawRectanglePro2(Rectangle rec, Vector2 origin, Vector2 skew, float rotati
 // NOTE: origin is relative to destination rectangle size
 void DrawTexturePro2 (Texture texture, Rectangle source, Rectangle dest, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
     if (texture.id > 0) {
+        rlCheckRenderBatchLimit(4);     // Make sure there is enough free space on the batch buffer
         float width = (float)texture.width;
         float height = (float)texture.height;
         bool flipX = false;
         if (source.width < 0) { flipX = true; source.width *= -1; }
         if (source.height < 0) source.y -= source.height;
-        Vector2 topLeft = { 0 };        Vector2 topRight = { 0 };        Vector2 bottomLeft = { 0 };        Vector2 bottomRight = { 0 };
+
+        Vector2 topLeft = { 0 }, topRight = { 0 }, bottomLeft = { 0 }, bottomRight = { 0 };
 
         if (rotation == 0.0f) { // do not calculate rotation
             float x = dest.x - origin.x;
@@ -503,7 +508,6 @@ void DrawTexturePro2 (Texture texture, Rectangle source, Rectangle dest, Vector2
             bottomRight.y = y + (dx + dest.width)*sinRotation + (dy + dest.height)*cosRotation;
         }
 
-        rlCheckRenderBatchLimit(4);     // Make sure there is enough free space on the batch buffer
         rlSetTexture(texture.id);
         rlBegin(RL_QUADS);
             rlNormal3f(0.0f, 0.0f, 1.0f);                          // Normal vector pointing towards viewer
@@ -540,6 +544,9 @@ Color get_pixel_color(Image *image, Vector2 position) {
 //    return (Color){r, g, b, a};
 }
 
+Vector2 get_tile_pixelsize(Vector2 tiles, Vector2 tileset_size) {
+    return (Vector2){tileset_size.x/tiles.x, tileset_size.y/tiles.y};
+}
 
 // **************************************************************************************** G R I D   S T R U C T U R E S
 #define NAMELENGTH_MAX      80
@@ -551,18 +558,18 @@ Color get_pixel_color(Image *image, Vector2 position) {
 
 
 typedef struct EX_cell {
-    uint64_t state;                        // all flags for cell
-    uint16_t value;                       // value of cell
-    uint8_t lines;                        // lines feature
-    uint16_t asset_id;                    // Each cell can point to a different tileset
-    uint16_t cycle_id;                    // cell animation sequence number
-    uint16_t palette_id;                  // color palette used for whole page
-    uint16_t colorfg_id;                  // palette index color for cell
-    uint16_t colorfg_cycle_id;            // color cycle index for cell
-    uint16_t colorbg_id;                  // palette index color for cell background
-    uint16_t colorbg_cycle_id;            // color cycle index for cell background
-    uint16_t colorln_id;                  // palette index color for cell lines
-    uint16_t colorln_cycle_id;            // color cycle index for cell lines
+    uint64_t state;                             // all flags for cell
+    uint16_t value;                             // value of cell
+    uint8_t lines;                              // lines feature
+    uint16_t asset_id;                          // Each cell can point to a different tileset
+    uint16_t cycle_id;                          // cell animation sequence number
+    uint16_t palette_id;                        // color palette used for whole page
+    uint16_t colorfg_id;                        // palette index color for cell
+    uint16_t colorfg_cycle_id;                  // color cycle index for cell
+    uint16_t colorbg_id;                        // palette index color for cell background
+    uint16_t colorbg_cycle_id;                  // color cycle index for cell background
+    uint16_t colorln_id;                        // palette index color for cell lines
+    uint16_t colorln_cycle_id;                  // color cycle index for cell lines
     Vector2 offset;                             // displacement from top left (x,y)
     Vector2 skew;                               // horizontal and vertical skew
     Vector2 scale;                              // (x,y) cell scale
@@ -571,22 +578,23 @@ typedef struct EX_cell {
     float angle;                                // degree of angle used to rotate the cell
     float fg_brightness;                        // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
     float bg_brightness;                        // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    uint8_t alpha;                        // transparency
+    uint8_t alpha;                              // transparency
     Color color_mask;                           // RGBA color mask of cell
     Color shadow_mask;                          // shadow RGBA mask
 } EX_cell;
 
 typedef struct EX_page {
     char name[NAMELENGTH_MAX + 1];
-    uint64_t state;                        // all flags for grid
-    uint16_t asset_id[PAGE_MAX_PALETTES];  // tilset used for this page
+    uint64_t state;                             // all flags for grid
+    uint16_t asset_id[PAGE_MAX_ASSETS];         // tilset used for this page
     uint16_t default_asset_id;
     Vector2 size;                               // total cells x and y
-    uint16_t palette_id[PAGE_MAX_PALETTES]; // color palette used for whole page
-    uint16_t default_palette_id;          // color palette used for whole page
-    uint16_t default_colorfg_id;          // palette index color for cell
-    uint16_t default_colorbg_id;          // palette index color for cell background
-    uint16_t default_colorln_id;          // palette index color for cell lines
+    Vector2 default_tilesize;
+    uint16_t palette_id[PAGE_MAX_PALETTES];     // color palette used for whole page
+    uint16_t default_palette_id;                // color palette used for whole page
+    uint16_t default_colorfg_id;                // palette index color for cell
+    uint16_t default_colorbg_id;                // palette index color for cell background
+    uint16_t default_colorln_id;                // palette index color for cell lines
     Vector2 offset;                             // displacement from top left (x,y)
     Vector2 displace[4];                        // cell corner displacement (x,y)
     Vector2 scale;                              // (x,y) cell scale
@@ -595,16 +603,16 @@ typedef struct EX_page {
     float angle;                                // degree of angle to rotate page
     float fg_brightness;                        // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
     float bg_brightness;                        // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    uint8_t alpha;                        // transparency
+    uint8_t alpha;                              // transparency
     Vector2 shadow;                             // shadow corner displacement (x,y)
     Vector2 shadow_displace[4];                 // shadow corners displacement (x,y)
     Color   color_mask;                         // RGBA color mask of page
     Color   shadow_mask;                        // shadow RGBA mask
-    EX_cell mouse;                              // mouse cursor
-    EX_cell keyboard;                           // key cursor
+    EX_cell mousecursor;                        // mouse cursor
+    EX_cell keycursor;                          // key cursor
     EX_cell mask;                               // used for when replicating
     uint32_t cell_count;
-    EX_cell* cell; // could be NULL
+    EX_cell* cell;                              // could be NULL
 } EX_page;
 
 typedef enum {
@@ -616,7 +624,7 @@ typedef enum {
 typedef struct EX_pagegroup {
     char name[NAMELENGTH_MAX + 1];
     uint32_t state;
-    int page_count;                            // total number of pages
+    uint16_t page_count;                            // total number of pages
     uint16_t default_asset_id;
     uint16_t default_palette_id;          // color palette used for whole page
     uint16_t default_colorfg_id;          // palette index color for cell
@@ -634,7 +642,7 @@ typedef struct EX_tileset {
     Vector2 count;                              // number of tiles (x, y)
     Texture tex;                                // Characters texture atlas
     uint32_t total;                         // Number of Tiles
-    int ascii_start;                            // if tileset if character font, identifies ascii code first tile
+    uint16_t ascii_start;                            // if tileset if character font, identifies ascii code first tile
 } EX_tileset;
 
 typedef struct EX_asset {
@@ -647,7 +655,7 @@ typedef struct EX_asset {
 
     uint32_t asset_type[MAXASSETS];
     uint32_t state[MAXASSETS];
-    int data_size[MAXASSETS];                   // storage space size in bytes
+    uint32_t data_size[MAXASSETS];                   // storage space size in bytes
 
     Image img[MAXASSETS];                       // storage space for unpacked images
     Texture tex[MAXASSETS];                     // storage space for textures
@@ -669,18 +677,18 @@ typedef struct EX_asset {
 typedef struct EX_track {
     bool is_playing;
     uint32_t state;
-    int asset;
-    int virtual_display;
+    uint16_t asset;
+    uint16_t virtual_display;
     float volume;
     float dest_volume; // TO DO
     float slide_speed; // TO DO
-    int order_playing;
-    int total_orders;
-    int order[MAXORDERS];
+    uint16_t order_playing;
+    uint16_t total_orders;
+    uint16_t order[MAXORDERS];
 } EX_track;
 
 typedef struct EX_audio {
-    int total_tracks;
+    uint16_t total_tracks;
     float global_volume;
     EX_track track[MAXAUDIOTRACKS];
 } EX_audio;
@@ -751,6 +759,7 @@ typedef struct EX_terminal {
 // With this comes a period table spanning from slow 8 second up to fast millisecond level state changes
 // With this a function to poll oscillator states
 typedef struct EX_temporal {
+    char    datetime[20];
     double period_table[64];
     uint64_t prev_osc;
     uint64_t osc;
@@ -951,24 +960,30 @@ Color get_palette_color2(uint16_t palette_id, uint16_t id, uint8_t alpha) {
 
 Color get_palette_color_pro(uint16_t palette_id, uint16_t id, uint8_t alpha, float brightness) {
     Color *color = sys.asset.palette[palette_id];
-    return (Color){color[id].r * brightness, color[id].g * brightness, color[id].b * brightness, 255};
+    return (Color){color[id].r * brightness, color[id].g * brightness, color[id].b * brightness, alpha};
+}
+
+Vector2 get_asset_pixelsize(asset_id) {
+    return (Vector2){sys.asset.img[asset_id].width, sys.asset.img[asset_id].height};
 }
 
 
-#define GRIDILON     1.182940076
+#define GRIDILON            1.182940076
+#define TEMPORAL_ARRAY_SIZE 64
 
-int init_temporal() {
+uint16_t init_temporal() {
     uint64_t osc;
+
+    datetime_literal(&sys.temporal.datetime);
     
     double range_high = 60.;
     double range_low = 1. / range_high;
-    uint64_t steps = 64;
 
     double ratio =  range_low;
     double value = range_low;
 
     double t = GetTime();
-    for (osc = 0; osc < steps; osc++) {
+    for (osc = 0; osc < TEMPORAL_ARRAY_SIZE; osc++) {
 //        printf (" %i = %lf\n", osc, value);
         sys.temporal.period_table[osc] = value;
         sys.temporal.osc_count[osc] = 0;
@@ -980,15 +995,15 @@ int init_temporal() {
     sys.temporal.prev_osc = 0; //
     sys.temporal.osc = 0; // oscillator states
     
-    return osc;
 }
 
 void update_temporal() {
-    uint64_t steps = 64;
+
+    datetime_literal(&sys.temporal.datetime);
 
     sys.temporal.prev_osc = sys.temporal.osc;
     double t = GetTime();
-    for (uint64_t osc = 0; osc < steps; osc++) {
+    for (uint64_t osc = 0; osc < TEMPORAL_ARRAY_SIZE; osc++) {
         if (t > sys.temporal.osc_next_frame[osc]) {
             while (1) {
                 sys.temporal.osc_next_frame[osc] += sys.temporal.period_table[osc];
@@ -1084,7 +1099,7 @@ typedef enum {
 #define GRFE_LNBLINK_BITS 29
 #define GRFE_BGBLINK_BITS 26
 #define GRFE_FGBLINK_BITS 23
-#define GET_FROM_STATE(state, mask, shift) ((state & mask) >> shift)
+#define GET_FROM_STATE(state, mask, shift) ((state & mask) >> shift) // shifting greater than 31 is invalid in the current march used...
 
 Rectangle get_tilezone_from_position(uint16_t asset_id, Vector2 position) {
     EX_tileset *tileset = &sys.asset.tileset[asset_id];
@@ -1100,8 +1115,8 @@ Rectangle get_tilezone_from_code(uint16_t asset_id, uint16_t code) {
     code -= sys.asset.tileset[asset_id].ascii_start;
     if (code > sys.asset.tileset[asset_id].total || code < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.x, tileset->tilesize.y};
 
-    float px = code % (int)tileset->count.x;
-    float py = (int)(code / (int)tileset->count.x);
+    float px = code % (uint32_t)tileset->count.x;
+    float py = (uint32_t)(code / (uint32_t)tileset->count.x);
     Vector2 *tilesize = &sys.asset.tileset[asset_id].tilesize;
     return (Rectangle) {px * tilesize->x, py * tilesize->y,  tilesize->x, tilesize->y};
 }
@@ -1188,11 +1203,11 @@ void set_page_default_asset(uint16_t pagegroup_id, uint16_t page_id, uint16_t as
     page->default_asset_id = asset_id;
 }
 
-uint16_t init_page(uint16_t pagegroup_id, uint16_t page_id, Vector2 size, uint64_t page_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
+uint16_t init_page(uint16_t pagegroup_id, uint16_t page_id, Vector2 tiles, uint64_t page_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
     EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint32_t cell_count = (uint16_t)size.x * (uint16_t)size.y;
-    page->size = size;
+    uint32_t cell_count = (uint16_t)tiles.x * (uint16_t)tiles.y;
+    page->size = tiles;
     page->state = page_state;
     set_page_default_palette(pagegroup_id, page_id, palette_id);
     set_page_default_asset(pagegroup_id, page_id, asset_id);
@@ -1201,13 +1216,14 @@ uint16_t init_page(uint16_t pagegroup_id, uint16_t page_id, Vector2 size, uint64
     page->offset = (Vector2) {0,0};
     page->scale = (Vector2) {1,1};
     page->angle = 0;
+    page->default_tilesize = get_tile_pixelsize(tiles, get_asset_pixelsize(asset_id));
     page->fg_brightness = 1.f;
     page->bg_brightness = 1.f;
     page->alpha = 255;
 
     EX_cell *cell = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
     for (uint32_t i = 0; i < cell_count; i++) {
-        init_cell_linear(&cell[i], cell_state, 0, 0);
+        init_cell_linear(&cell[i], cell_state, 0, 0); // this process is temporary, as the better alternative is to mass copy a template cell
     }
     return 1;
 }
@@ -1292,7 +1308,7 @@ void page_set_mouse_position(uint16_t pagegroup_id, uint16_t page_id, Vector2 ta
     uint16_t lsx = page->size.x, lsy = page->size.y;
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
-    page->mouse.offset = target;
+    page->mousecursor.offset = target;
 }
 
 void page_set_keyboard_position(uint16_t pagegroup_id, uint16_t page_id, Vector2 target) {
@@ -1300,7 +1316,7 @@ void page_set_keyboard_position(uint16_t pagegroup_id, uint16_t page_id, Vector2
     uint16_t lsx = page->size.x, lsy = page->size.y;
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
-    page->keyboard.offset = target;
+    page->keycursor.offset = target;
 }
 
 void set_cell_state(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint64_t state) {
@@ -1766,8 +1782,12 @@ void copy_cell_to_page(uint16_t source_pagegroup_id, uint16_t source_page_id, Re
     }
 }
 
-void render_page(uint16_t page_id) {
-    Color vertex_colors[4];
+void copy_page() {
+    // copy page routine, mostly used for backup restore of page content from / to a copy buffer
+}
+
+void render_page(uint16_t page_id, Vector2 rendersize) {
+    static Color vertex_colors[4];
     uint16_t pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
 
     EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
@@ -1780,33 +1800,18 @@ void render_page(uint16_t page_id) {
             cell_offset = lsx * y + x;
             EX_cell *c = &cell[cell_offset];
             uint64_t state = c->state;
-            uint16_t palette_id = c->palette_id;
-            if (!palette_id) palette_id = page->default_palette_id;
-            // for now only page alpha supported, per cell alpha will force to use float to combine page and cell alpha (potentially), or set the texture alpha as the page alpha
-            Color colorfg = get_palette_color_pro(palette_id, c->colorfg_id, page->alpha, c->fg_brightness * page->fg_brightness);
-            Color colorbg = get_palette_color_pro(palette_id, c->colorbg_id, page->alpha, c->bg_brightness * page->bg_brightness);
-            Color colorln = get_palette_color(palette_id, c->colorln_id);
+
+            // establish scaling on screen....  For a 512x224 display = 64x28 tiles of 8 x 8 pixels, for that we need a ratio for x and y
+            Vector2 tsize  = page->default_tilesize;
+            Vector2 tscaled = {c->scale.x * tsize.x, c->scale.y * tsize.y};
             Vector2 offset = c->offset;
-            Vector2 scale = c->scale;
-            Vector2 skew = c->skew;
-            float angle = c->angle;
-            if (!(state & GRFE_ROTATION)) angle = 0.f;
-            
-            // we have the cell data we can use it to draw our background, foreground and shadow
-            // calculate position x,y
-            // ascii code is in c.value
-            // reading color from palette get_palette_color(palette,id);
-            // background set color of corner to color of next tile 
-            //    GRFE_BGBLEND_LL       // background vertex color blend lower left
-            //    GRFE_BGBLEND_LR       // background vertex color blend lower right
-            //    GRFE_BGBLEND_UR       // background vertex color blend upper right
-            //    GRFE_BGBLEND_UL       // background vertex color blend upper left
-            // foreground set color of corner to color of next tile 
-            //    GRFE_FGBLEND_LL       // foreground vertex color blend lower left
-            //    GRFE_FGBLEND_LR       // foreground vertex color blend lower right
-            //    GRFE_FGBLEND_UR       // foreground vertex color blend upper right
-            //    GRFE_FGBLEND_UL       // foreground vertex color blend upper left
-/*  All STATES (exhaustive logic) and LINES (just a DrawTexture) to consider
+            Vector2 cellpos = {page->offset.x + offset.x + x * tsize.x, page->offset.y + offset.y + y * tsize.y};
+            Vector2 skew; if (!(state & GRFE_SKEW))     skew = (Vector2){0}; else skew = c->skew;
+
+            // if inbound proceed to draw cell tiles
+            if (((cellpos.x + tscaled.x + skew.x) >= 0) && ((cellpos.y + tscaled.y + skew.y) >= 0) && ((cellpos.x) <= rendersize.x) && ((cellpos.y) <= rendersize.y)) {
+
+/*  All STATES (exhaustive logic)
     // This is a different beast and not sure yet how to handle sequences
     GRFE_LINESSEQ            // turn on lines sequencing
     GRFE_COLORSEQ            // turn on color sequencing
@@ -1823,72 +1828,82 @@ void render_page(uint16_t page_id) {
     GRFE_WRAP_Y              // turn on wrap around on y axis
     GRFE_FLIPH               // flip cell(s) horizontally
     GRFE_FLIPV               // flip cell(s) vertically
-    // a simple & of each Color value with the flag @ true
-    GRFE_RED                 // turn on red channel
-    GRFE_GREEN               // turn on green channel
-    GRFE_BLUE                // turn on blue channel
-    GRFE_ALPHA               // turn on transparency
-
-    DrawTexturePro2(
-    );
 */
-            // to elaborate color blending between tiles... (will involve snooping all 4 directions for color depend on blending options)
+                uint16_t palette_id = c->palette_id;
+                if (!palette_id)    palette_id = page->default_palette_id;
+                // for now only page alpha supported, per cell alpha will force to use float to combine page and cell alpha (potentially), or set the texture alpha as the page alpha
+                Color colorfg = get_palette_color_pro(palette_id, c->colorfg_id, page->alpha, c->fg_brightness * page->fg_brightness);
+                Color colorbg = get_palette_color_pro(palette_id, c->colorbg_id, page->alpha, c->bg_brightness * page->bg_brightness);
+                Color colorln = get_palette_color(palette_id, c->colorln_id);
+ 
+                float angle; if (!(state & GRFE_ROTATION))  angle = 0.f; else  angle = c->angle;
 
-            // establish scaling on screen....  For a 512x224 display = 64x28 tiles of 8 x 8 pixels, for that we need a ratio for x and y
-            Vector2 ratio  = {8, 8};
-            Vector2 cellpos = {page->offset.x + offset.x + x * ratio.x, page->offset.y + offset.y + y * ratio.y};
-            if (state & GRFE_BACKGROUND) {
-                if (state & GRFE_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
-                if (state & GRFE_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
-                if (state & GRFE_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
-                if (state & GRFE_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
-                vertex_colors[1] = vertex_colors[0];
-                vertex_colors[2] = vertex_colors[0];
-                vertex_colors[3] = vertex_colors[0];
-                DrawRectanglePro2(
-                    (Rectangle) { cellpos.x, cellpos.y, scale.x, scale.y },
-                    (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
-            }
-            uint16_t asset_id = c->asset_id;
-            if (!asset_id) asset_id = page->default_asset_id;
-            if (state & GRFE_FOREGROUND) {
-                uint16_t value = c->value;
-                if (state & GRFE_SHADOW) {
-                    vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
-                    vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
-                    vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
-                    vertex_colors[3] = (Color) {0.f, 0.f, 0.f, 48.f};
+                if (state & GRFE_BACKGROUND) {
+                    // background set color of corner to color of next tile 
+                    //    GRFE_BGBLEND_LL       // background vertex color blend lower left
+                    //    GRFE_BGBLEND_LR       // background vertex color blend lower right
+                    //    GRFE_BGBLEND_UR       // background vertex color blend upper right
+                    //    GRFE_BGBLEND_UL       // background vertex color blend upper left
+                    // to elaborate color blending between tiles... (will involve snooping all 4 directions for color depend on blending options)
+                    if (state & GRFE_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
+                    if (state & GRFE_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
+                    if (state & GRFE_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
+                    if (state & GRFE_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
+                    vertex_colors[1] = vertex_colors[0]; //  for now just copy the color content to all corners... (TEMPORARY) *******************
+                    vertex_colors[2] = vertex_colors[0];
+                    vertex_colors[3] = vertex_colors[0];
+                    DrawRectanglePro2(
+                        (Rectangle) { cellpos.x, cellpos.y, tscaled.x, tscaled.y },
+                        (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
+                }
+                uint16_t asset_id = c->asset_id;
+                if (!asset_id) asset_id = page->default_asset_id;
+                if (state & GRFE_FOREGROUND) {
+                    uint16_t value = c->value;
+                    if (state & GRFE_SHADOW) {
+                        vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
+                        vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
+                        vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
+                        vertex_colors[3] = (Color) {0.f, 0.f, 0.f, 48.f};
+                        DrawTexturePro2(sys.asset.tex[asset_id],
+                            get_tilezone_from_code(asset_id, value),
+                            (Rectangle) { cellpos.x + shadow.x, cellpos.y + shadow.y, tscaled.x, tscaled.y },
+                            (Vector2) {0,0}, skew, angle, vertex_colors);
+                    };
+                    // we have the cell data we can use it to draw our background, foreground and shadow
+                    // reading color from palette get_palette_color(palette,id);
+                    // foreground set color of corner to color of next tile 
+                    //    GRFE_FGBLEND_LL       // foreground vertex color blend lower left
+                    //    GRFE_FGBLEND_LR       // foreground vertex color blend lower right
+                    //    GRFE_FGBLEND_UR       // foreground vertex color blend upper right
+                    //    GRFE_FGBLEND_UL       // foreground vertex color blend upper left
+                    if (state & GRFE_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
+                    if (state & GRFE_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
+                    if (state & GRFE_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
+                    if (state & GRFE_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
+                    vertex_colors[1] = vertex_colors[0];
+                    vertex_colors[2] = vertex_colors[0];
+                    vertex_colors[3] = vertex_colors[0];
                     DrawTexturePro2(sys.asset.tex[asset_id],
                         get_tilezone_from_code(asset_id, value),
-                        (Rectangle) { cellpos.x + shadow.x, cellpos.y + shadow.y, scale.x, scale.y },
+                        (Rectangle) { cellpos.x, cellpos.y , tscaled.x, tscaled.y },
                         (Vector2) {0,0}, skew, angle, vertex_colors);
-                };
-                if (state & GRFE_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
-                if (state & GRFE_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
-                if (state & GRFE_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
-                if (state & GRFE_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
-                vertex_colors[1] = vertex_colors[0];
-                vertex_colors[2] = vertex_colors[0];
-                vertex_colors[3] = vertex_colors[0];
-                DrawTexturePro2(sys.asset.tex[asset_id],
-                    get_tilezone_from_code(asset_id, value),
-                    (Rectangle) { cellpos.x, cellpos.y , scale.x, scale.y },
-                    (Vector2) {0,0}, skew, angle, vertex_colors);
-            }
+                }
 
-            uint8_t lines = GET_FROM_STATE(state, GRFE_LINES_MASK, GRFE_LINES_BITS);
-            if (lines) {
-                if (state & GRFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
-                if (state & GRFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
-                if (state & GRFE_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
-                if (state & GRFE_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
-                vertex_colors[1] = vertex_colors[0];
-                vertex_colors[2] = vertex_colors[0];
-                vertex_colors[3] = vertex_colors[0];
-                DrawTexturePro2(sys.asset.tex[sys.asset.lines_id],
-                    get_tilezone_from_code(sys.asset.lines_id, lines),
-                    (Rectangle) { cellpos.x, cellpos.y , scale.x, scale.y },
-                    (Vector2) {0,0}, skew, angle, vertex_colors);
+                uint8_t lines = GET_FROM_STATE(state, GRFE_LINES_MASK, GRFE_LINES_BITS);
+                if (lines) {
+                    if (state & GRFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
+                    if (state & GRFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
+                    if (state & GRFE_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
+                    if (state & GRFE_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
+                    vertex_colors[1] = vertex_colors[0];
+                    vertex_colors[2] = vertex_colors[0];
+                    vertex_colors[3] = vertex_colors[0];
+                    DrawTexturePro2(sys.asset.tex[sys.asset.lines_id],
+                        get_tilezone_from_code(sys.asset.lines_id, lines),
+                        (Rectangle) { cellpos.x, cellpos.y , tscaled.x, tscaled.y },
+                        (Vector2) {0,0}, skew, angle, vertex_colors);
+                }
             }
         }
     }
@@ -1897,35 +1912,29 @@ void render_page(uint16_t page_id) {
 //RLAPI Vector2 GetMousePosition(void);                         // Get mouse position XY
 }
 
+// does the execution of the modifiers
+void process_page(uint16_t page_id) {
+    // modifiers logic
+    // temporal considerations
+}
+
 void render_pagegroup() {
     uint16_t pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
     EX_pagegroup  *pagegroup  = &sys.video.pagegroup[pagegroup_id];
 
-//begin draw necessary here
-
+    begin_draw(true);
     for (uint16_t i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
-        render_page(i);
+        render_page(i, sys.video.virtual_res[sys.video.current_virtual]);
     }
     return 0;
-// end draw here
+    end_draw();
 }
 
-// does the execution of the modifiers
-void process_page(int page_id) {
-}
-
-void process_pagegroup(int pagegroup_id) {
+void process_pagegroup(uint16_t pagegroup_id) {
     uint16_t page_id = 0;
-    process_page(page_id);
-    render_page(page_id);
+    //process_pagegroup();
+    render_pagegroup();
 }
-
-void load_page() {
-}
-
-void save_page() {
-}
-
 
 
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** E N D
@@ -2031,9 +2040,9 @@ void update_assets(void) {
     }    
 }
 
-int load_asset (uint32_t assettype, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
+uint16_t load_asset (uint32_t assettype, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
     uint16_t id = sys.asset.total_assets;
-    debug_console_out("int load_asset", id);
+    debug_console_out("load_asset", id);
 
     BITS_INIT(sys.asset.state[id], ASSET_INITIALIZED | assettype);
 
@@ -2189,7 +2198,7 @@ int load_asset (uint32_t assettype, const char* fileName, const char* fileType, 
 }
 
 
-int load_palette(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
+uint16_t load_palette(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
     uint16_t asset_id = load_asset(ASSET_PALETTE, fileName, fileType, fileData, dataSize, pak);
     float width = (float)sys.asset.img[asset_id].width;
     float height = (float)sys.asset.img[asset_id].height;
@@ -2206,7 +2215,7 @@ int load_palette(Vector2 count, const char* fileName, const char* fileType, cons
 }
 
 
-int load_tileset(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t ascii_start) {
+uint16_t load_tileset(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t ascii_start) {
 
     uint16_t asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
     float width = (float)sys.asset.img[asset_id].width;
@@ -2397,9 +2406,9 @@ static int16_t add_track(uint16_t display, uint32_t state, const char* fileName,
     sys.audio.track[track_id].state = state;
     sys.audio.track[track_id].asset = load_asset(ASSET_XM, fileName, fileType, fileData, dataSize, pak);
     sys.audio.track[track_id].volume = 1.f;
-    //int asset = sys.audio.track[].asset_playing;
+    //uint16_t asset = sys.audio.track[].asset_playing;
 
-    //int total_orders = sizeof(orderlist[0]) / sizeof(int);
+    //uint16_t total_orders = sizeof(orderlist[0]) / sizeof(int);
     for (uint16_t i = 0; i < total_orders; i++) {
         sys.audio.track[track_id].order[i] = orderlist[i];
     }
@@ -3561,9 +3570,7 @@ void show_terminal(void) {
     // aimed at displaying the terminal pagegroup only
     flip_frame_buffer(TERMINALDISPLAY, false);
 
-    begin_draw(true);
-    render_page(sys.terminal.current_page_id);
-    end_draw();
+    render_pagegroup(sys.terminal.current_page_id); /////// ******************************************
 
     flip_frame_buffer(sys.video.previous_virtual, false);
 }
@@ -3612,7 +3619,7 @@ debug_display_option(bool bit, uint16_t x, uint16_t y, uint16_t size, const char
 void display_keybed(void)  {
     uint16_t keys_in_row = 24;
     for (uint16_t j = 0; j < 7; j++) {
-        for (int i = 0; i < keys_in_row; i++) {
+        for (uint16_t i = 0; i < keys_in_row; i++) {
             uint16_t key = (j * keys_in_row) + i;
             uint16_t code = kbmap_scancode[key];
             if (code) {
@@ -3708,7 +3715,7 @@ void update_debug(bool show_options) {
         if (IsKeyPressed(KEY_KP_5)) {ex_canopy.pal_idx_text -= 16; if(ex_canopy.pal_idx_text < 0) {ex_canopy.pal_idx_text +=256;};};
         if (IsKeyPressed(KEY_KP_6)) {ex_canopy.pal_idx_text += 16; if(ex_canopy.pal_idx_text > 255) {ex_canopy.pal_idx_text -=256;};};
 
-        DrawText(TextFormat("%s", time_stamp()), 1400, 0, 40, DARKGRAY);
+        DrawText(TextFormat("%s", sys.temporal.datetime), 1400, 0, 40, DARKGRAY);
         DrawText(TextFormat("FRAMES=%i", (uint32_t)sys.video.frames[sys.video.display_id]), 0, 0, 20, DARKGRAY);
         DrawText(TextFormat("prev_time = %f", (float)sys.video.prev_time[sys.video.display_id]), 0, 0, 40, DARKGRAY);
         DrawText(TextFormat("monitors = %i, current = %i, %s", (uint16_t)GetMonitorCount(), (uint16_t)sys.video.display_id, GetMonitorName(sys.video.display_id)), 0, 60, 20, DARKGRAY);
@@ -3723,13 +3730,16 @@ void update_debug(bool show_options) {
         DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 260, 20, DARKGRAY);
         DrawText(TextFormat("     cos = %f", cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 280, 20, DARKGRAY);
 
-        uint16_t ys = 20;
-        uint16_t y = sys.video.screen[sys.video.display_id].y - ys;
-        for (uint64_t i = 0; i < 64; i++) {
-            uint64_t bit = (sys.temporal.osc & (uint64_t)(1 <<i));
+        uint16_t s = 30;
+        uint16_t y = sys.video.screen[sys.video.display_id].y - s;
+        uint16_t x = TEMPORAL_ARRAY_SIZE * s;
+        uint64_t bit_tested = 1;
+        for (uint64_t i = 0; i < TEMPORAL_ARRAY_SIZE; i++) {
+            uint64_t bit = sys.temporal.osc & bit_tested;
             Color col;
             if (bit) col = GREEN; else col = ORANGE;
-            DrawRectangle(1280 - (i * ys), y, ys, ys, col);
+            DrawRectangle(x - (i * s), y, s, s, col);
+            bit_tested = bit_tested << 1;
         }
         show_options = false;
     }
@@ -3767,7 +3777,7 @@ void debug_console_out(const char* message, uint32_t status) {
     if (BITS_TEST(sys.program.pmsnstate, PMSN_TRACE)) {
         TRACELOG(LOG_INFO, "%s | %s | CTRL = 0x%000000008X | PMSN = 0x%000000008X | status = 0x%000000008X <<<<< %s",
         SOFTWARE,
-        time_stamp(),
+        sys.temporal.datetime,
         sys.program.ctrlstate,
         sys.program.pmsnstate,
         status,
@@ -4069,7 +4079,7 @@ void manage_program() {
 
 ////////////// ENTRY POINT FROM RUNTIME //////////////
 // Once runtime heads here --> stuck till CTRL_END
-int process_system(uint32_t ctrlstate, uint32_t pmsnstate, const char* name) {
+int16_t process_system(uint32_t ctrlstate, uint32_t pmsnstate, const char* name) {
     if (name > NULL) strcpy(sys.program.name, name); else strcpy(sys.program.name, "_o/");
     set_permission(pmsnstate);
     add_service(ctrlstate);
