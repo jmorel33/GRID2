@@ -611,9 +611,10 @@ typedef struct EX_canvas {
 } EX_canvas;
 
 typedef enum {
-    PGGP_DELETE              = 0b10000000000000000000000000000000,
-    PGGP_UPDATE              = 0b01000000000000000000000000000000,
-    PGGP_INITIALIZED         = 0b00000000000000000000000000000001,
+    CVGP_DELETE              = 0b10000000000000000000000000000000,
+    CVGP_UPDATE              = 0b01000000000000000000000000000000,
+    CVGP_INITIALIZED         = 0b00000000000000000000000000000001,
+// to be determined
 } canvasgroup_states;
 
 typedef struct EX_canvasgroup {
@@ -629,8 +630,8 @@ typedef struct EX_canvasgroup {
 } EX_canvasgroup;
 
 // **************************************************************************************** A S S E T   S T R U C T U R E S
-#define MAXASSETS 1024
-#define MAXPALETTECOLORS 4096
+#define MAXASSETS           1024
+#define MAXPALETTECOLORS    4096
 
 typedef struct EX_tileset {
     Vector2     tilesize;                   // Tile size
@@ -646,10 +647,9 @@ typedef struct EX_asset {
     uint16_t    lines_id;
     uint16_t    basefont_id;
 
-    uint32_t    dead_assets[MAXASSETS];
-
-    uint32_t    asset_type[MAXASSETS];
     uint32_t    state[MAXASSETS];
+    uint32_t    dead_assets[MAXASSETS];
+    uint32_t    asset_type[MAXASSETS];
     uint32_t    data_size[MAXASSETS];       // storage space size in bytes
 
     Image       img[MAXASSETS];             // storage space for unpacked images
@@ -666,8 +666,8 @@ typedef struct EX_asset {
 
 // **************************************************************************************** A U D I O   S T R U C T U R E S
 
-#define MAXAUDIOTRACKS 10
-#define MAXORDERS 50
+#define MAXAUDIOTRACKS  10
+#define MAXORDERS       50
 
 typedef struct EX_track {
     bool        is_playing;
@@ -690,12 +690,12 @@ typedef struct  EX_audio {
 
 // **************************************************************************************** V I D E O   S T R U C T U R E S
 
-#define MAXDISPLAYS 5
-#define PRIMARYDISPLAY 0
-#define MENUDISPLAY 1
-#define INGAMEDISPLAY 2
-#define UNFOCUSEDDISPLAY 3
-#define TERMINALDISPLAY 4
+#define MAXDISPLAYS         5
+#define PRIMARYDISPLAY      0
+#define MENUDISPLAY         1
+#define INGAMEDISPLAY       2
+#define UNFOCUSEDDISPLAY    3
+#define TERMINALDISPLAY     4
 
 typedef struct EX_video {
     //uint32_t state;
@@ -730,18 +730,21 @@ typedef struct EX_video {
 
 // **************************************************************************************** T E R M I N A L   S T R U C T U R E S
 
-#define IOBUFFERSIZE 8192
-#define TERM_TOTALPAGES  8
+#define IOBUFFERSIZE    8192
+#define TERM_MAXPAGES   8
+#define TERM_MAXFONTS   8
 
 typedef struct EX_page {
     uint32_t    state;
     Vector2     cursor_position;
+    uint16_t    default_font;
+    uint16_t    current_font;
     uint16_t    text_blink_rate;
     uint16_t    margin_left;
     uint16_t    margin_right;
     uint16_t    margin_top;
     uint16_t    margin_bottom;
-    Vector2     page_split;
+    Vector2     page_split;     // Horizontal and vertical page split position (usually center)
 } EX_page;
 
 typedef struct EX_terminal {
@@ -754,7 +757,9 @@ typedef struct EX_terminal {
     uint8_t     output_buffer[IOBUFFERSIZE];
     uint32_t    input_buffer_pos;
     uint32_t    output_buffer_pos;
-    EX_page     page[TERM_TOTALPAGES];
+    EX_page     page[TERM_MAXPAGES];
+    uint16_t    font_id[TERM_MAXFONTS];
+    uint16_t    fonts;
 } EX_terminal;
 
 
@@ -775,12 +780,12 @@ typedef struct EX_temporal {
 } EX_temporal;
 
 typedef struct EX_player {
-
+// to be determined
 } EX_player;
 
 typedef struct EX_game {
     EX_player player;
-
+// to be determined
 } EX_game;
 
 typedef enum {
@@ -933,8 +938,9 @@ typedef struct EX_system {
     EX_video        video;
     EX_program      program;
 } EX_system;
-
-EX_system sys;
+                // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
+EX_system sys;  // / / > > > > >   G l o b a l   W o r k i n g   S t o r a g e   < < < < < / / //
+                // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
 
 void set_permission(uint32_t state)     {BITS_ON(sys.program.pmsnstate, state);}
 void unset_permission(uint32_t state)   {BITS_OFF(sys.program.pmsnstate, state);}
@@ -1116,11 +1122,11 @@ typedef enum {
     CVFE_DEFAULT4           = 0b0000000000000000000000000000000000000000000000000100000011110101  // DEFAULT STATE :TERMINAL DISPLAY
 } canvas_features;
 
-#define CVFE_LINES_BITS 56
-#define CVFE_LNBLINK_BITS 29
-#define CVFE_BGBLINK_BITS 26
-#define CVFE_FGBLINK_BITS 23
-#define GET_FROM_STATE(state, mask, shift) ((state & mask) >> shift) // shifting greater than 31 is invalid in the current march used...
+#define CVFE_LINES_BITS     56
+#define CVFE_LNBLINK_BITS   29
+#define CVFE_BGBLINK_BITS   26
+#define CVFE_FGBLINK_BITS   23
+#define GET_FROM_STATE(state, mask, shift) ((state & mask) >> shift) // shifting greater than 31 is invalid in non 64bit -march...
 
 Rectangle get_tilezone_from_position(uint16_t asset_id, Vector2 position) {
     EX_tileset *tileset = &sys.asset.tileset[asset_id];
@@ -1201,6 +1207,16 @@ void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vecto
     }
 }
 
+static void plot_cell(uint16_t canvasgroup_id, uint16_t canvas_id, EX_cell* cell, Vector2 target) {
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    if (target.x >= lsx || target.y >= lsy || target.x < 0 || target.y < 0) return;
+
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
+    uint16_t linear_offset = lsx * target.y + target.x;
+    target_cell[linear_offset] = *cell;
+}
+
 bool init_cell_linear(EX_cell *cell, uint64_t cell_state, uint32_t color_id, uint32_t colorbg_id) {
     cell->state = cell_state;
     cell->value = 0;
@@ -1246,7 +1262,7 @@ uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 tiles,
 
     EX_cell *cell = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint32_t i = 0; i < cell_count; i++) {
-        init_cell_linear(&cell[i], cell_state, 0, 0); // this process is temporary, as the better alternative is to mass copy a template cell
+        init_cell_linear(&cell[i], cell_state, 0, 0); // this process is temporary, as the faster alternative is to mass copy a template cell
     }
     return 1;
 }
@@ -1941,7 +1957,7 @@ void process_canvas(uint16_t canvas_id) {
     // temporal considerations
 }
 
-void render_canvasgroup() {
+void render_canvasgroup(void) {
     uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
     EX_canvasgroup  *canvasgroup  = &sys.video.canvasgroup[canvasgroup_id];
 
@@ -2685,19 +2701,19 @@ void deinit_display(void) {
 // ********** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** B E G I N
 
 typedef enum {
-    PARTICLE_RESERVED       = 0b10000000000000000000000000000000, //
-    PARTICLE_ROTATION       = 0b00000000001000000000000000000000, // turn on rotation
-    PARTICLE_SCALE          = 0b00000000000100000000000000000000, // turn on scaling
-    PARTICLE_R              = 0b00000000000000010000000000000000, // turn on red channel
-    PARTICLE_G              = 0b00000000000000001000000000000000, // turn on green channel
-    PARTICLE_B              = 0b00000000000000000100000000000000, // turn on blue channel
-    PARTICLE_A              = 0b00000000000000000010000000000000, // turn on alpha channel
-    PARTICLE_STAY           = 0b00000000000000000000001000000000, // does not move using speedX, speedY
-    PARTICLE_HIDE           = 0b00000000000000000000000010000000, // does not display
-    PARTICLE_FREEZE         = 0b00000000000000000000000000100000, // does not move at all or animate, speedX, speedY, xsin, ysin
-    PARTICLE_DYING          = 0b00000000000000000000000000001000, // expiration sequence
-    PARTICLE_EXPIRED        = 0b00000000000000000000000000000010, // decomissionned
-    PARTICLE_ACTIVE         = 0b00000000000000000000000000000001
+    PTFE_RESERVED       = 0b10000000000000000000000000000000, //
+    PTFE_ROTATION       = 0b00000000001000000000000000000000, // turn on rotation
+    PTFE_SCALE          = 0b00000000000100000000000000000000, // turn on scaling
+    PTFE_R              = 0b00000000000000010000000000000000, // turn on red channel
+    PTFE_G              = 0b00000000000000001000000000000000, // turn on green channel
+    PTFE_B              = 0b00000000000000000100000000000000, // turn on blue channel
+    PTFE_A              = 0b00000000000000000010000000000000, // turn on alpha channel
+    PTFE_STAY           = 0b00000000000000000000001000000000, // does not move using speedX, speedY
+    PTFE_HIDE           = 0b00000000000000000000000010000000, // does not display
+    PTFE_FREEZE         = 0b00000000000000000000000000100000, // does not move at all or animate, speedX, speedY, xsin, ysin
+    PTFE_DYING          = 0b00000000000000000000000000001000, // expiration sequence
+    PTFE_EXPIRED        = 0b00000000000000000000000000000010, // decomissionned
+    PTFE_ACTIVE         = 0b00000000000000000000000000000001
 } particle_features;
 
 #define MAXPARTICLES 65536
@@ -3604,19 +3620,73 @@ typedef enum {
 static void init_page(uint16_t page_id, Vector2 size) {
     EX_page *page = &sys.terminal.page[page_id];
     page->state             = TCAPS_DEFAULT_MASK;
+    page->default_font      = 0;
+    page->current_font      = page->default_font;
     page->text_blink_rate   = 0;
     page->margin_left       = 0;
     page->margin_right      = size.x - 1;
     page->margin_top        = 0;
     page->margin_bottom     = size.y - 1;
-    page->page_split        = {0,0};
-    page->cursor_position   = {0,0};
+    page->cursor_position   = (Vector2){page->margin_left, page->margin_top};
+    page->page_split        = (Vector2){0,0};
 
-    // set default font, background color, text color 
+    // background color, text color 
 }
 
-static void write_to_page() {
+static bool write_to_cell(uint8_t value) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    //    sys.terminal.canvasgroup_id
+    // pass on all graphics rendition to the cell template
+    EX_cell cell;
+    cell.asset_id = page->current_font;
+    cell.value = value;
+    cell.state = 0x0000000000000000;
+    // in reserse attribute, the colors are swapped between fg and bg
+    cell.colorfg_id = 0;
+    cell.colorbg_id = 0;
+//    state |= 0; // assign corresponding lines based on some states (underline, strikeout, box, ...)
+/*
+    state |= CVFE_LINE_TOP           // turn on line top
+    state |= CVFE_LINE_BOT           // turn on line bottom
+    state |= CVFE_LINE_LEF           // turn on line left
+    state |= CVFE_LINE_RIG           // turn on line right
+    state |= CVFE_LINE_HOR           // turn on line center horizontal
+    state |= CVFE_LINE_VER           // turn on line center vertical
+*/
+    cell.skew = (Vector2) {0,0};     // determine with italic flag
+    cell.offset = (Vector2){0,0};    // set offset for superscript or subscript
+    plot_cell(TERMINALDISPLAY, page_id, &cell, page->cursor_position);
+    return true; // mostly if writing to the cell worked
+}
 
+static void write_char_to_page(uint8_t value) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    uint64_t state;
+    Vector2 position = page->cursor_position;
+    bool status = write_to_cell(value);
+    // if the status did not return ok, then react accordingly
+    // then move cursor + 1 (to left or right)
+    // check for borders, protected cell, move to new line (check borders)
+}
+
+static void write_string_to_page(uint8_t* s, uint16_t length) {
+    for (uint16_t i=0; i < length; ++i) {
+        uint8_t value = s[i];
+        write_char_to_page(value);
+    }
+}
+
+static void set_terminal_fonts(void) {
+    uint16_t tfont = 0;
+    sys.terminal.fonts = 0;
+    for (uint16_t i = 0; i < MAXASSETS; ++i) {
+        if (sys.asset.state[i] & ASSET_FONT) {
+            sys.terminal.font_id[tfont] = i;
+            ++sys.terminal.fonts;
+            ++tfont; if (tfont > TERM_MAXFONTS) break;
+        }
+    }    
 }
 
 static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
@@ -3624,16 +3694,17 @@ static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     flip_frame_buffer(TERMINALDISPLAY, false);
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
     uint16_t display = sys.video.current_virtual;
+    set_terminal_fonts();
     uint32_t canvasgroup_state = 0;
     uint64_t canvas_state = CVFE_DEFAULT4;
     uint64_t cell_state = CVFE_DEFAULT4;
     sys.terminal.canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
 
     Vector2 size = {64,28};
-    for (page_id = 0, page_id < TERM_TOTALPAGES; ++page_id) {
+    for (uint16_t page_id = 0; page_id < TERM_MAXPAGES; ++page_id) {
         init_page(page_id, size);
     }
-    status = init_canvasgroup(sys.terminal.canvasgroup_id, size, TERM_TOTALPAGES, canvasgroup_state, canvas_state, cell_state, tileset_id, palette_id);
+    status = init_canvasgroup(sys.terminal.canvasgroup_id, size, TERM_MAXPAGES, canvasgroup_state, canvas_state, cell_state, tileset_id, palette_id);
     sys.terminal.current_page_id = 0;
     flip_frame_buffer(sys.video.previous_virtual, false);
     return status;
@@ -3657,8 +3728,9 @@ void show_terminal(void) {
     // aimed at displaying the terminal canvasgroup only
     flip_frame_buffer(TERMINALDISPLAY, false);
 
-    render_canvasgroup(sys.terminal.current_page_id); /////// ******************************************
-
+    begin_draw(true);
+    render_canvas(sys.terminal.current_page_id, get_current_virtual_size());
+    end_draw();
     flip_frame_buffer(sys.video.previous_virtual, false);
 }
 
@@ -3698,8 +3770,12 @@ void debug_controls_flip()      {debug.controls = !debug.controls;}
 void debug_fps_flip()           {debug.fps = !debug.fps;}
 //void debug_trace_flip()         {debug.trace = !debug.trace;}
 
-debug_display_option(bool bit, uint16_t x, uint16_t y, uint16_t size, const char* text) {
-    if (bit) { DrawRectangle(x, y, size * 12, size, RED); } else { DrawRectangle(x, y, size * 12, size, GREEN); }
+void debug_display_option(bool bit, uint16_t x, uint16_t y, uint16_t size, const char* text) {
+    if (bit) {
+        DrawRectangle(x, y, size * 12, size, RED);
+    } else {
+        DrawRectangle(x, y, size * 12, size, GREEN);
+    }
     DrawText(TextFormat("%s %s", text, BIT_LITERAL_ON_OFF(bit)), x, y, size, WHITE);
 }
 
