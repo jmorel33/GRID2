@@ -371,7 +371,6 @@ void datetime_literal(char *datetime) {
     struct tm *tm;
     tm = localtime(&ltime);
     sprintf(datetime,"%04d/%02d/%02d-%02d:%02d:%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
-//    return datetime;
 }
 
 // to be determined (need this to replace the RayLib basic Vector structs)
@@ -544,129 +543,125 @@ Color get_pixel_color(Image *image, Vector2 position) {
 //    return (Color){r, g, b, a};
 }
 
-Vector2 get_tile_pixelsize(Vector2 tiles, Vector2 tileset_size) {
-    return (Vector2){tileset_size.x/tiles.x, tileset_size.y/tiles.y};
-}
-
 // **************************************************************************************** G R I D   S T R U C T U R E S
-#define NAMELENGTH_MAX      80
-#define GRID_MAX_CELLS      65536
-#define GRID_MAX_PAGEGROUPS 5
-#define GRID_MAX_PAGES      16
-#define PAGE_MAX_PALETTES   8
-#define PAGE_MAX_ASSETS     8
+#define NAMELENGTH_MAX          80
+#define GRID_MAX_CELLS          65536
+#define GRID_MAX_CANVASGROUPS   5
+#define GRID_MAX_CANVASES       16
+#define CANVAS_MAX_PALETTES     8
+#define CANVAS_MAX_ASSETS       8
 
 
 typedef struct EX_cell {
-    uint64_t state;                             // all flags for cell
-    uint16_t value;                             // value of cell
-    uint8_t lines;                              // lines feature
-    uint16_t asset_id;                          // Each cell can point to a different tileset
-    uint16_t cycle_id;                          // cell animation sequence number
-    uint16_t palette_id;                        // color palette used for whole page
-    uint16_t colorfg_id;                        // palette index color for cell
-    uint16_t colorfg_cycle_id;                  // color cycle index for cell
-    uint16_t colorbg_id;                        // palette index color for cell background
-    uint16_t colorbg_cycle_id;                  // color cycle index for cell background
-    uint16_t colorln_id;                        // palette index color for cell lines
-    uint16_t colorln_cycle_id;                  // color cycle index for cell lines
-    Vector2 offset;                             // displacement from top left (x,y)
-    Vector2 skew;                               // horizontal and vertical skew
-    Vector2 scale;                              // (x,y) cell scale
-    Vector2 scale_speed;                        // (x,y) cell scale speed
-    Vector2 scroll_speed;                       // (x,y) cell scroll speed
-    float angle;                                // degree of angle used to rotate the cell
-    float fg_brightness;                        // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
-    float bg_brightness;                        // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    uint8_t alpha;                              // transparency
-    Color color_mask;                           // RGBA color mask of cell
-    Color shadow_mask;                          // shadow RGBA mask
+    uint64_t    state;                      // all flags for cell
+    uint16_t    value;                      // value of cell
+    uint8_t     lines;                      // lines feature
+    uint16_t    asset_id;                   // Each cell can point to a different tileset
+    uint16_t    cycle_id;                   // cell animation sequence number
+    uint16_t    palette_id;                 // color palette used for whole canvas
+    uint16_t    colorfg_id;                 // palette index color for cell
+    uint16_t    colorfg_cycle_id;           // color cycle index for cell
+    uint16_t    colorbg_id;                 // palette index color for cell background
+    uint16_t    colorbg_cycle_id;           // color cycle index for cell background
+    uint16_t    colorln_id;                 // palette index color for cell lines
+    uint16_t    colorln_cycle_id;           // color cycle index for cell lines
+    Vector2     offset;                     // displacement from top left (x,y)
+    Vector2     skew;                       // horizontal and vertical skew
+    Vector2     scale;                      // (x,y) cell scale
+    Vector2     scale_speed;                // (x,y) cell scale speed
+    Vector2     scroll_speed;               // (x,y) cell scroll speed
+    float       angle;                      // degree of angle used to rotate the cell
+    float       fg_brightness;              // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+    float       bg_brightness;              // background brightness (values 0...1 divides, values 1 to 255 multiply)
+    uint8_t     alpha;                      // transparency
+    Color       color_mask;                 // RGBA color mask of cell
+    Color       shadow_mask;                // shadow RGBA mask
 } EX_cell;
 
-typedef struct EX_page {
-    char name[NAMELENGTH_MAX + 1];
-    uint64_t state;                             // all flags for grid
-    uint16_t asset_id[PAGE_MAX_ASSETS];         // tilset used for this page
-    uint16_t default_asset_id;
-    Vector2 size;                               // total cells x and y
-    Vector2 default_tilesize;
-    uint16_t palette_id[PAGE_MAX_PALETTES];     // color palette used for whole page
-    uint16_t default_palette_id;                // color palette used for whole page
-    uint16_t default_colorfg_id;                // palette index color for cell
-    uint16_t default_colorbg_id;                // palette index color for cell background
-    uint16_t default_colorln_id;                // palette index color for cell lines
-    Vector2 offset;                             // displacement from top left (x,y)
-    Vector2 displace[4];                        // cell corner displacement (x,y)
-    Vector2 scale;                              // (x,y) cell scale
-    Vector2 scale_speed;                        // (x,y) cell scale speed
-    Vector2 scroll_speed;                       // page scroll speed (x,y)
-    float angle;                                // degree of angle to rotate page
-    float fg_brightness;                        // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
-    float bg_brightness;                        // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    uint8_t alpha;                              // transparency
-    Vector2 shadow;                             // shadow corner displacement (x,y)
-    Vector2 shadow_displace[4];                 // shadow corners displacement (x,y)
-    Color   color_mask;                         // RGBA color mask of page
-    Color   shadow_mask;                        // shadow RGBA mask
-    EX_cell mousecursor;                        // mouse cursor
-    EX_cell keycursor;                          // key cursor
-    EX_cell mask;                               // used for when replicating
-    uint32_t cell_count;
-    EX_cell* cell;                              // could be NULL
-} EX_page;
+typedef struct EX_canvas {
+    char        name[NAMELENGTH_MAX + 1];
+    uint64_t    state;                      // all flags for grid
+    uint16_t    asset_id[CANVAS_MAX_ASSETS];// tilset used for this canvas
+    uint16_t    default_asset_id;
+    Vector2     size;                       // total cells x and y
+    Vector2     default_tilesize;
+    uint16_t    palette_id[CANVAS_MAX_PALETTES];     // color palette used for whole canvas
+    uint16_t    default_palette_id;         // color palette used for whole canvas
+    uint16_t    default_colorfg_id;         // palette index color for cell
+    uint16_t    default_colorbg_id;         // palette index color for cell background
+    uint16_t    default_colorln_id;         // palette index color for cell lines
+    Vector2     offset;                     // displacement from top left (x,y)
+    Vector2     displace[4];                // cell corner displacement (x,y)
+    Vector2     scale;                      // (x,y) cell scale
+    Vector2     scale_speed;                // (x,y) cell scale speed
+    Vector2     scroll_speed;               // canvas scroll speed (x,y)
+    float       angle;                      // degree of angle to rotate canvas
+    float       fg_brightness;              // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+    float       bg_brightness;              // background brightness (values 0...1 divides, values 1 to 255 multiply)
+    uint8_t     alpha;                      // transparency
+    Vector2     shadow;                     // shadow corner displacement (x,y)
+    Vector2     shadow_displace[4];         // shadow corners displacement (x,y)
+    Color       color_mask;                 // RGBA color mask of canvas
+    Color       shadow_mask;                // shadow RGBA mask
+    EX_cell     mousecursor;                // mouse cursor
+    EX_cell     keycursor;                  // key cursor
+    EX_cell     mask;                       // used for when replicating
+    uint32_t    cell_count;
+    EX_cell*    cell;                       // could be NULL
+} EX_canvas;
 
 typedef enum {
     PGGP_DELETE              = 0b10000000000000000000000000000000,
     PGGP_UPDATE              = 0b01000000000000000000000000000000,
     PGGP_INITIALIZED         = 0b00000000000000000000000000000001,
-} pagegroup_states;
+} canvasgroup_states;
 
-typedef struct EX_pagegroup {
-    char name[NAMELENGTH_MAX + 1];
-    uint32_t state;
-    uint16_t page_count;                            // total number of pages
-    uint16_t default_asset_id;
-    uint16_t default_palette_id;          // color palette used for whole page
-    uint16_t default_colorfg_id;          // palette index color for cell
-    uint16_t default_colorbg_id;          // palette index color for cell background
-    uint16_t default_colorln_id;          // palette index color for cell lines
-    EX_page* page;                             // could be NULL (if not initialized)
-} EX_pagegroup;
+typedef struct EX_canvasgroup {
+    char        name[NAMELENGTH_MAX + 1];
+    uint32_t    state;
+    uint16_t    canvas_count;               // total number of canvases
+    uint16_t    default_asset_id;
+    uint16_t    default_palette_id;         // color palette used for whole canvas
+    uint16_t    default_colorfg_id;         // palette index color for cell
+    uint16_t    default_colorbg_id;         // palette index color for cell background
+    uint16_t    default_colorln_id;         // palette index color for cell lines
+    EX_canvas* canvas;                      // could be NULL (if not initialized)
+} EX_canvasgroup;
 
 // **************************************************************************************** A S S E T   S T R U C T U R E S
 #define MAXASSETS 1024
 #define MAXPALETTECOLORS 4096
 
 typedef struct EX_tileset {
-    Vector2 tilesize;                           // Tile size
-    Vector2 count;                              // number of tiles (x, y)
-    Texture tex;                                // Characters texture atlas
-    uint32_t total;                         // Number of Tiles
-    uint16_t ascii_start;                            // if tileset if character font, identifies ascii code first tile
+    Vector2     tilesize;                   // Tile size
+    Vector2     count;                      // number of tiles (x, y)
+    Texture     tex;                        // Characters texture atlas
+    uint32_t    total;                      // Number of Tiles
+    uint16_t    ascii_start;                // if tileset if character font, identifies ascii code first tile
 } EX_tileset;
 
 typedef struct EX_asset {
-    char name[NAMELENGTH_MAX + 1];
-    uint32_t total_assets;
-    uint16_t lines_id;
-    uint16_t basefont_id;
+    char        name[NAMELENGTH_MAX + 1];
+    uint32_t    total_assets;
+    uint16_t    lines_id;
+    uint16_t    basefont_id;
 
-    uint32_t dead_assets[MAXASSETS];
+    uint32_t    dead_assets[MAXASSETS];
 
-    uint32_t asset_type[MAXASSETS];
-    uint32_t state[MAXASSETS];
-    uint32_t data_size[MAXASSETS];                   // storage space size in bytes
+    uint32_t    asset_type[MAXASSETS];
+    uint32_t    state[MAXASSETS];
+    uint32_t    data_size[MAXASSETS];       // storage space size in bytes
 
-    Image img[MAXASSETS];                       // storage space for unpacked images
-    Texture tex[MAXASSETS];                     // storage space for textures
-    Color *palette[MAXASSETS];                  // storage space for indexed colors
-    uint32_t palette_colors[MAXASSETS];     // total number of colors in palette
-    EX_tileset tileset[MAXASSETS];              // storage space for texture based fonts
-    RenderTexture framebuffer[MAXASSETS];       // storage space for frame buffer
-    Font font[MAXASSETS];                       // storage space for texture based fonts
-    Music music[MAXASSETS];                     // storage space for unpacked music
-    Shader shader[MAXASSETS];                   // storage space for shaders
-    uint8_t *data[MAXASSETS];             // storage space for any text, data, JSON, LUA ...
+    Image       img[MAXASSETS];             // storage space for unpacked images
+    Texture     tex[MAXASSETS];             // storage space for textures
+    Color       *palette[MAXASSETS];        // storage space for indexed colors
+    uint32_t    palette_colors[MAXASSETS];  // total number of colors in palette
+    EX_tileset  tileset[MAXASSETS];         // storage space for texture based fonts
+    RenderTexture framebuffer[MAXASSETS];   // storage space for frame buffer
+    Font        font[MAXASSETS];            // storage space for texture based fonts
+    Music       music[MAXASSETS];           // storage space for unpacked music
+    Shader      shader[MAXASSETS];          // storage space for shaders
+    uint8_t     *data[MAXASSETS];           // storage space for any text, data, JSON, LUA ...
 } EX_asset;
 
 // **************************************************************************************** A U D I O   S T R U C T U R E S
@@ -675,22 +670,22 @@ typedef struct EX_asset {
 #define MAXORDERS 50
 
 typedef struct EX_track {
-    bool is_playing;
-    uint32_t state;
-    uint16_t asset;
-    uint16_t virtual_display;
-    float volume;
-    float dest_volume; // TO DO
-    float slide_speed; // TO DO
-    uint16_t order_playing;
-    uint16_t total_orders;
-    uint16_t order[MAXORDERS];
+    bool        is_playing;
+    uint32_t    state;
+    uint16_t    asset;
+    uint16_t    virtual_display;
+    float       volume;
+    float       dest_volume; // TO DO
+    float       slide_speed; // TO DO
+    uint16_t    order_playing;
+    uint16_t    total_orders;
+    uint16_t    order[MAXORDERS];
 } EX_track;
 
-typedef struct EX_audio {
-    uint16_t total_tracks;
-    float global_volume;
-    EX_track track[MAXAUDIOTRACKS];
+typedef struct  EX_audio {
+    uint16_t    total_tracks;
+    float       global_volume;
+    EX_track    track[MAXAUDIOTRACKS];
 } EX_audio;
 
 // **************************************************************************************** V I D E O   S T R U C T U R E S
@@ -704,52 +699,62 @@ typedef struct EX_audio {
 
 typedef struct EX_video {
     //uint32_t state;
-    uint32_t state[MAXDISPLAYS];            // virtual display state
-    Vector2 screen[MAXDISPLAYS];                // Windows Display Resolution (x, y)
-    uint32_t screen_rate[MAXDISPLAYS];               // screen refresh rate
-    uint32_t fps[MAXDISPLAYS];                       // frames per second
-    uint32_t frames[MAXDISPLAYS];                    // number of game frame elasped since initialisation
-    double prev_time[MAXDISPLAYS];              // keep track of time to grab delta
-    double elapsed_time_nofocus[MAXDISPLAYS];   // elapsed time since nofocus
-    double elapsed_time[MAXDISPLAYS];           // elapsed time in milliseconds since last frame refresh
-    float elapsed_time_var[MAXDISPLAYS];        // elapsed time in milliseconds since last frame refresh (with ratio)
-    float elapsed_time_var_ratio[MAXDISPLAYS];  // multiplication factor
-    float value_anim[MAXDISPLAYS];              // space for animated controls (to be elaborated)
-    float frame_time[MAXDISPLAYS];
-    float frame_time_inc[MAXDISPLAYS];
-    Vector2 virtual_res[MAXDISPLAYS];           // framebuffer resolution (x, y)
-    uint16_t virtual_asset[MAXDISPLAYS];             // framebuffer asset number
+    uint32_t    state[MAXDISPLAYS];                     // virtual display state
+    Vector2     screen[MAXDISPLAYS];                    // Windows Display Resolution (x, y)
+    uint32_t    screen_rate[MAXDISPLAYS];               // screen refresh rate
+    uint32_t    fps[MAXDISPLAYS];                       // frames per second
+    uint32_t    frames[MAXDISPLAYS];                    // number of game frame elasped since initialisation
+    double      prev_time[MAXDISPLAYS];                 // keep track of time to grab delta
+    double      elapsed_time_nofocus[MAXDISPLAYS];      // elapsed time since nofocus
+    double      elapsed_time[MAXDISPLAYS];              // elapsed time in milliseconds since last frame refresh
+    float       elapsed_time_var[MAXDISPLAYS];          // elapsed time in milliseconds since last frame refresh (with ratio)
+    float       elapsed_time_var_ratio[MAXDISPLAYS];    // multiplication factor
+    float       value_anim[MAXDISPLAYS];                // space for animated controls (to be elaborated)
+    float       frame_time[MAXDISPLAYS];
+    float       frame_time_inc[MAXDISPLAYS];
+    Vector2     virtual_res[MAXDISPLAYS];               // framebuffer resolution (x, y)
+    uint16_t    virtual_asset[MAXDISPLAYS];             // framebuffer asset number
 
-    EX_pagegroup pagegroup[MAXDISPLAYS];        // pagegroup data
+    EX_canvasgroup canvasgroup[MAXDISPLAYS];            // canvasgroup data
 
-    uint32_t windowstate_normal;            // screen window state in normal mode
-    uint32_t windowstate_paused;            // screen window state when game is paused
-    uint16_t display_id;                             // screen currently used
-    bool screen_refresh;
-    uint16_t current_virtual;                        // virtual display currently used
-    uint16_t previous_virtual;                       // virtual display previously used
+    uint32_t    windowstate_normal;                     // screen window state in normal mode
+    uint32_t    windowstate_paused;                     // screen window state when game is paused
+    uint16_t    display_id;                             // screen currently used
+    bool        screen_refresh;
+    uint16_t    current_virtual;                        // virtual display currently used
+    uint16_t    previous_virtual;                       // virtual display previously used
 
-    bool window_focus;                          // last state of window focus (true = in applicatioo, false = outside of application)
+    bool        window_focus;                           // last state of window focus (true = in applicatioo, false = outside of application)
 } EX_video;
 
 
 // **************************************************************************************** T E R M I N A L   S T R U C T U R E S
 
 #define IOBUFFERSIZE 8192
+#define TERM_TOTALPAGES  8
+
+typedef struct EX_page {
+    uint32_t    state;
+    Vector2     cursor_position;
+    uint16_t    text_blink_rate;
+    uint16_t    margin_left;
+    uint16_t    margin_right;
+    uint16_t    margin_top;
+    uint16_t    margin_bottom;
+    Vector2     page_split;
+} EX_page;
 
 typedef struct EX_terminal {
-    uint32_t state;
-    uint16_t asset_id;
-    uint16_t pagegroup_id; // Where all terminal pages reside
-    uint16_t current_page_id;
-    uint16_t previous_page_id;
-    Vector2 last_mouse_poll;
-    Vector2 last_cursor_poll;
-    uint8_t input_buffer[IOBUFFERSIZE];
-    uint8_t output_buffer[IOBUFFERSIZE];
-    uint32_t input_buffer_pos;
-    uint32_t output_buffer_pos;
-    
+    uint32_t    state;
+    uint16_t    asset_id;
+    uint16_t    canvasgroup_id; // Where all terminal canvases reside
+    uint16_t    current_page_id;
+    uint16_t    previous_page_id;
+    uint8_t     input_buffer[IOBUFFERSIZE];
+    uint8_t     output_buffer[IOBUFFERSIZE];
+    uint32_t    input_buffer_pos;
+    uint32_t    output_buffer_pos;
+    EX_page     page[TERM_TOTALPAGES];
 } EX_terminal;
 
 
@@ -758,13 +763,15 @@ typedef struct EX_terminal {
 // The heartbeat of the system flows through these 64 oscillator states
 // With this comes a period table spanning from slow 8 second up to fast millisecond level state changes
 // With this a function to poll oscillator states
+#define TEMPORAL_ARRAY_SIZE 64
+
 typedef struct EX_temporal {
-    char    datetime[20];
-    double period_table[64];
-    uint64_t prev_osc;
-    uint64_t osc;
-    uint64_t osc_count[64];         // counts are on full cycles
-    double osc_next_frame[64];  // calculated following frame to trigger a state change
+    char        datetime[20];
+    double      period_table[TEMPORAL_ARRAY_SIZE];
+    uint64_t    prev_osc;
+    uint64_t    osc;
+    uint64_t    osc_count[TEMPORAL_ARRAY_SIZE];     // counts are on full cycles
+    double      osc_next_frame[TEMPORAL_ARRAY_SIZE];  // calculated following frame to trigger a state change
 } EX_temporal;
 
 typedef struct EX_player {
@@ -908,11 +915,11 @@ const char* permission_state_literal(uint32_t state) {
 }
 
 typedef struct EX_program {
-        uint32_t ctrlstate;
-        uint32_t ctrlstate_prev;
-        uint32_t pmsnstate;
-        char name[NAMELENGTH_MAX + 1];
-        uint32_t status;
+        uint32_t    ctrlstate;
+        uint32_t    ctrlstate_prev;
+        uint32_t    pmsnstate;
+        char        name[NAMELENGTH_MAX + 1];
+        uint32_t    status;
 } EX_program;
 
 
@@ -963,21 +970,34 @@ Color get_palette_color_pro(uint16_t palette_id, uint16_t id, uint8_t alpha, flo
     return (Color){color[id].r * brightness, color[id].g * brightness, color[id].b * brightness, alpha};
 }
 
+Vector2 get_current_virtual_size(void) {
+    return sys.video.virtual_res[sys.video.current_virtual];
+}
+
+Vector2 get_tile_size(Vector2 tiles, Vector2 tileset_size) {
+    return (Vector2){tileset_size.x/tiles.x, tileset_size.y/tiles.y};
+}
+
 Vector2 get_asset_pixelsize(asset_id) {
     return (Vector2){sys.asset.img[asset_id].width, sys.asset.img[asset_id].height};
 }
 
+Vector2 get_canvas_size(uint16_t tileset_id) {
+    Vector2 size = get_current_virtual_size();
+    return (Vector2){size.x / sys.asset.tileset[tileset_id].tilesize.x, size.y / sys.asset.tileset[tileset_id].tilesize.y};
+}
+
 
 #define GRIDILON            1.182940076
-#define TEMPORAL_ARRAY_SIZE 64
+#define GRIDEDGECYCLE       60
 
 uint16_t init_temporal() {
     uint64_t osc;
 
     datetime_literal(&sys.temporal.datetime);
     
-    double range_high = 60.;
-    double range_low = 1. / range_high;
+    double range_high = GRIDEDGECYCLE;
+    double range_low = 1. / GRIDEDGECYCLE;
 
     double ratio =  range_low;
     double value = range_low;
@@ -994,7 +1014,8 @@ uint16_t init_temporal() {
     }
     sys.temporal.prev_osc = 0; //
     sys.temporal.osc = 0; // oscillator states
-    
+
+    return osc;
 }
 
 void update_temporal() {
@@ -1020,85 +1041,85 @@ void update_temporal() {
 // ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
 
 typedef enum {
-    GRFE_LINE_TOP           = 0b1000000000000000000000000000000000000000000000000000000000000000, // turn on line top
-    GRFE_LINE_BOT           = 0b0100000000000000000000000000000000000000000000000000000000000000, // turn on line bottom
-    GRFE_LINE_LEF           = 0b0010000000000000000000000000000000000000000000000000000000000000, // turn on line left
-    GRFE_LINE_RIG           = 0b0001000000000000000000000000000000000000000000000000000000000000, // turn on line right
-    GRFE_LINE_HOR           = 0b0000100000000000000000000000000000000000000000000000000000000000, // turn on line center horizontal
-    GRFE_LINE_VER           = 0b0000010000000000000000000000000000000000000000000000000000000000, // turn on line center vertical
-    GRFE_LINE_DOW           = 0b0000001000000000000000000000000000000000000000000000000000000000, // turn on line angle down
-    GRFE_LINE_UP            = 0b0000000100000000000000000000000000000000000000000000000000000000, // turn on line angle up
-    GRFE_LIABLEND_LL        = 0b0000000010000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend lower left
-    GRFE_LIABLEND_LR        = 0b0000000001000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend lower right
-    GRFE_LIABLEND_UR        = 0b0000000000100000000000000000000000000000000000000000000000000000, // lines vertex alpha blend upper right
-    GRFE_LIABLEND_UL        = 0b0000000000010000000000000000000000000000000000000000000000000000, // lines vertex alpha blend upper left
-    GRFE_LICBLEND_LL        = 0b0000000000001000000000000000000000000000000000000000000000000000, // lines vertex color blend lower left
-    GRFE_LICBLEND_LR        = 0b0000000000000100000000000000000000000000000000000000000000000000, // lines vertex color blend lower right
-    GRFE_LICBLEND_UR        = 0b0000000000000010000000000000000000000000000000000000000000000000, // lines vertex color blend upper right
-    GRFE_LICBLEND_UL        = 0b0000000000000001000000000000000000000000000000000000000000000000, // lines vertex color blend upper left
-    GRFE_BGABLEND_LL        = 0b0000000000000000100000000000000000000000000000000000000000000000, // background vertex alpha blend lower left
-    GRFE_BGABLEND_LR        = 0b0000000000000000010000000000000000000000000000000000000000000000, // background vertex alpha blend lower right
-    GRFE_BGABLEND_UR        = 0b0000000000000000001000000000000000000000000000000000000000000000, // background vertex alpha blend upper right
-    GRFE_BGABLEND_UL        = 0b0000000000000000000100000000000000000000000000000000000000000000, // background vertex alpha blend upper left
-    GRFE_BGCBLEND_LL        = 0b0000000000000000000010000000000000000000000000000000000000000000, // background vertex color blend lower left
-    GRFE_BGCBLEND_LR        = 0b0000000000000000000001000000000000000000000000000000000000000000, // background vertex color blend lower right
-    GRFE_BGCBLEND_UR        = 0b0000000000000000000000100000000000000000000000000000000000000000, // background vertex color blend upper right
-    GRFE_BGCBLEND_UL        = 0b0000000000000000000000010000000000000000000000000000000000000000, // background vertex color blend upper left
-    GRFE_FGABLEND_LL        = 0b0000000000000000000000001000000000000000000000000000000000000000, // foreground vertex alpha blend lower left
-    GRFE_FGABLEND_LR        = 0b0000000000000000000000000100000000000000000000000000000000000000, // foreground vertex alpha blend lower right
-    GRFE_FGABLEND_UR        = 0b0000000000000000000000000010000000000000000000000000000000000000, // foreground vertex alpha blend upper right
-    GRFE_FGABLEND_UL        = 0b0000000000000000000000000001000000000000000000000000000000000000, // foreground vertex alpha blend upper left
-    GRFE_FGCBLEND_LL        = 0b0000000000000000000000000000100000000000000000000000000000000000, // foreground vertex color blend lower left
-    GRFE_FGCBLEND_LR        = 0b0000000000000000000000000000010000000000000000000000000000000000, // foreground vertex color blend lower right
-    GRFE_FGCBLEND_UR        = 0b0000000000000000000000000000001000000000000000000000000000000000, // foreground vertex color blend upper right
-    GRFE_FGCBLEND_UL        = 0b0000000000000000000000000000000100000000000000000000000000000000, // foreground vertex color blend upper left
-    GRFE_LNBLINK3           = 0b0000000000000000000000000000000010000000000000000000000000000000, // lines blinking speed (0...7) 0 = no blink
-    GRFE_LNBLINK2           = 0b0000000000000000000000000000000001000000000000000000000000000000, // lines blinking speed
-    GRFE_LNBLINK1           = 0b0000000000000000000000000000000000100000000000000000000000000000, // lines blinking speed
-    GRFE_BGBLINK3           = 0b0000000000000000000000000000000000010000000000000000000000000000, // background blinking speed (0...7) 0 = no blink
-    GRFE_BGBLINK2           = 0b0000000000000000000000000000000000001000000000000000000000000000, // background blinking speed
-    GRFE_BGBLINK1           = 0b0000000000000000000000000000000000000100000000000000000000000000, // background blinking speed
-    GRFE_FGBLINK3           = 0b0000000000000000000000000000000000000010000000000000000000000000, // foreground blinking speed (0...7) 0 = no blink
-    GRFE_FGBLINK2           = 0b0000000000000000000000000000000000000001000000000000000000000000, // foreground blinking speed
-    GRFE_FGBLINK1           = 0b0000000000000000000000000000000000000000100000000000000000000000, // foreground blinking speed
-    GRFE_DOUBLEHEIGHT       = 0b0000000000000000000000000000000000000000010000000000000000000000, // double height content
-    GRFE_DOUBLEWIDTH        = 0b0000000000000000000000000000000000000000001000000000000000000000, // double width content
-    GRFE_LINESSEQ           = 0b0000000000000000000000000000000000000000000100000000000000000000, // turn on lines sequencing
-    GRFE_COLORSEQ           = 0b0000000000000000000000000000000000000000000010000000000000000000, // turn on color sequencing
-    GRFE_VALUESEQ           = 0b0000000000000000000000000000000000000000000001000000000000000000, // turn on cell value sequencing
-    GRFE_AUTOSCRX           = 0b0000000000000000000000000000000000000000000000100000000000000000, // turn on automatic scrolling on x axis
-    GRFE_AUTOSCRY           = 0b0000000000000000000000000000000000000000000000010000000000000000, // turn on automatic scrolling on y axis
-    GRFE_ROTATION           = 0b0000000000000000000000000000000000000000000000001000000000000000, // turn on rotation 
-    GRFE_SKEW               = 0b0000000000000000000000000000000000000000000000000100000000000000, // turn on cell skewing
-    GRFE_WRAP_X             = 0b0000000000000000000000000000000000000000000000000010000000000000, // turn on wrap around on x axis
-    GRFE_WRAP_Y             = 0b0000000000000000000000000000000000000000000000000001000000000000, // turn on wrap around on y axis
-    GRFE_SCALE_X            = 0b0000000000000000000000000000000000000000000000000000100000000000, // turn on cell scaling on x axis
-    GRFE_SCALE_Y            = 0b0000000000000000000000000000000000000000000000000000010000000000, // turn on cell scaling on y axis
-    GRFE_FLIPH              = 0b0000000000000000000000000000000000000000000000000000001000000000, // flip cell(s) horizontally
-    GRFE_FLIPV              = 0b0000000000000000000000000000000000000000000000000000000100000000, // flip cell(s) vertically
-    GRFE_RED                = 0b0000000000000000000000000000000000000000000000000000000010000000, // turn on red channel
-    GRFE_GREEN              = 0b0000000000000000000000000000000000000000000000000000000001000000, // turn on green channel
-    GRFE_BLUE               = 0b0000000000000000000000000000000000000000000000000000000000100000, // turn on blue channel
-    GRFE_ALPHA              = 0b0000000000000000000000000000000000000000000000000000000000010000, // turn on transparency
-    GRFE_PROTECTED          = 0b0000000000000000000000000000000000000000000000000000000000001000, // protect value from being changed
-    GRFE_SHADOW             = 0b0000000000000000000000000000000000000000000000000000000000000100, // turn on shadow cell
-    GRFE_BACKGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000010, // turn on cell background (tile rectangle fill)
-    GRFE_FOREGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000001, // turn on cell foreground (value) (used for hidden mode)
-    GRFE_LINES_MASK         = 0b1111111100000000000000000000000000000000000000000000000000000000, 
-    GRFE_BLENDING_MASK      = 0b0000000011111111111111111111111100000000000000000000000000000000, 
-    GRFE_LNBLINK_MASK       = 0b0000000000000000000000000000000011100000000000000000000000000000,
-    GRFE_BGBLINK_MASK       = 0b0000000000000000000000000000000000011100000000000000000000000000,
-    GRFE_FGBLINK_MASK       = 0b0000000000000000000000000000000000000011100000000000000000000000,
-    GRFE_DEFAULT1           = 0b0000000000000000000000000000000000000000011100000000000011110101, // DEFAULT STATE :HEAVY PROCESSING
-    GRFE_DEFAULT2           = 0b0000000000000000000000000000000000000000000000001100000011110111, // DEFAULT STATE :SCROLLTEXT
-    GRFE_DEFAULT3           = 0b0000000000000000000000000000000000000000000000000000000000000000, // DEFAULT STATE :GAME page
-    GRFE_DEFAULT4           = 0b0000000000000000000000000000000000000000000000000100000011110101  // DEFAULT STATE :TERMINAL DISPLAY
-} grid_features;
+    CVFE_LINE_TOP           = 0b1000000000000000000000000000000000000000000000000000000000000000, // turn on line top
+    CVFE_LINE_BOT           = 0b0100000000000000000000000000000000000000000000000000000000000000, // turn on line bottom
+    CVFE_LINE_LEF           = 0b0010000000000000000000000000000000000000000000000000000000000000, // turn on line left
+    CVFE_LINE_RIG           = 0b0001000000000000000000000000000000000000000000000000000000000000, // turn on line right
+    CVFE_LINE_HOR           = 0b0000100000000000000000000000000000000000000000000000000000000000, // turn on line center horizontal
+    CVFE_LINE_VER           = 0b0000010000000000000000000000000000000000000000000000000000000000, // turn on line center vertical
+    CVFE_LINE_DOW           = 0b0000001000000000000000000000000000000000000000000000000000000000, // turn on line angle down
+    CVFE_LINE_UP            = 0b0000000100000000000000000000000000000000000000000000000000000000, // turn on line angle up
+    CVFE_LIABLEND_LL        = 0b0000000010000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend lower left
+    CVFE_LIABLEND_LR        = 0b0000000001000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend lower right
+    CVFE_LIABLEND_UR        = 0b0000000000100000000000000000000000000000000000000000000000000000, // lines vertex alpha blend upper right
+    CVFE_LIABLEND_UL        = 0b0000000000010000000000000000000000000000000000000000000000000000, // lines vertex alpha blend upper left
+    CVFE_LICBLEND_LL        = 0b0000000000001000000000000000000000000000000000000000000000000000, // lines vertex color blend lower left
+    CVFE_LICBLEND_LR        = 0b0000000000000100000000000000000000000000000000000000000000000000, // lines vertex color blend lower right
+    CVFE_LICBLEND_UR        = 0b0000000000000010000000000000000000000000000000000000000000000000, // lines vertex color blend upper right
+    CVFE_LICBLEND_UL        = 0b0000000000000001000000000000000000000000000000000000000000000000, // lines vertex color blend upper left
+    CVFE_BGABLEND_LL        = 0b0000000000000000100000000000000000000000000000000000000000000000, // background vertex alpha blend lower left
+    CVFE_BGABLEND_LR        = 0b0000000000000000010000000000000000000000000000000000000000000000, // background vertex alpha blend lower right
+    CVFE_BGABLEND_UR        = 0b0000000000000000001000000000000000000000000000000000000000000000, // background vertex alpha blend upper right
+    CVFE_BGABLEND_UL        = 0b0000000000000000000100000000000000000000000000000000000000000000, // background vertex alpha blend upper left
+    CVFE_BGCBLEND_LL        = 0b0000000000000000000010000000000000000000000000000000000000000000, // background vertex color blend lower left
+    CVFE_BGCBLEND_LR        = 0b0000000000000000000001000000000000000000000000000000000000000000, // background vertex color blend lower right
+    CVFE_BGCBLEND_UR        = 0b0000000000000000000000100000000000000000000000000000000000000000, // background vertex color blend upper right
+    CVFE_BGCBLEND_UL        = 0b0000000000000000000000010000000000000000000000000000000000000000, // background vertex color blend upper left
+    CVFE_FGABLEND_LL        = 0b0000000000000000000000001000000000000000000000000000000000000000, // foreground vertex alpha blend lower left
+    CVFE_FGABLEND_LR        = 0b0000000000000000000000000100000000000000000000000000000000000000, // foreground vertex alpha blend lower right
+    CVFE_FGABLEND_UR        = 0b0000000000000000000000000010000000000000000000000000000000000000, // foreground vertex alpha blend upper right
+    CVFE_FGABLEND_UL        = 0b0000000000000000000000000001000000000000000000000000000000000000, // foreground vertex alpha blend upper left
+    CVFE_FGCBLEND_LL        = 0b0000000000000000000000000000100000000000000000000000000000000000, // foreground vertex color blend lower left
+    CVFE_FGCBLEND_LR        = 0b0000000000000000000000000000010000000000000000000000000000000000, // foreground vertex color blend lower right
+    CVFE_FGCBLEND_UR        = 0b0000000000000000000000000000001000000000000000000000000000000000, // foreground vertex color blend upper right
+    CVFE_FGCBLEND_UL        = 0b0000000000000000000000000000000100000000000000000000000000000000, // foreground vertex color blend upper left
+    CVFE_LNBLINK3           = 0b0000000000000000000000000000000010000000000000000000000000000000, // lines blinking speed (0...7) 0 = no blink
+    CVFE_LNBLINK2           = 0b0000000000000000000000000000000001000000000000000000000000000000, // lines blinking speed
+    CVFE_LNBLINK1           = 0b0000000000000000000000000000000000100000000000000000000000000000, // lines blinking speed
+    CVFE_BGBLINK3           = 0b0000000000000000000000000000000000010000000000000000000000000000, // background blinking speed (0...7) 0 = no blink
+    CVFE_BGBLINK2           = 0b0000000000000000000000000000000000001000000000000000000000000000, // background blinking speed
+    CVFE_BGBLINK1           = 0b0000000000000000000000000000000000000100000000000000000000000000, // background blinking speed
+    CVFE_FGBLINK3           = 0b0000000000000000000000000000000000000010000000000000000000000000, // foreground blinking speed (0...7) 0 = no blink
+    CVFE_FGBLINK2           = 0b0000000000000000000000000000000000000001000000000000000000000000, // foreground blinking speed
+    CVFE_FGBLINK1           = 0b0000000000000000000000000000000000000000100000000000000000000000, // foreground blinking speed
+    CVFE_DOUBLEHEIGHT       = 0b0000000000000000000000000000000000000000010000000000000000000000, // double height content
+    CVFE_DOUBLEWIDTH        = 0b0000000000000000000000000000000000000000001000000000000000000000, // double width content
+    CVFE_LINESSEQ           = 0b0000000000000000000000000000000000000000000100000000000000000000, // turn on lines sequencing
+    CVFE_COLORSEQ           = 0b0000000000000000000000000000000000000000000010000000000000000000, // turn on color sequencing
+    CVFE_VALUESEQ           = 0b0000000000000000000000000000000000000000000001000000000000000000, // turn on cell value sequencing
+    CVFE_AUTOSCRX           = 0b0000000000000000000000000000000000000000000000100000000000000000, // turn on automatic scrolling on x axis
+    CVFE_AUTOSCRY           = 0b0000000000000000000000000000000000000000000000010000000000000000, // turn on automatic scrolling on y axis
+    CVFE_ROTATION           = 0b0000000000000000000000000000000000000000000000001000000000000000, // turn on rotation 
+    CVFE_SKEW               = 0b0000000000000000000000000000000000000000000000000100000000000000, // turn on cell skewing
+    CVFE_WRAP_X             = 0b0000000000000000000000000000000000000000000000000010000000000000, // turn on wrap around on x axis
+    CVFE_WRAP_Y             = 0b0000000000000000000000000000000000000000000000000001000000000000, // turn on wrap around on y axis
+    CVFE_SCALE_X            = 0b0000000000000000000000000000000000000000000000000000100000000000, // turn on cell scaling on x axis
+    CVFE_SCALE_Y            = 0b0000000000000000000000000000000000000000000000000000010000000000, // turn on cell scaling on y axis
+    CVFE_FLIPH              = 0b0000000000000000000000000000000000000000000000000000001000000000, // flip cell(s) horizontally
+    CVFE_FLIPV              = 0b0000000000000000000000000000000000000000000000000000000100000000, // flip cell(s) vertically
+    CVFE_RED                = 0b0000000000000000000000000000000000000000000000000000000010000000, // turn on red channel
+    CVFE_GREEN              = 0b0000000000000000000000000000000000000000000000000000000001000000, // turn on green channel
+    CVFE_BLUE               = 0b0000000000000000000000000000000000000000000000000000000000100000, // turn on blue channel
+    CVFE_ALPHA              = 0b0000000000000000000000000000000000000000000000000000000000010000, // turn on transparency
+    CVFE_PROTECTED          = 0b0000000000000000000000000000000000000000000000000000000000001000, // protect value from being changed
+    CVFE_SHADOW             = 0b0000000000000000000000000000000000000000000000000000000000000100, // turn on shadow cell
+    CVFE_BACKGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000010, // turn on cell background (tile rectangle fill)
+    CVFE_FOREGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000001, // turn on cell foreground (value) (used for hidden mode)
+    CVFE_LINES_MASK         = 0b1111111100000000000000000000000000000000000000000000000000000000, 
+    CVFE_BLENDING_MASK      = 0b0000000011111111111111111111111100000000000000000000000000000000, 
+    CVFE_LNBLINK_MASK       = 0b0000000000000000000000000000000011100000000000000000000000000000,
+    CVFE_BGBLINK_MASK       = 0b0000000000000000000000000000000000011100000000000000000000000000,
+    CVFE_FGBLINK_MASK       = 0b0000000000000000000000000000000000000011100000000000000000000000,
+    CVFE_DEFAULT1           = 0b0000000000000000000000000000000000000000011100000000000011110101, // DEFAULT STATE :HEAVY PROCESSING
+    CVFE_DEFAULT2           = 0b0000000000000000000000000000000000000000000000001100000011110111, // DEFAULT STATE :SCROLLTEXT
+    CVFE_DEFAULT3           = 0b0000000000000000000000000000000000000000000000000000000000000000, // DEFAULT STATE :GAME canvas
+    CVFE_DEFAULT4           = 0b0000000000000000000000000000000000000000000000000100000011110101  // DEFAULT STATE :TERMINAL DISPLAY
+} canvas_features;
 
-#define GRFE_LINES_BITS 56
-#define GRFE_LNBLINK_BITS 29
-#define GRFE_BGBLINK_BITS 26
-#define GRFE_FGBLINK_BITS 23
+#define CVFE_LINES_BITS 56
+#define CVFE_LNBLINK_BITS 29
+#define CVFE_BGBLINK_BITS 26
+#define CVFE_FGBLINK_BITS 23
 #define GET_FROM_STATE(state, mask, shift) ((state & mask) >> shift) // shifting greater than 31 is invalid in the current march used...
 
 Rectangle get_tilezone_from_position(uint16_t asset_id, Vector2 position) {
@@ -1123,14 +1144,16 @@ Rectangle get_tilezone_from_code(uint16_t asset_id, uint16_t code) {
 
 //        plot_character(ex_scrolltext[s].font, ch, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].colorbg, colorln, state);
 void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, uint64_t state) {
+    //add logic for out of bound position
+    // get the current render texture's size
     Color vertex_colors[4];
-    if (!(state & GRFE_ROTATION)) angle = 0.f;
+    if (!(state & CVFE_ROTATION)) angle = 0.f;
 
-    if (state & GRFE_BACKGROUND) {
-        if (state & GRFE_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
-        if (state & GRFE_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
-        if (state & GRFE_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
-        if (state & GRFE_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
+    if (state & CVFE_BACKGROUND) {
+        if (state & CVFE_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
+        if (state & CVFE_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
+        if (state & CVFE_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
+        if (state & CVFE_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
         vertex_colors[1] = vertex_colors[0];
         vertex_colors[2] = vertex_colors[0];
         vertex_colors[3] = vertex_colors[0];
@@ -1138,8 +1161,8 @@ void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vecto
             (Rectangle) { position.x, position.y, scale.x, scale.y },
             (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
     }
-    if (state & GRFE_FOREGROUND) {
-            if (state & GRFE_SHADOW) {
+    if (state & CVFE_FOREGROUND) {
+            if (state & CVFE_SHADOW) {
                 vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
                 vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
                 vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
@@ -1149,10 +1172,10 @@ void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vecto
                     (Rectangle) { position.x + shadow.x, position.y + shadow.y, scale.x, scale.y },
                     (Vector2) {0,0}, skew, angle, vertex_colors);
             };
-            if (state & GRFE_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
-            if (state & GRFE_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
-            if (state & GRFE_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
-            if (state & GRFE_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
+            if (state & CVFE_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
+            if (state & CVFE_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
+            if (state & CVFE_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
+            if (state & CVFE_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
             vertex_colors[1] = vertex_colors[0];
             vertex_colors[2] = vertex_colors[0];
             vertex_colors[3] = vertex_colors[0];
@@ -1162,12 +1185,12 @@ void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vecto
                 (Vector2) {0,0}, skew, angle, vertex_colors);
     }
 
-    uint8_t lines = GET_FROM_STATE(state, GRFE_LINES_MASK, GRFE_LINES_BITS);
+    uint8_t lines = GET_FROM_STATE(state, CVFE_LINES_MASK, CVFE_LINES_BITS);
     if (lines) {
-            if (state & GRFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
-            if (state & GRFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
-            if (state & GRFE_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
-            if (state & GRFE_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
+            if (state & CVFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
+            if (state & CVFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
+            if (state & CVFE_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
+            if (state & CVFE_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
             vertex_colors[1] = vertex_colors[0];
             vertex_colors[2] = vertex_colors[0];
             vertex_colors[3] = vertex_colors[0];
@@ -1193,137 +1216,137 @@ bool init_cell_linear(EX_cell *cell, uint64_t cell_state, uint32_t color_id, uin
 }
 
 
-void set_page_default_palette(uint16_t pagegroup_id, uint16_t page_id, uint16_t palette_id) {
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    page->default_palette_id = palette_id;
+void set_canvas_default_palette(uint16_t canvasgroup_id, uint16_t canvas_id, uint16_t palette_id) {
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    canvas->default_palette_id = palette_id;
 }
 
-void set_page_default_asset(uint16_t pagegroup_id, uint16_t page_id, uint16_t asset_id) {
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    page->default_asset_id = asset_id;
+void set_canvas_default_asset(uint16_t canvasgroup_id, uint16_t canvas_id, uint16_t asset_id) {
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    canvas->default_asset_id = asset_id;
 }
 
-uint16_t init_page(uint16_t pagegroup_id, uint16_t page_id, Vector2 tiles, uint64_t page_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
-    EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
+uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 tiles, uint64_t canvas_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
+    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint32_t cell_count = (uint16_t)tiles.x * (uint16_t)tiles.y;
-    page->size = tiles;
-    page->state = page_state;
-    set_page_default_palette(pagegroup_id, page_id, palette_id);
-    set_page_default_asset(pagegroup_id, page_id, asset_id);
-    page->cell_count = cell_count;
-    page->cell = calloc(cell_count, sizeof(EX_cell));
-    page->offset = (Vector2) {0,0};
-    page->scale = (Vector2) {1,1};
-    page->angle = 0;
-    page->default_tilesize = get_tile_pixelsize(tiles, get_asset_pixelsize(asset_id));
-    page->fg_brightness = 1.f;
-    page->bg_brightness = 1.f;
-    page->alpha = 255;
+    canvas->size = tiles;
+    canvas->state = canvas_state;
+    set_canvas_default_palette(canvasgroup_id, canvas_id, palette_id);
+    set_canvas_default_asset(canvasgroup_id, canvas_id, asset_id);
+    canvas->cell_count = cell_count;
+    canvas->cell = calloc(cell_count, sizeof(EX_cell));
+    canvas->offset = (Vector2) {0,0};
+    canvas->scale = (Vector2) {1,1};
+    canvas->angle = 0;
+    canvas->default_tilesize = get_tile_size(tiles, get_asset_pixelsize(asset_id));
+    canvas->fg_brightness = 1.f;
+    canvas->bg_brightness = 1.f;
+    canvas->alpha = 255;
 
-    EX_cell *cell = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_cell *cell = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint32_t i = 0; i < cell_count; i++) {
         init_cell_linear(&cell[i], cell_state, 0, 0); // this process is temporary, as the better alternative is to mass copy a template cell
     }
     return 1;
 }
 
-void set_pagegroup_default_palette(uint16_t pagegroup_id, uint16_t palette_id) {
-    EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
-    pagegroup->default_palette_id = palette_id;
+void set_canvasgroup_default_palette(uint16_t canvasgroup_id, uint16_t palette_id) {
+    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
+    canvasgroup->default_palette_id = palette_id;
 }
 
-void set_pagegroup_default_asset(uint16_t pagegroup_id, uint16_t asset_id) {
-    EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
-    pagegroup->default_asset_id = asset_id;
+void set_canvasgroup_default_asset(uint16_t canvasgroup_id, uint16_t asset_id) {
+    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
+    canvasgroup->default_asset_id = asset_id;
 }
 
-uint16_t init_pagegroup(uint32_t pagegroup_id, Vector2 size, uint16_t page_count, uint32_t pagegroup_state, uint64_t page_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
-    uint16_t pages = 0;
-    sys.video.pagegroup[pagegroup_id].state = pagegroup_state;
-    sys.video.pagegroup[pagegroup_id].page_count = page_count;
-    set_pagegroup_default_palette(pagegroup_id, palette_id);
-    set_pagegroup_default_asset(pagegroup_id, asset_id);
-    sys.video.pagegroup[pagegroup_id].page = calloc(sys.video.pagegroup[pagegroup_id].page_count, sizeof(EX_page));
-    for (uint16_t page_id = 0; page_id < page_count; page_id++) {
-        pages += init_page(pagegroup_id, page_id, size, page_state, cell_state, asset_id, palette_id);
+uint16_t init_canvasgroup(uint32_t canvasgroup_id, Vector2 size, uint16_t canvas_count, uint32_t canvasgroup_state, uint64_t canvas_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
+    uint16_t canvases = 0;
+    sys.video.canvasgroup[canvasgroup_id].state = canvasgroup_state;
+    sys.video.canvasgroup[canvasgroup_id].canvas_count = canvas_count;
+    set_canvasgroup_default_palette(canvasgroup_id, palette_id);
+    set_canvasgroup_default_asset(canvasgroup_id, asset_id);
+    sys.video.canvasgroup[canvasgroup_id].canvas = calloc(sys.video.canvasgroup[canvasgroup_id].canvas_count, sizeof(EX_canvas));
+    for (uint16_t canvas_id = 0; canvas_id < canvas_count; canvas_id++) {
+        canvases += init_canvas(canvasgroup_id, canvas_id, size, canvas_state, cell_state, asset_id, palette_id);
     }
-    return pages;
+    return canvases;
 }
 
 // *************** REFERENCING SHORTCUTS TO USE *****************
-// EX_pagegroup  *pagegroup  = &sys.video.pagegroup[pagegroup_id];
-// EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-// EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0]; ( cell[50].state )
+// EX_canvasgroup  *canvasgroup  = &sys.video.canvasgroup[canvasgroup_id];
+// EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+// EX_cell  *cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0]; ( cell[50].state )
 // This functionality requires setting a bunch of stuff afterwards;
 // - per cell states
-// - per page asset
-bool init_pagegroup_multipage(Vector2 size, uint32_t pagegroup_state, uint64_t page_state[]) {
-    uint16_t pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
+// - per canvas asset
+bool init_canvasgroup_multicanvas(Vector2 size, uint32_t canvasgroup_state, uint64_t canvas_state[]) {
+    uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
 
-    sys.video.pagegroup[pagegroup_id].state = pagegroup_state;
-    sys.video.pagegroup[pagegroup_id].page_count = sizeof(page_state) / sizeof_member(EX_page, state);
+    sys.video.canvasgroup[canvasgroup_id].state = canvasgroup_state;
+    sys.video.canvasgroup[canvasgroup_id].canvas_count = sizeof(canvas_state) / sizeof_member(EX_canvas, state);
 
-    sys.video.pagegroup[pagegroup_id].page = calloc(sys.video.pagegroup[pagegroup_id].page_count, sizeof(EX_page));
-    for (uint16_t i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
-        init_page(pagegroup_id, i, size, page_state[i], 0, 0, 0);
+    sys.video.canvasgroup[canvasgroup_id].canvas = calloc(sys.video.canvasgroup[canvasgroup_id].canvas_count, sizeof(EX_canvas));
+    for (uint16_t i = 0; i < sys.video.canvasgroup[canvasgroup_id].canvas_count; i++) {
+        init_canvas(canvasgroup_id, i, size, canvas_state[i], 0, 0, 0);
     }
     return 0;
 }
 
-uint16_t unload_page(uint16_t pagegroup_id, uint16_t page_id) {
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    if (page->cell_count > 0) {
-        page->size = (Vector2){0};
-        page->state = 0;
-        page->cell_count = 0;
-        free(page->cell);
+uint16_t unload_canvas(uint16_t canvasgroup_id, uint16_t canvas_id) {
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    if (canvas->cell_count > 0) {
+        canvas->size = (Vector2){0};
+        canvas->state = 0;
+        canvas->cell_count = 0;
+        free(canvas->cell);
         return 1;
     } else {
-        return 0; // was an empty page
+        return 0; // was an empty canvas
     }
 }
 
-uint16_t unload_pagegroup(uint16_t pagegroup_id) {
-    uint16_t pages = 0;
-    EX_pagegroup *pagegroup = &sys.video.pagegroup[pagegroup_id];
-    for (uint16_t page_id = 0; page_id < (pagegroup->page_count); page_id++) {
-        pages += unload_page(pagegroup_id, page_id);
+uint16_t unload_canvasgroup(uint16_t canvasgroup_id) {
+    uint16_t canvases = 0;
+    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
+    for (uint16_t canvas_id = 0; canvas_id < (canvasgroup->canvas_count); canvas_id++) {
+        canvases += unload_canvas(canvasgroup_id, canvas_id);
     }
-    if (pages) free(sys.video.pagegroup[pagegroup_id].page);
-    return pages;
+    if (canvases) free(sys.video.canvasgroup[canvasgroup_id].canvas);
+    return canvases;
 }
 
-uint16_t unload_all_pagegroups() {
-    uint16_t pagegroups = 0, pages = 0;
-    for (uint16_t pagegroup_id = 0; pagegroup_id < GRID_MAX_PAGEGROUPS; pagegroup_id++) {
-        pages += unload_pagegroup(pagegroup_id);
-        if (pages) ++pagegroups;
+uint16_t unload_all_canvasgroups() {
+    uint16_t canvasgroups = 0, canvases = 0;
+    for (uint16_t canvasgroup_id = 0; canvasgroup_id < GRID_MAX_CANVASGROUPS; canvasgroup_id++) {
+        canvases += unload_canvasgroup(canvasgroup_id);
+        if (canvases) ++canvasgroups;
     }
-    return pages;
+    return canvases;
 }
 
-void page_set_mouse_position(uint16_t pagegroup_id, uint16_t page_id, Vector2 target) {
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
+void canvas_set_mouse_position(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 target) {
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
-    page->mousecursor.offset = target;
+    canvas->mousecursor.offset = target;
 }
 
-void page_set_keyboard_position(uint16_t pagegroup_id, uint16_t page_id, Vector2 target) {
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
+void canvas_set_keyboard_position(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 target) {
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
-    page->keycursor.offset = target;
+    canvas->keycursor.offset = target;
 }
 
-void set_cell_state(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint64_t state) {
+void set_cell_state(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint64_t state) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1337,11 +1360,11 @@ void set_cell_state(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, u
     }
 }
 
-void clear_cell_state(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint64_t state) {
+void clear_cell_state(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint64_t state) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1355,11 +1378,11 @@ void clear_cell_state(uint16_t pagegroup_id, uint16_t page_id, Rectangle target,
     }
 }
 
-void set_cell_colorfg(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint16_t color_id) {
+void set_cell_colorfg(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint16_t color_id) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1373,11 +1396,11 @@ void set_cell_colorfg(uint16_t pagegroup_id, uint16_t page_id, Rectangle target,
     }
 }
 
-void set_cell_colorbg(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint16_t color_id) {
+void set_cell_colorbg(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint16_t color_id) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1391,11 +1414,11 @@ void set_cell_colorbg(uint16_t pagegroup_id, uint16_t page_id, Rectangle target,
     }
 }
 
-void set_cell_colorln(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint16_t color_id) {
+void set_cell_colorln(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint16_t color_id) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1409,11 +1432,11 @@ void set_cell_colorln(uint16_t pagegroup_id, uint16_t page_id, Rectangle target,
     }
 }
 
-void set_cell_color_mask(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, Color color) {
+void set_cell_color_mask(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, Color color) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1427,11 +1450,11 @@ void set_cell_color_mask(uint16_t pagegroup_id, uint16_t page_id, Rectangle targ
     }
 }
 
-void set_cell_color_shadow_mask(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, Color color) {
+void set_cell_color_shadow_mask(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, Color color) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1445,11 +1468,11 @@ void set_cell_color_shadow_mask(uint16_t pagegroup_id, uint16_t page_id, Rectang
     }
 }
 
-void set_cell_offset(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, Vector2 offset) {
+void set_cell_offset(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, Vector2 offset) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1463,11 +1486,11 @@ void set_cell_offset(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, 
     }
 }
 
-void set_cell_angle(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, float angle) {
+void set_cell_angle(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, float angle) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1481,11 +1504,11 @@ void set_cell_angle(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, f
     }
 }
 
-void set_cell_scale(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, Vector2 scale) {
+void set_cell_scale(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, Vector2 scale) {
     uint16_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1499,12 +1522,12 @@ void set_cell_scale(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, V
     }
 }
 
-// iterate through charracter ascii codes, if font pixels then copy desired source_cell information to the page
-void plot_big_characters(uint16_t pagegroup_id, uint16_t page_id, Vector2 target, uint64_t state, uint16_t font_id, uint8_t *ch) {
+// iterate through charracter ascii codes, if font pixels then copy desired source_cell information to the canvas
+void plot_big_characters(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 target, uint64_t state, uint16_t font_id, uint8_t *ch) {
     uint32_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     uint32_t length = sizeof(ch);
 
@@ -1514,38 +1537,38 @@ void plot_big_characters(uint16_t pagegroup_id, uint16_t page_id, Vector2 target
 }
 
 typedef enum {
-    GFLD_R32                  = 0b10000000000000000000000000000000,
-    GFLD_STATE                = 0b01000000000000000000000000000000,   // all flags for cell
-    GFLD_VALUE                = 0b00010000000000000000000000000000,   // value of cell
-    GFLD_LINES                = 0b00000010000000000000000000000000,   // lines feature
-    GFLD_CYCLE                = 0b00000000000010000000000000000000,   // cell animation sequence number
-    GFLD_FG_COLOR             = 0b00000000000000100000000000000000,   // palette index color for cell
-    GFLD_FG_COLOR_CYCLE       = 0b00000000000000010000000000000000,   // color cycle index
-    GFLD_BG_COLOR             = 0b00000000000000001000000000000000,   // palette index color for cell background
-    GFLD_BG_COLOR_CYCLE       = 0b00000000000000000100000000000000,   // color cycle index
-    GFLD_LINES_COLOR          = 0b00000000000000000010000000000000,   // palette index color for cell background
-    GFLD_LINES_COLOR_CYCLE    = 0b00000000000000000001000000000000,   // color cycle index
-    GFLD_OFFSET               = 0b00000000000000000000100000000000,   // displacement from top left (x,y)
-    GFLD_SKEW                 = 0b00000000000000000000010000000000,   // horizontal and vertical skew
-    GFLD_SCALE                = 0b00000000000000000000001000000000,   // (x,y) cell scale
-    GFLD_SCALE_SPEED          = 0b00000000000000000000000100000000,   // (x,y) cell scale speed
-    GFLD_SCROLL_SPEED         = 0b00000000000000000000000010000000,   // (x,y) cell scroll speed
-    GFLD_ANGLE                = 0b00000000000000000000000001000000,   // degree of angle used to rotate the cell
-    GFLD_FG_BRIGHTNESS        = 0b00000000000000000000000000100000,   // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
-    GFLD_BG_BRIGHTNESS        = 0b00000000000000000000000000010000,   // background brightness (values 0...1 divides, values 1 to 255 multiply)
-    GFLD_ALPHA                = 0b00000000010000000000000000000000,   // alpha channel
-    GFLD_COLOR_MASK           = 0b00000000000000000000000000001000,   // RGBA color mask of cell
-    GFLD_SHADOW_MASK          = 0b00000000000000000000000000000100,   // shadow RGBA mask
-    GFLD_ALL                  = 0b11111111111111111111111111111111,   // all fields
-    GFLD_NO_STATE_MASK        = 0b00111111111111111111111111111111    // all fields except the state of the cell
-} gridfield_features;
+    CFLD_R32                  = 0b10000000000000000000000000000000,
+    CFLD_STATE                = 0b01000000000000000000000000000000,   // all flags for cell
+    CFLD_VALUE                = 0b00010000000000000000000000000000,   // value of cell
+    CFLD_LINES                = 0b00000010000000000000000000000000,   // lines feature
+    CFLD_CYCLE                = 0b00000000000010000000000000000000,   // cell animation sequence number
+    CFLD_FG_COLOR             = 0b00000000000000100000000000000000,   // palette index color for cell
+    CFLD_FG_COLOR_CYCLE       = 0b00000000000000010000000000000000,   // color cycle index
+    CFLD_BG_COLOR             = 0b00000000000000001000000000000000,   // palette index color for cell background
+    CFLD_BG_COLOR_CYCLE       = 0b00000000000000000100000000000000,   // color cycle index
+    CFLD_LINES_COLOR          = 0b00000000000000000010000000000000,   // palette index color for cell background
+    CFLD_LINES_COLOR_CYCLE    = 0b00000000000000000001000000000000,   // color cycle index
+    CFLD_OFFSET               = 0b00000000000000000000100000000000,   // displacement from top left (x,y)
+    CFLD_SKEW                 = 0b00000000000000000000010000000000,   // horizontal and vertical skew
+    CFLD_SCALE                = 0b00000000000000000000001000000000,   // (x,y) cell scale
+    CFLD_SCALE_SPEED          = 0b00000000000000000000000100000000,   // (x,y) cell scale speed
+    CFLD_SCROLL_SPEED         = 0b00000000000000000000000010000000,   // (x,y) cell scroll speed
+    CFLD_ANGLE                = 0b00000000000000000000000001000000,   // degree of angle used to rotate the cell
+    CFLD_FG_BRIGHTNESS        = 0b00000000000000000000000000100000,   // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+    CFLD_BG_BRIGHTNESS        = 0b00000000000000000000000000010000,   // background brightness (values 0...1 divides, values 1 to 255 multiply)
+    CFLD_ALPHA                = 0b00000000010000000000000000000000,   // alpha channel
+    CFLD_COLOR_MASK           = 0b00000000000000000000000000001000,   // RGBA color mask of cell
+    CFLD_SHADOW_MASK          = 0b00000000000000000000000000000100,   // shadow RGBA mask
+    CFLD_ALL                  = 0b11111111111111111111111111111111,   // all fields
+    CFLD_NO_STATE_MASK        = 0b00111111111111111111111111111111    // all fields except the state of the cell
+} cellfield_features;
 
 // init every cell using a prototype cell and based on a stat system
-void init_cell (uint16_t pagegroup_id, uint16_t page_id, Rectangle target, EX_cell info_cell, uint64_t state) {
+void init_cell (uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, EX_cell info_cell, uint64_t state) {
     uint32_t target_offset, source_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
 
@@ -1554,29 +1577,29 @@ void init_cell (uint16_t pagegroup_id, uint16_t page_id, Rectangle target, EX_ce
             for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
                 if (y >= 0 && y < lsy) {
                     target_offset = lsx * y + x;
-                    if (state & GFLD_ALL)                   target_cell[target_offset]                      = info_cell;
+                    if (state & CFLD_ALL)                   target_cell[target_offset]                      = info_cell;
                     else {
-                        if (state & GFLD_STATE)             target_cell[target_offset].state                = info_cell.state;
-                        if (state & GFLD_VALUE)             target_cell[target_offset].value                = info_cell.value;
-                        if (state & GFLD_LINES)             target_cell[target_offset].lines                = info_cell.lines;
-                        if (state & GFLD_CYCLE)             target_cell[target_offset].cycle_id             = info_cell.cycle_id;
-                        if (state & GFLD_FG_COLOR)          target_cell[target_offset].colorfg_id           = info_cell.colorfg_id;
-                        if (state & GFLD_FG_COLOR_CYCLE)    target_cell[target_offset].colorfg_cycle_id     = info_cell.colorfg_cycle_id;
-                        if (state & GFLD_BG_COLOR)          target_cell[target_offset].colorbg_id           = info_cell.colorbg_id;
-                        if (state & GFLD_BG_COLOR_CYCLE)    target_cell[target_offset].colorbg_cycle_id     = info_cell.colorbg_cycle_id;
-                        if (state & GFLD_LINES_COLOR)       target_cell[target_offset].colorln_id           = info_cell.colorln_id;
-                        if (state & GFLD_LINES_COLOR_CYCLE) target_cell[target_offset].colorln_cycle_id     = info_cell.colorln_cycle_id;
-                        if (state & GFLD_OFFSET)            target_cell[target_offset].offset               = info_cell.offset;
-                        if (state & GFLD_SKEW)              target_cell[target_offset].skew                 = info_cell.skew;
-                        if (state & GFLD_SCALE)             target_cell[target_offset].scale                = info_cell.scale;
-                        if (state & GFLD_SCALE_SPEED)       target_cell[target_offset].scale_speed          = info_cell.scale_speed;
-                        if (state & GFLD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed         = info_cell.scroll_speed;
-                        if (state & GFLD_ANGLE)             target_cell[target_offset].angle                = info_cell.angle;
-                        if (state & GFLD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness        = info_cell.fg_brightness;
-                        if (state & GFLD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness        = info_cell.bg_brightness;
-                        if (state & GFLD_ALPHA)             target_cell[target_offset].alpha                = info_cell.alpha;
-                        if (state & GFLD_COLOR_MASK)        target_cell[target_offset].color_mask           = info_cell.color_mask;
-                        if (state & GFLD_SHADOW_MASK)       target_cell[target_offset].shadow_mask          = info_cell.shadow_mask;
+                        if (state & CFLD_STATE)             target_cell[target_offset].state                = info_cell.state;
+                        if (state & CFLD_VALUE)             target_cell[target_offset].value                = info_cell.value;
+                        if (state & CFLD_LINES)             target_cell[target_offset].lines                = info_cell.lines;
+                        if (state & CFLD_CYCLE)             target_cell[target_offset].cycle_id             = info_cell.cycle_id;
+                        if (state & CFLD_FG_COLOR)          target_cell[target_offset].colorfg_id           = info_cell.colorfg_id;
+                        if (state & CFLD_FG_COLOR_CYCLE)    target_cell[target_offset].colorfg_cycle_id     = info_cell.colorfg_cycle_id;
+                        if (state & CFLD_BG_COLOR)          target_cell[target_offset].colorbg_id           = info_cell.colorbg_id;
+                        if (state & CFLD_BG_COLOR_CYCLE)    target_cell[target_offset].colorbg_cycle_id     = info_cell.colorbg_cycle_id;
+                        if (state & CFLD_LINES_COLOR)       target_cell[target_offset].colorln_id           = info_cell.colorln_id;
+                        if (state & CFLD_LINES_COLOR_CYCLE) target_cell[target_offset].colorln_cycle_id     = info_cell.colorln_cycle_id;
+                        if (state & CFLD_OFFSET)            target_cell[target_offset].offset               = info_cell.offset;
+                        if (state & CFLD_SKEW)              target_cell[target_offset].skew                 = info_cell.skew;
+                        if (state & CFLD_SCALE)             target_cell[target_offset].scale                = info_cell.scale;
+                        if (state & CFLD_SCALE_SPEED)       target_cell[target_offset].scale_speed          = info_cell.scale_speed;
+                        if (state & CFLD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed         = info_cell.scroll_speed;
+                        if (state & CFLD_ANGLE)             target_cell[target_offset].angle                = info_cell.angle;
+                        if (state & CFLD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness        = info_cell.fg_brightness;
+                        if (state & CFLD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness        = info_cell.bg_brightness;
+                        if (state & CFLD_ALPHA)             target_cell[target_offset].alpha                = info_cell.alpha;
+                        if (state & CFLD_COLOR_MASK)        target_cell[target_offset].color_mask           = info_cell.color_mask;
+                        if (state & CFLD_SHADOW_MASK)       target_cell[target_offset].shadow_mask          = info_cell.shadow_mask;
                     }
                 }
             }
@@ -1584,16 +1607,16 @@ void init_cell (uint16_t pagegroup_id, uint16_t page_id, Rectangle target, EX_ce
     }
 }
 
-void clear_cell (uint16_t pagegroup_id, uint16_t page_id, Rectangle target, uint64_t state) {
+void clear_cell (uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint64_t state) {
     static inline EX_cell blank_cell;
-    init_cell(pagegroup_id, page_id, target, blank_cell, state);
+    init_cell(canvasgroup_id, canvas_id, target, blank_cell, state);
 }
 
-void shift_cell_field_rectangle(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, float shift, uint64_t state) {
+void shift_cell_field_rectangle(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, float shift, uint64_t state) {
     uint16_t target_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1602,35 +1625,35 @@ void shift_cell_field_rectangle(uint16_t pagegroup_id, uint16_t page_id, Rectang
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             target_offset = lsx * y + x;
-                        if (state & GFLD_STATE)             {target_cell[target_offset].state               += shift;} // 0xffffffff
-                        if (state & GFLD_VALUE)             {target_cell[target_offset].value               += shift;} // determined by texture # tiles
-                        if (state & GFLD_LINES)             {target_cell[target_offset].lines               += shift;} // 0...255
-                        if (state & GFLD_CYCLE)             {target_cell[target_offset].cycle_id            += shift;} // determined by texture # tiles
-                        if (state & GFLD_FG_COLOR)          {target_cell[target_offset].colorfg_id          += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_FG_COLOR_CYCLE)    {target_cell[target_offset].colorfg_cycle_id    += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_BG_COLOR)          {target_cell[target_offset].colorbg_id          += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_BG_COLOR_CYCLE)    {target_cell[target_offset].colorbg_cycle_id    += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_LINES_COLOR)       {target_cell[target_offset].colorln_id          += shift;} // 0...255 (or palette size)
-                        if (state & GFLD_LINES_COLOR_CYCLE) {target_cell[target_offset].colorln_cycle_id    += shift;} // 0...255 (or palette size)
-                        //if (state & GFLD_OFFSET)            {target_cell[target_offset].offset                += shift;} // Vector2 x,y
-                        //if (state & GFLD_SKEW)              {target_cell[target_offset].skew                  += shift;} // Vector2 x,y
-                        //if (state & GFLD_SCALE)             {target_cell[target_offset].scale                 += shift;} // Vector2 x,y
-                        //if (state & GFLD_SCALE_SPEED)       {target_cell[target_offset].scale_speed           += shift;} // 
-                        //if (state & GFLD_SCROLL_SPEED)      {target_cell[target_offset].scroll_speed          += shift;} // 
-                        if (state & GFLD_ANGLE)             {target_cell[target_offset].angle               += shift;} // 0...360
-                        if (state & GFLD_FG_BRIGHTNESS)     {target_cell[target_offset].fg_brightness       += shift;} // 0...255
-                        if (state & GFLD_BG_BRIGHTNESS)     {target_cell[target_offset].bg_brightness       += shift;} // 0...255
-                        //if (state & GFLD_COLOR_MASK)        {target_cell[target_offset].color_mask            += shift;} // Color
-                        //if (state & GFLD_SHADOW_MASK)       {target_cell[target_offset].shadow_mask           += shift;} // Color
+                        if (state & CFLD_STATE)             {target_cell[target_offset].state               += shift;} // 0xffffffff
+                        if (state & CFLD_VALUE)             {target_cell[target_offset].value               += shift;} // determined by texture # tiles
+                        if (state & CFLD_LINES)             {target_cell[target_offset].lines               += shift;} // 0...255
+                        if (state & CFLD_CYCLE)             {target_cell[target_offset].cycle_id            += shift;} // determined by texture # tiles
+                        if (state & CFLD_FG_COLOR)          {target_cell[target_offset].colorfg_id          += shift;} // 0...255 (or palette size)
+                        if (state & CFLD_FG_COLOR_CYCLE)    {target_cell[target_offset].colorfg_cycle_id    += shift;} // 0...255 (or palette size)
+                        if (state & CFLD_BG_COLOR)          {target_cell[target_offset].colorbg_id          += shift;} // 0...255 (or palette size)
+                        if (state & CFLD_BG_COLOR_CYCLE)    {target_cell[target_offset].colorbg_cycle_id    += shift;} // 0...255 (or palette size)
+                        if (state & CFLD_LINES_COLOR)       {target_cell[target_offset].colorln_id          += shift;} // 0...255 (or palette size)
+                        if (state & CFLD_LINES_COLOR_CYCLE) {target_cell[target_offset].colorln_cycle_id    += shift;} // 0...255 (or palette size)
+                        //if (state & CFLD_OFFSET)            {target_cell[target_offset].offset                += shift;} // Vector2 x,y
+                        //if (state & CFLD_SKEW)              {target_cell[target_offset].skew                  += shift;} // Vector2 x,y
+                        //if (state & CFLD_SCALE)             {target_cell[target_offset].scale                 += shift;} // Vector2 x,y
+                        //if (state & CFLD_SCALE_SPEED)       {target_cell[target_offset].scale_speed           += shift;} // 
+                        //if (state & CFLD_SCROLL_SPEED)      {target_cell[target_offset].scroll_speed          += shift;} // 
+                        if (state & CFLD_ANGLE)             {target_cell[target_offset].angle               += shift;} // 0...360
+                        if (state & CFLD_FG_BRIGHTNESS)     {target_cell[target_offset].fg_brightness       += shift;} // 0...255
+                        if (state & CFLD_BG_BRIGHTNESS)     {target_cell[target_offset].bg_brightness       += shift;} // 0...255
+                        //if (state & CFLD_COLOR_MASK)        {target_cell[target_offset].color_mask            += shift;} // Color
+                        //if (state & CFLD_SHADOW_MASK)       {target_cell[target_offset].shadow_mask           += shift;} // Color
         }
     }
 }
 
-void shift_cell_field_circle(uint16_t pagegroup_id, uint16_t page_id, Rectangle target, float shift, uint64_t state) {
+void shift_cell_field_circle(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, float shift, uint64_t state) {
     uint32_t linear_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1648,21 +1671,21 @@ void shift_cell_field_circle(uint16_t pagegroup_id, uint16_t page_id, Rectangle 
 
 
 typedef enum {
-    GRIDSHIFT_UP        = 1,
-    GRIDSHIFT_DOWN      = 2,
-    GRIDSHIFT_LEFT      = 3,
-    GRIDSHIFT_RIGHT     = 4,
-    GRIDSHIFT_UPLEFT    = 5,
-    GRIDSHIFT_DOWNLEFT  = 6,
-    GRIDSHIFT_UPRIGHT   = 7,
-    GRIDSHIFT_DOWNRIGHT = 8
+    CELLSHIFT_UP        = 1,
+    CELLSHIFT_DOWN      = 2,
+    CELLSHIFT_LEFT      = 3,
+    CELLSHIFT_RIGHT     = 4,
+    CELLSHIFT_UPLEFT    = 5,
+    CELLSHIFT_DOWNLEFT  = 6,
+    CELLSHIFT_UPRIGHT   = 7,
+    CELLSHIFT_DOWNRIGHT = 8
 } cell_direction;
 
-void copy_cell_in_page(uint16_t pagegroup_id, uint16_t page_id, Rectangle source, Vector2 target, uint64_t state) {
+void copy_cell_in_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle source, Vector2 target, uint64_t state) {
     uint32_t source_offset, target_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     
     if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
     if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.y + source.height) < 0) return;
@@ -1681,28 +1704,28 @@ void copy_cell_in_page(uint16_t pagegroup_id, uint16_t page_id, Rectangle source
                 if (x >= 0 && ((x + tx) < lsx) && (x + tx) >= 0) {
                     source_offset = lsx * y + x;
                     target_offset = lsx * (y + ty) + (x + tx);
-                    if (state & GFLD_ALL)                   cell[target_offset]                       = cell[source_offset];
+                    if (state & CFLD_ALL)                   cell[target_offset]                       = cell[source_offset];
                     else {
-                        if (state & GFLD_STATE)             cell[target_offset].state               = cell[source_offset].state;
-                        if (state & GFLD_VALUE)             cell[target_offset].value               = cell[source_offset].value;
-                        if (state & GFLD_LINES)             cell[target_offset].lines               = cell[source_offset].lines;
-                        if (state & GFLD_CYCLE)             cell[target_offset].cycle_id            = cell[source_offset].cycle_id;
-                        if (state & GFLD_FG_COLOR)          cell[target_offset].colorfg_id          = cell[source_offset].colorfg_id;
-                        if (state & GFLD_FG_COLOR_CYCLE)    cell[target_offset].colorfg_cycle_id    = cell[source_offset].colorfg_cycle_id;
-                        if (state & GFLD_BG_COLOR)          cell[target_offset].colorbg_id          = cell[source_offset].colorbg_id;
-                        if (state & GFLD_BG_COLOR_CYCLE)    cell[target_offset].colorbg_cycle_id    = cell[source_offset].colorbg_cycle_id;
-                        if (state & GFLD_LINES_COLOR)       cell[target_offset].colorln_id          = cell[source_offset].colorln_id;
-                        if (state & GFLD_LINES_COLOR_CYCLE) cell[target_offset].colorln_cycle_id    = cell[source_offset].colorln_cycle_id;
-                        if (state & GFLD_OFFSET)            cell[target_offset].offset              = cell[source_offset].offset;
-                        if (state & GFLD_SKEW)              cell[target_offset].skew                = cell[source_offset].skew;
-                        if (state & GFLD_SCALE)             cell[target_offset].scale               = cell[source_offset].scale;
-                        if (state & GFLD_SCALE_SPEED)       cell[target_offset].scale_speed         = cell[source_offset].scale_speed;
-                        if (state & GFLD_SCROLL_SPEED)      cell[target_offset].scroll_speed        = cell[source_offset].scroll_speed;
-                        if (state & GFLD_ANGLE)             cell[target_offset].angle               = cell[source_offset].angle;
-                        if (state & GFLD_FG_BRIGHTNESS)     cell[target_offset].fg_brightness       = cell[source_offset].fg_brightness;
-                        if (state & GFLD_BG_BRIGHTNESS)     cell[target_offset].bg_brightness       = cell[source_offset].bg_brightness;
-                        if (state & GFLD_COLOR_MASK)        cell[target_offset].color_mask          = cell[source_offset].color_mask;
-                        if (state & GFLD_SHADOW_MASK)       cell[target_offset].shadow_mask         = cell[source_offset].shadow_mask;
+                        if (state & CFLD_STATE)             cell[target_offset].state               = cell[source_offset].state;
+                        if (state & CFLD_VALUE)             cell[target_offset].value               = cell[source_offset].value;
+                        if (state & CFLD_LINES)             cell[target_offset].lines               = cell[source_offset].lines;
+                        if (state & CFLD_CYCLE)             cell[target_offset].cycle_id            = cell[source_offset].cycle_id;
+                        if (state & CFLD_FG_COLOR)          cell[target_offset].colorfg_id          = cell[source_offset].colorfg_id;
+                        if (state & CFLD_FG_COLOR_CYCLE)    cell[target_offset].colorfg_cycle_id    = cell[source_offset].colorfg_cycle_id;
+                        if (state & CFLD_BG_COLOR)          cell[target_offset].colorbg_id          = cell[source_offset].colorbg_id;
+                        if (state & CFLD_BG_COLOR_CYCLE)    cell[target_offset].colorbg_cycle_id    = cell[source_offset].colorbg_cycle_id;
+                        if (state & CFLD_LINES_COLOR)       cell[target_offset].colorln_id          = cell[source_offset].colorln_id;
+                        if (state & CFLD_LINES_COLOR_CYCLE) cell[target_offset].colorln_cycle_id    = cell[source_offset].colorln_cycle_id;
+                        if (state & CFLD_OFFSET)            cell[target_offset].offset              = cell[source_offset].offset;
+                        if (state & CFLD_SKEW)              cell[target_offset].skew                = cell[source_offset].skew;
+                        if (state & CFLD_SCALE)             cell[target_offset].scale               = cell[source_offset].scale;
+                        if (state & CFLD_SCALE_SPEED)       cell[target_offset].scale_speed         = cell[source_offset].scale_speed;
+                        if (state & CFLD_SCROLL_SPEED)      cell[target_offset].scroll_speed        = cell[source_offset].scroll_speed;
+                        if (state & CFLD_ANGLE)             cell[target_offset].angle               = cell[source_offset].angle;
+                        if (state & CFLD_FG_BRIGHTNESS)     cell[target_offset].fg_brightness       = cell[source_offset].fg_brightness;
+                        if (state & CFLD_BG_BRIGHTNESS)     cell[target_offset].bg_brightness       = cell[source_offset].bg_brightness;
+                        if (state & CFLD_COLOR_MASK)        cell[target_offset].color_mask          = cell[source_offset].color_mask;
+                        if (state & CFLD_SHADOW_MASK)       cell[target_offset].shadow_mask         = cell[source_offset].shadow_mask;
                     }
                 }
                 x += xi; if (xi == 1) {if (x >= xb) break;} else if (x < xb) break;
@@ -1713,11 +1736,11 @@ void copy_cell_in_page(uint16_t pagegroup_id, uint16_t page_id, Rectangle source
 }
 
 // Move cell content to any of 8 directions
-void shift_cell (uint16_t pagegroup_id, uint16_t page_id, Rectangle source, uint8_t shift_method, bool cycle, uint64_t state) {
+void shift_cell (uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle source, uint8_t shift_method, bool cycle, uint64_t state) {
     uint32_t source_offset, target_offset;
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    uint16_t lsx = page->size.x, lsy = page->size.y;
-    EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    EX_cell  *cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     //if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
     //if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.y + source.height) < 0) return;
@@ -1726,16 +1749,16 @@ void shift_cell (uint16_t pagegroup_id, uint16_t page_id, Rectangle source, uint
 
 }
 
-void copy_cell_to_page(uint16_t source_pagegroup_id, uint16_t source_page_id, Rectangle source, uint16_t target_pagegroup_id, uint16_t target_page_id, Vector2 target, uint64_t state) {
+void copy_cell_to_canvas(uint16_t source_canvasgroup_id, uint16_t source_canvas_id, Rectangle source, uint16_t target_canvasgroup_id, uint16_t target_canvas_id, Vector2 target, uint64_t state) {
     uint32_t source_offset, target_offset;
 
-    EX_page *source_page = &sys.video.pagegroup[source_pagegroup_id].page[source_page_id];
-    uint16_t lsx = source_page->size.x, lsy = source_page->size.y;
-    EX_cell  *source_cell  = &sys.video.pagegroup[source_pagegroup_id].page[source_page_id].cell[0];
+    EX_canvas *source_canvas = &sys.video.canvasgroup[source_canvasgroup_id].canvas[source_canvas_id];
+    uint16_t lsx = source_canvas->size.x, lsy = source_canvas->size.y;
+    EX_cell  *source_cell  = &sys.video.canvasgroup[source_canvasgroup_id].canvas[source_canvas_id].cell[0];
 
-    EX_page *target_page = &sys.video.pagegroup[target_pagegroup_id].page[target_page_id];
-    uint16_t ltx = target_page->size.x, lty = target_page->size.y;
-    EX_cell  *target_cell  = &sys.video.pagegroup[target_pagegroup_id].page[target_page_id].cell[0];
+    EX_canvas *target_canvas = &sys.video.canvasgroup[target_canvasgroup_id].canvas[target_canvas_id];
+    uint16_t ltx = target_canvas->size.x, lty = target_canvas->size.y;
+    EX_cell  *target_cell  = &sys.video.canvasgroup[target_canvasgroup_id].canvas[target_canvas_id].cell[0];
 
     if (source.x >= lsx || source.y >= lsy || target.x >= ltx || target.y >= lty) return;
     if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.x + source.height) < 0) return;
@@ -1751,30 +1774,30 @@ void copy_cell_to_page(uint16_t source_pagegroup_id, uint16_t source_page_id, Re
                     source_offset = lsx * y + x;
                     target_offset = ltx * (y + ty) + (x + tx);
 
-//    if (!(state & GRFE_PROTECTED))   // if not protected destination field, then you can write
+//    if (!(state & CVFE_PROTECTED))   // if not protected destination field, then you can write
 
-                    if (state & GFLD_ALL)                   target_cell[target_offset]                      = source_cell[source_offset];
+                    if (state & CFLD_ALL)                   target_cell[target_offset]                      = source_cell[source_offset];
                     else {
-                        if (state & GFLD_STATE)             target_cell[target_offset].state                = source_cell[source_offset].state;
-                        if (state & GFLD_VALUE)             target_cell[target_offset].value                = source_cell[source_offset].value;
-                        if (state & GFLD_LINES)             target_cell[target_offset].lines                = source_cell[source_offset].lines;
-                        if (state & GFLD_CYCLE)             target_cell[target_offset].cycle_id             = source_cell[source_offset].cycle_id;
-                        if (state & GFLD_FG_COLOR)          target_cell[target_offset].colorfg_id           = source_cell[source_offset].colorfg_id;
-                        if (state & GFLD_FG_COLOR_CYCLE)    target_cell[target_offset].colorfg_cycle_id     = source_cell[source_offset].colorfg_cycle_id;
-                        if (state & GFLD_BG_COLOR)          target_cell[target_offset].colorbg_id           = source_cell[source_offset].colorbg_id;
-                        if (state & GFLD_BG_COLOR_CYCLE)    target_cell[target_offset].colorbg_cycle_id     = source_cell[source_offset].colorbg_cycle_id;
-                        if (state & GFLD_LINES_COLOR)       target_cell[target_offset].colorln_id           = source_cell[source_offset].colorln_id;
-                        if (state & GFLD_LINES_COLOR_CYCLE) target_cell[target_offset].colorln_cycle_id     = source_cell[source_offset].colorln_cycle_id;
-                        if (state & GFLD_OFFSET)            target_cell[target_offset].offset               = source_cell[source_offset].offset;
-                        if (state & GFLD_SKEW)              target_cell[target_offset].skew                 = source_cell[source_offset].skew;
-                        if (state & GFLD_SCALE)             target_cell[target_offset].scale                = source_cell[source_offset].scale;
-                        if (state & GFLD_SCALE_SPEED)       target_cell[target_offset].scale_speed          = source_cell[source_offset].scale_speed;
-                        if (state & GFLD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed         = source_cell[source_offset].scroll_speed;
-                        if (state & GFLD_ANGLE)             target_cell[target_offset].angle                = source_cell[source_offset].angle;
-                        if (state & GFLD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness        = source_cell[source_offset].fg_brightness;
-                        if (state & GFLD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness        = source_cell[source_offset].bg_brightness;
-                        if (state & GFLD_COLOR_MASK)        target_cell[target_offset].color_mask           = source_cell[source_offset].color_mask;
-                        if (state & GFLD_SHADOW_MASK)       target_cell[target_offset].shadow_mask          = source_cell[source_offset].shadow_mask;
+                        if (state & CFLD_STATE)             target_cell[target_offset].state                = source_cell[source_offset].state;
+                        if (state & CFLD_VALUE)             target_cell[target_offset].value                = source_cell[source_offset].value;
+                        if (state & CFLD_LINES)             target_cell[target_offset].lines                = source_cell[source_offset].lines;
+                        if (state & CFLD_CYCLE)             target_cell[target_offset].cycle_id             = source_cell[source_offset].cycle_id;
+                        if (state & CFLD_FG_COLOR)          target_cell[target_offset].colorfg_id           = source_cell[source_offset].colorfg_id;
+                        if (state & CFLD_FG_COLOR_CYCLE)    target_cell[target_offset].colorfg_cycle_id     = source_cell[source_offset].colorfg_cycle_id;
+                        if (state & CFLD_BG_COLOR)          target_cell[target_offset].colorbg_id           = source_cell[source_offset].colorbg_id;
+                        if (state & CFLD_BG_COLOR_CYCLE)    target_cell[target_offset].colorbg_cycle_id     = source_cell[source_offset].colorbg_cycle_id;
+                        if (state & CFLD_LINES_COLOR)       target_cell[target_offset].colorln_id           = source_cell[source_offset].colorln_id;
+                        if (state & CFLD_LINES_COLOR_CYCLE) target_cell[target_offset].colorln_cycle_id     = source_cell[source_offset].colorln_cycle_id;
+                        if (state & CFLD_OFFSET)            target_cell[target_offset].offset               = source_cell[source_offset].offset;
+                        if (state & CFLD_SKEW)              target_cell[target_offset].skew                 = source_cell[source_offset].skew;
+                        if (state & CFLD_SCALE)             target_cell[target_offset].scale                = source_cell[source_offset].scale;
+                        if (state & CFLD_SCALE_SPEED)       target_cell[target_offset].scale_speed          = source_cell[source_offset].scale_speed;
+                        if (state & CFLD_SCROLL_SPEED)      target_cell[target_offset].scroll_speed         = source_cell[source_offset].scroll_speed;
+                        if (state & CFLD_ANGLE)             target_cell[target_offset].angle                = source_cell[source_offset].angle;
+                        if (state & CFLD_FG_BRIGHTNESS)     target_cell[target_offset].fg_brightness        = source_cell[source_offset].fg_brightness;
+                        if (state & CFLD_BG_BRIGHTNESS)     target_cell[target_offset].bg_brightness        = source_cell[source_offset].bg_brightness;
+                        if (state & CFLD_COLOR_MASK)        target_cell[target_offset].color_mask           = source_cell[source_offset].color_mask;
+                        if (state & CFLD_SHADOW_MASK)       target_cell[target_offset].shadow_mask          = source_cell[source_offset].shadow_mask;
                     }
                 }
             }
@@ -1782,19 +1805,19 @@ void copy_cell_to_page(uint16_t source_pagegroup_id, uint16_t source_page_id, Re
     }
 }
 
-void copy_page() {
-    // copy page routine, mostly used for backup restore of page content from / to a copy buffer
+void copy_canvas() {
+    // copy canvas routine, mostly used for backup restore of canvas content from / to a copy buffer
 }
 
-void render_page(uint16_t page_id, Vector2 rendersize) {
+void render_canvas(uint16_t canvas_id, Vector2 rendersize) {
     static Color vertex_colors[4];
-    uint16_t pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
+    uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
 
-    EX_page *page = &sys.video.pagegroup[pagegroup_id].page[page_id];
-    EX_cell  *cell  = &sys.video.pagegroup[pagegroup_id].page[page_id].cell[0];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    EX_cell  *cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     uint32_t cell_offset;
-    Vector2 shadow = page->shadow;
-    uint16_t lsx = page->size.x, lsy = page->size.y;
+    Vector2 shadow = canvas->shadow;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
     for (uint16_t x = 0; x < lsx; x++) {
         for (uint16_t y = 0; y < lsy; y++) {
             cell_offset = lsx * y + x;
@@ -1802,53 +1825,53 @@ void render_page(uint16_t page_id, Vector2 rendersize) {
             uint64_t state = c->state;
 
             // establish scaling on screen....  For a 512x224 display = 64x28 tiles of 8 x 8 pixels, for that we need a ratio for x and y
-            Vector2 tsize  = page->default_tilesize;
+            Vector2 tsize  = canvas->default_tilesize;
             Vector2 tscaled = {c->scale.x * tsize.x, c->scale.y * tsize.y};
             Vector2 offset = c->offset;
-            Vector2 cellpos = {page->offset.x + offset.x + x * tsize.x, page->offset.y + offset.y + y * tsize.y};
-            Vector2 skew; if (!(state & GRFE_SKEW))     skew = (Vector2){0}; else skew = c->skew;
+            Vector2 cellpos = {canvas->offset.x + offset.x + x * tsize.x, canvas->offset.y + offset.y + y * tsize.y};
+            Vector2 skew; if (!(state & CVFE_SKEW))     skew = (Vector2){0}; else skew = c->skew;
 
             // if inbound proceed to draw cell tiles
             if (((cellpos.x + tscaled.x + skew.x) >= 0) && ((cellpos.y + tscaled.y + skew.y) >= 0) && ((cellpos.x) <= rendersize.x) && ((cellpos.y) <= rendersize.y)) {
 
 /*  All STATES (exhaustive logic)
     // This is a different beast and not sure yet how to handle sequences
-    GRFE_LINESSEQ            // turn on lines sequencing
-    GRFE_COLORSEQ            // turn on color sequencing
-    GRFE_VALUESEQ            // turn on cell value sequencing
+    CVFE_LINESSEQ            // turn on lines sequencing
+    CVFE_COLORSEQ            // turn on color sequencing
+    CVFE_VALUESEQ            // turn on cell value sequencing
     // This is a different beast and not sure yet how to handle scrolling of tiles
-    GRFE_AUTOSCRX            // turn on automatic scrolling on x axis
-    GRFE_AUTOSCRY            // turn on automatic scrolling on y axis
-    if (state & GRFE_ROTATION) // then allow using the rotation value else use 0 
-    if (state & GRFE_SKEW)   // then allow using the skew value else use 0
-    if (state & GRFE_CELLDIS)  // then allow corner displacements
-    GRFE_SCALE_X             // turn on cell scaling on x axis
-    GRFE_SCALE_Y             // turn on cell scaling on y axis
-    GRFE_WRAP_X              // turn on wrap around on x axis
-    GRFE_WRAP_Y              // turn on wrap around on y axis
-    GRFE_FLIPH               // flip cell(s) horizontally
-    GRFE_FLIPV               // flip cell(s) vertically
+    CVFE_AUTOSCRX            // turn on automatic scrolling on x axis
+    CVFE_AUTOSCRY            // turn on automatic scrolling on y axis
+    if (state & CVFE_ROTATION) // then allow using the rotation value else use 0 
+    if (state & CVFE_SKEW)   // then allow using the skew value else use 0
+    if (state & CVFE_CELLDIS)  // then allow corner displacements
+    CVFE_SCALE_X             // turn on cell scaling on x axis
+    CVFE_SCALE_Y             // turn on cell scaling on y axis
+    CVFE_WRAP_X              // turn on wrap around on x axis
+    CVFE_WRAP_Y              // turn on wrap around on y axis
+    CVFE_FLIPH               // flip cell(s) horizontally
+    CVFE_FLIPV               // flip cell(s) vertically
 */
                 uint16_t palette_id = c->palette_id;
-                if (!palette_id)    palette_id = page->default_palette_id;
-                // for now only page alpha supported, per cell alpha will force to use float to combine page and cell alpha (potentially), or set the texture alpha as the page alpha
-                Color colorfg = get_palette_color_pro(palette_id, c->colorfg_id, page->alpha, c->fg_brightness * page->fg_brightness);
-                Color colorbg = get_palette_color_pro(palette_id, c->colorbg_id, page->alpha, c->bg_brightness * page->bg_brightness);
+                if (!palette_id)    palette_id = canvas->default_palette_id;
+                // for now only canvas alpha supported, per cell alpha will force to use float to combine canvas and cell alpha (potentially), or set the texture alpha as the canvas alpha
+                Color colorfg = get_palette_color_pro(palette_id, c->colorfg_id, canvas->alpha, c->fg_brightness * canvas->fg_brightness);
+                Color colorbg = get_palette_color_pro(palette_id, c->colorbg_id, canvas->alpha, c->bg_brightness * canvas->bg_brightness);
                 Color colorln = get_palette_color(palette_id, c->colorln_id);
  
-                float angle; if (!(state & GRFE_ROTATION))  angle = 0.f; else  angle = c->angle;
+                float angle; if (!(state & CVFE_ROTATION))  angle = 0.f; else  angle = c->angle;
 
-                if (state & GRFE_BACKGROUND) {
+                if (state & CVFE_BACKGROUND) {
                     // background set color of corner to color of next tile 
-                    //    GRFE_BGBLEND_LL       // background vertex color blend lower left
-                    //    GRFE_BGBLEND_LR       // background vertex color blend lower right
-                    //    GRFE_BGBLEND_UR       // background vertex color blend upper right
-                    //    GRFE_BGBLEND_UL       // background vertex color blend upper left
+                    //    CVFE_BGBLEND_LL       // background vertex color blend lower left
+                    //    CVFE_BGBLEND_LR       // background vertex color blend lower right
+                    //    CVFE_BGBLEND_UR       // background vertex color blend upper right
+                    //    CVFE_BGBLEND_UL       // background vertex color blend upper left
                     // to elaborate color blending between tiles... (will involve snooping all 4 directions for color depend on blending options)
-                    if (state & GRFE_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
-                    if (state & GRFE_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
-                    if (state & GRFE_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
-                    if (state & GRFE_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
+                    if (state & CVFE_RED)   vertex_colors[0].r = colorbg.r; else vertex_colors[0].r = 0;
+                    if (state & CVFE_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
+                    if (state & CVFE_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
+                    if (state & CVFE_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
                     vertex_colors[1] = vertex_colors[0]; //  for now just copy the color content to all corners... (TEMPORARY) *******************
                     vertex_colors[2] = vertex_colors[0];
                     vertex_colors[3] = vertex_colors[0];
@@ -1857,10 +1880,10 @@ void render_page(uint16_t page_id, Vector2 rendersize) {
                         (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
                 }
                 uint16_t asset_id = c->asset_id;
-                if (!asset_id) asset_id = page->default_asset_id;
-                if (state & GRFE_FOREGROUND) {
+                if (!asset_id) asset_id = canvas->default_asset_id;
+                if (state & CVFE_FOREGROUND) {
                     uint16_t value = c->value;
-                    if (state & GRFE_SHADOW) {
+                    if (state & CVFE_SHADOW) {
                         vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
                         vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
                         vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
@@ -1873,14 +1896,14 @@ void render_page(uint16_t page_id, Vector2 rendersize) {
                     // we have the cell data we can use it to draw our background, foreground and shadow
                     // reading color from palette get_palette_color(palette,id);
                     // foreground set color of corner to color of next tile 
-                    //    GRFE_FGBLEND_LL       // foreground vertex color blend lower left
-                    //    GRFE_FGBLEND_LR       // foreground vertex color blend lower right
-                    //    GRFE_FGBLEND_UR       // foreground vertex color blend upper right
-                    //    GRFE_FGBLEND_UL       // foreground vertex color blend upper left
-                    if (state & GRFE_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
-                    if (state & GRFE_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
-                    if (state & GRFE_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
-                    if (state & GRFE_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
+                    //    CVFE_FGBLEND_LL       // foreground vertex color blend lower left
+                    //    CVFE_FGBLEND_LR       // foreground vertex color blend lower right
+                    //    CVFE_FGBLEND_UR       // foreground vertex color blend upper right
+                    //    CVFE_FGBLEND_UL       // foreground vertex color blend upper left
+                    if (state & CVFE_RED)   vertex_colors[0].r = colorfg.r; else vertex_colors[0].r = 0;
+                    if (state & CVFE_GREEN) vertex_colors[0].g = colorfg.g; else vertex_colors[0].g = 0;
+                    if (state & CVFE_BLUE)  vertex_colors[0].b = colorfg.b; else vertex_colors[0].b = 0;
+                    if (state & CVFE_ALPHA) vertex_colors[0].a = colorfg.a; else vertex_colors[0].a = 0;
                     vertex_colors[1] = vertex_colors[0];
                     vertex_colors[2] = vertex_colors[0];
                     vertex_colors[3] = vertex_colors[0];
@@ -1890,12 +1913,12 @@ void render_page(uint16_t page_id, Vector2 rendersize) {
                         (Vector2) {0,0}, skew, angle, vertex_colors);
                 }
 
-                uint8_t lines = GET_FROM_STATE(state, GRFE_LINES_MASK, GRFE_LINES_BITS);
+                uint8_t lines = GET_FROM_STATE(state, CVFE_LINES_MASK, CVFE_LINES_BITS);
                 if (lines) {
-                    if (state & GRFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
-                    if (state & GRFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
-                    if (state & GRFE_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
-                    if (state & GRFE_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
+                    if (state & CVFE_RED)   vertex_colors[0].r = colorln.r; else vertex_colors[0].r = 0;
+                    if (state & CVFE_GREEN) vertex_colors[0].g = colorln.g; else vertex_colors[0].g = 0;
+                    if (state & CVFE_BLUE)  vertex_colors[0].b = colorln.b; else vertex_colors[0].b = 0;
+                    if (state & CVFE_ALPHA) vertex_colors[0].a = colorln.a; else vertex_colors[0].a = 0;
                     vertex_colors[1] = vertex_colors[0];
                     vertex_colors[2] = vertex_colors[0];
                     vertex_colors[3] = vertex_colors[0];
@@ -1913,27 +1936,28 @@ void render_page(uint16_t page_id, Vector2 rendersize) {
 }
 
 // does the execution of the modifiers
-void process_page(uint16_t page_id) {
+void process_canvas(uint16_t canvas_id) {
     // modifiers logic
     // temporal considerations
 }
 
-void render_pagegroup() {
-    uint16_t pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
-    EX_pagegroup  *pagegroup  = &sys.video.pagegroup[pagegroup_id];
+void render_canvasgroup() {
+    uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
+    EX_canvasgroup  *canvasgroup  = &sys.video.canvasgroup[canvasgroup_id];
 
     begin_draw(true);
-    for (uint16_t i = 0; i < sys.video.pagegroup[pagegroup_id].page_count; i++) {
-        render_page(i, sys.video.virtual_res[sys.video.current_virtual]);
+    for (uint16_t i = 0; i < sys.video.canvasgroup[canvasgroup_id].canvas_count; i++) {
+        // get_current_virtual_size()
+        render_canvas(i, sys.video.virtual_res[sys.video.current_virtual]);
     }
     return 0;
     end_draw();
 }
 
-void process_pagegroup(uint16_t pagegroup_id) {
-    uint16_t page_id = 0;
-    //process_pagegroup();
-    render_pagegroup();
+void process_canvasgroup(uint16_t canvasgroup_id) {
+    uint16_t canvas_id = 0;
+    //process_canvasgroup();
+    render_canvasgroup();
 }
 
 
@@ -2117,7 +2141,7 @@ uint16_t load_asset (uint32_t assettype, const char* fileName, const char* fileT
             break;
 
             case ASSET_FRAMEBUFFER : // set current_virtual prior to use
-            sys.asset.framebuffer[id] = LoadRenderTexture( sys.video.virtual_res[sys.video.current_virtual].x, sys.video.virtual_res[sys.video.current_virtual].y );
+            sys.asset.framebuffer[id] = LoadRenderTexture(get_current_virtual_size().x, get_current_virtual_size().y);
             BITS_ON(sys.asset.state[id], ASSET_LOADED);
             SetTextureFilter(sys.asset.framebuffer[id].texture, FILTER_POINT);
             sys.asset.data_size[id] = dataSize; // ??????????? WRONG !! There is no dataSize passed... so that is a NULL
@@ -2717,7 +2741,7 @@ typedef struct particle {
 } particle;
 
 particle init_particle(Texture texture, Vector2 r1, Vector2 speed) {
-	Vector2 res = sys.video.virtual_res[sys.video.current_virtual];
+	Vector2 res = get_current_virtual_size();
 	particle p;
 	p.texture = texture;
 	p.position = r1;
@@ -2735,7 +2759,7 @@ particle init_particle(Texture texture, Vector2 r1, Vector2 speed) {
 };
 
 void update_particle(particle *particle, Vector2 velocity) {
-	Vector2 res = sys.video.virtual_res[sys.video.current_virtual];
+	Vector2 res = get_current_virtual_size();
     velocity.x *= sys.video.frame_time[sys.video.current_virtual];
     velocity.y *= sys.video.frame_time[sys.video.current_virtual];
 	for(uint16_t i = 0; i < MAXPARTICLES; i++) {
@@ -2778,7 +2802,7 @@ static void copper_animation(int16_t direction, uint16_t asset, uint16_t segment
     static float y_start;
     static uint16_t copper;
     uint16_t display = sys.video.current_virtual;
-    Vector2 vres = sys.video.virtual_res[sys.video.current_virtual];
+    Vector2 vres = get_current_virtual_size();
 	float size_x = vres.x / (float)segments;
     float amp = (vres.y * scale) - (size_y * 0.5);
     for(uint16_t y = 0; y < coppers; y++) {
@@ -2812,6 +2836,7 @@ EX_marquee ex_marquee[MAXDISPLAYS];
 
 static void update_marquee_animation(uint16_t asset_id, uint16_t palette_id, Vector2 logosize, float transparency, Vector2 offset, float speed, float shadow_transparency) {
     uint16_t display = sys.video.current_virtual;
+    Vector2 vres = get_current_virtual_size();
     if (ex_marquee[display].palptr_next_frame_time < sys.video.frame_time_inc[display]) {
         ex_marquee[display].palptr_next_frame_time = sys.video.frame_time_inc[display] + 1/absf(speed);
         if (speed > 0.0f) {
@@ -2825,7 +2850,7 @@ static void update_marquee_animation(uint16_t asset_id, uint16_t palette_id, Vec
 
     if (transparency > 0.0f) {
         Vector2 scale = {(255.0f - transparency) * 0.01f + 1.0f, 1.0f};
-        Vector2 final_offset = {offset.x + (sys.video.virtual_res[sys.video.current_virtual].x-(logosize.x * scale.x))/2.0, offset.y};
+        Vector2 final_offset = {offset.x + (vres.x-(logosize.x * scale.x))/2.0, offset.y};
         for(uint16_t i = 0; i < logosize.y; i++) {
             if (palptr_loop > 255) {palptr_loop -= 256;} else if (palptr_loop < 0) {palptr_loop += 256;};
             
@@ -2903,9 +2928,10 @@ static void init_canopy (uint16_t font_id, uint16_t palette_id, Vector2 cells, V
 }
 
 static void update_canopy(uint16_t asset_id) {
-    ex_canopy.offset.x = (sys.video.virtual_res[sys.video.current_virtual].x-((ex_canopy.cells_x+1)*ex_canopy.cell_size.x))*0.5f;
+    Vector2 vres = get_current_virtual_size();
+    ex_canopy.offset.x = (vres.x - ((ex_canopy.cells_x + 1) * ex_canopy.cell_size.x)) * 0.5f;
     ex_canopy.offset.y = 7.0f * ex_canopy.cell_size.x + (255.f - ex_canopy.transparency);
-    if ((ex_canopy.transparency > 0.0f) & (ex_canopy.offset.y <= sys.video.virtual_res[sys.video.current_virtual].y)) {
+    if ((ex_canopy.transparency > 0.0f) & (ex_canopy.offset.y <= vres.y)) {
             
         Vector2 cell_size;
         int16_t col_idx;
@@ -2961,10 +2987,11 @@ static void update_canopy(uint16_t asset_id) {
 const Color colorbar[] = {{255,255,255,255}, {255,255,0,255}, {0,255,255,255}, {0,255,0,255}, {255,0,255,255}, {255,0,0,255}, {0,0,255,255}, {0,0,0,255}};
 
 static void draw_colorbar(void) {
+    Vector2 vres = get_current_virtual_size();
     uint16_t bar_count = sizeof(colorbar) / sizeof(Color);
-    float x = sys.video.virtual_res[sys.video.current_virtual].x * 1/bar_count;
+    float x = vres.x * 1/bar_count;
     for (uint16_t i = 0; i < bar_count; i++) {
-        DrawRectangle(i * x, 0, x, sys.video.virtual_res[sys.video.current_virtual].y, (Color) colorbar[i]);        
+        DrawRectangle(i * x, 0, x, vres.y, (Color) colorbar[i]);        
     }
 }
 
@@ -3067,6 +3094,7 @@ uint16_t scrolltext_color_pick(int16_t id) {
 
 static void update_scrolltext(uint16_t s, float text_scale) {
     uint16_t palette_id = ex_scrolltext[s].palette_id;
+    Vector2 vres = get_current_virtual_size();
     
     if (ex_scrolltext[s].text_pause <= 0.0) {
         ex_scrolltext[s].position.x -= (sys.video.frame_time[sys.video.current_virtual] * ex_scrolltext[s].text_scroll_speed) / text_scale;
@@ -3143,7 +3171,7 @@ static void update_scrolltext(uint16_t s, float text_scale) {
             ex_scrolltext[s].colorfg_flag = 0;
             break;
         default:
-            if(((ex_scrolltext[s].position.x + (i_x - 1)) * text_scale ) < sys.video.virtual_res[sys.video.current_virtual].x && ((ex_scrolltext[s].position.x + (i_x + 2)) * text_scale ) > 0) {
+            if(((ex_scrolltext[s].position.x + (i_x - 1)) * text_scale ) < vres.x && ((ex_scrolltext[s].position.x + (i_x + 2)) * text_scale ) > 0) {
                 if (ch == SCROLL_PAUSE) { // pause the scroll x amount of seconds (a-z = 1 to 26 seconds)
                     i++;
                     if (ex_scrolltext[s].pause_found != (i - 1)) {
@@ -3182,11 +3210,11 @@ static void update_scrolltext(uint16_t s, float text_scale) {
                     };
 
                     uint64_t state = 0;
-                    BITS_ON(state, GRFE_DEFAULT2);
-                    if (ex_scrolltext[s].colorbg_flag == 0) BITS_OFF(state, GRFE_BACKGROUND);
-                    if (!(ex_scrolltext[s].text_angle))     BITS_OFF(state, GRFE_ROTATION);
-                    if (ex_scrolltext[s].text_shadow == 0.0) BITS_OFF(state, GRFE_SHADOW);
-                    if (ex_scrolltext[s].text_angle)        BITS_OFF(state, GRFE_SKEW);
+                    BITS_ON(state, CVFE_DEFAULT2);
+                    if (ex_scrolltext[s].colorbg_flag == 0) BITS_OFF(state, CVFE_BACKGROUND);
+                    if (!(ex_scrolltext[s].text_angle))     BITS_OFF(state, CVFE_ROTATION);
+                    if (ex_scrolltext[s].text_shadow == 0.0) BITS_OFF(state, CVFE_SHADOW);
+                    if (ex_scrolltext[s].text_angle)        BITS_OFF(state, CVFE_SKEW);
 
                     plot_character(ex_scrolltext[s].font_id, ex_scrolltext[s].palette_id, ch, 
                         (Vector2) {(ex_scrolltext[s].position.x +  i_x) * text_scale, (ex_scrolltext[s].position.y * text_scale) + ex_scrolltext[s].text_wave}, 
@@ -3208,7 +3236,7 @@ static void update_scrolltext(uint16_t s, float text_scale) {
 	};
 
     if (ex_scrolltext[s].position.x < -i_x) {
-        ex_scrolltext[s].position.x = sys.video.virtual_res[sys.video.current_virtual].x / text_scale;
+        ex_scrolltext[s].position.x = vres.x / text_scale;
         ex_scrolltext[s].pause_found = 0;
     };
 }
@@ -3298,8 +3326,8 @@ typedef enum {
     CMD_SEP     = 59,   // Value separator for numeric parameter characters ( ; ) 
     CMD_ST      = 92,   // String Terminator ( \ )
     CMD_OSC     = 93,   // Operating System Command ( ] )
-    CMD_PM      = 94,   // CSI ^    Privacy message (String Control Sequence)
-    CMD_APC     = 95,   // CSI _    Application Program Command (for embedding custom commands)
+    CMD_PM      = 94,   // ^    Privacy message (String Control Sequence)
+    CMD_APC     = 95,   // _    Application Program Command (for embedding custom commands)
 
     CMD_6       = 54,   // Move cursor back 1 column
     CMD_9       = 57,   // Move cursor forward 1 column
@@ -3322,237 +3350,296 @@ typedef enum {
     CMD_V       = 86,   // (VT-52) Print Cursor Line
     CMD_W       = 87,   // (VT-52) Enter printer controller mode
     CMD_X       = 88,   // (VT-52) Exit printer controller mode
-    CMD_Y       = 89,   // (VT-52) Direct cursor address CSIY10 20
+    CMD_Y       = 89,   // (VT-52) Direct cursor address, example: CSIY10 20
     CMD_Z       = 90,   // (VT-52) Identify (DECID)
     CMD_CL      = 93,   // (VT-52) Print screen
     CMD_EX      = 94,   // (VT-52) Enter auto print mode
     CMD_UN      = 95,   // (VT-52) Exit auto print mode
-    CMD_LA      = 35,   // Line Attribute: Double height = CSI#3 Top Half, CSI#4 Bottom Half, Width = CSI#5 Single Width Line, CSI#6 Double Width Line
-    CMD_DECALN  = 56,   // CSI#8    Screen Alignment Pattern; sets margins to extreem of pagegroup and cursor to home, fills display with pattern
-    CMD_RIS     = 99,   // CSIc     Reset to Initial State (Performs a communications line disconnect.  Clears UDKs.    Clears a down-line-loaded character set.
+    CMD_LA      = 35,   // Line Attribute: Double height = #3 Top Half, #4 Bottom Half, Width = #5 Single Width Line, #6 Double Width Line
+    CMD_DECALN  = 56,   // #8    Screen Alignment Pattern; sets margins to extreem of canvasgroup and cursor to home, fills display with pattern
+    CMD_RIS     = 99,   // c     Reset to Initial State (Performs a communications line disconnect.  Clears UDKs.    Clears a down-line-loaded character set.
                         // Clears the screen.  Returns the cursor to the upper-left corner of the screen.  Sets the SGR state to normal.
                         // Sets the selective erase attribute write state to "not erasable".   Sets all character sets to the default.)
-    CMD_DCS     = 80,   // CSIP{Pc;Pl|Ky1/st1;ky2/st2;...kyn/stn}ST  Device Control String Introducer(P)
+    CMD_DCS     = 80,   // P{Pc;Pl|Ky1/st1;ky2/st2;...kyn/stn}ST  Device Control String Introducer(P)
                         // {Pc} None or 0 = Clear all keys before loading new values. 1 = Load new key values, clear old ones
                         // {pl} None	or 0 = Lock the keys. (Cannot be redefined.) 1 = Do not lock the keys. (Can be redefined.)
                         // {Kyn/Stn} Function Key Definition string where Kyn = number (1 - 12), Stn = String parameter (up to 1024 char)
                         // User programmed function keys are accessed using the shift + Fn key combo
-                        // CSIP{Ps v D...D}ST Load Answerback Message
+                        // P{Ps v D...D}ST Load Answerback Message
                         // answerback data string may consist of from 0 to 30, 8-bit characters
                         // Ps =decoding mode, 1 = standard for VT510
-                        // CSIP{Ps r D...D}ST Load Banner Message
+                        // P{Ps r D...D}ST Load Banner Message
                         // Ps = 0 Omitted, 1 Interprets as ASCII, 2 Loads as text in VT default character set
                         // D...D is a 30 character string
 
-    CMD_DECSC   = 55,   // CSI 7    DEC Save cursor (position, graphic rendition, character set shift state, state of wrap flag, state of origin mode, state of selective erase)
-    CMD_DECRC   = 56,   // CSI 8    DEC Restore Cursor
-    CMD_CUU     = 65,   // CSI #A   Cursor Up: move cursor up # lines
-    CMD_CUD     = 66,   // CSI #B   Cursor Down: move cursor down # lines
-    CMD_CUF     = 67,   // CSI #C   Cursor Forward: move cursor right # columns
-    CMD_CUB     = 68,   // CSI #D   Cursor Backwards: move cursor left # columns
-    CMD_CNL     = 69,   // CSI #E   Cursor Next Line: moves cursor to beginning of next line, # lines down
-    CMD_CPL     = 70,   // CSI #F   Cursor Previous Line: moves cursor to beginning of previous line, # lines down
-    CMD_CHA     = 71,   // CSI #G   moves cursor to column # (Horizontal absolute)
-    CMD_CUP     = 72,   // Cursor Position (ie. CSI H = cursor to home position (0, 0), CSI {line};{column}H = cursor to specific cell
-    CMD_CHT     = 73,   // CSI #I   Cursor Horizontal Forward Tabulation (where # is the number of tabs)
+    CMD_DECSC   = 55,   // 7    DEC Save cursor (position, graphic rendition, character set shift state, state of wrap flag, state of origin mode, state of selective erase)
+    CMD_DECRC   = 56,   // 8    DEC Restore Cursor
+    CMD_CUU     = 65,   // #A   Cursor Up: move cursor up # lines
+    CMD_CUD     = 66,   // #B   Cursor Down: move cursor down # lines
+    CMD_CUF     = 67,   // #C   Cursor Forward: move cursor right # columns
+    CMD_CUB     = 68,   // #D   Cursor Backwards: move cursor left # columns
+    CMD_CNL     = 69,   // #E   Cursor Next Line: moves cursor to beginning of next line, # lines down
+    CMD_CPL     = 70,   // #F   Cursor Previous Line: moves cursor to beginning of previous line, # lines down
+    CMD_CHA     = 71,   // #G   moves cursor to column # (Horizontal absolute)
+    CMD_CUP     = 72,   // Cursor Position (ie.  H = cursor to home position (0, 0),  {line};{column}H = cursor to specific cell
+    CMD_CHT     = 73,   // #I   Cursor Horizontal Forward Tabulation (where # is the number of tabs)
     CMD_ED      = 74,   // Erase in Display
-                        // CSI J    Erase from the cursor position to end of display (line attr become single width / height on erased lines)
-                        // CSI 0J   <same as above>
-                        // CSI 1J   clears from cursor to beginning of display
-                        // CSI 2J   clears entire display
-                        // CSI ?J   DECSCA Erase all erasable characters from the cursor position to end of display (line attr become single width / height on erased lines), does not affect video char attr or video line attr (SGR)
-                        // CSI ?0J  DECSCA <same as above>
-                        // CSI ?1J  DECSCA Erase all erasable characters from cursor to beginning of display, does not affect video char attr or video line attr (SGR)
-                        // CSI ?2J  DECSCA Erase all erasable characters entire display, does not affect video char attr or video line attr (SGR)
+                        // J    Erase from the cursor position to end of display (line attr become single width / height on erased lines)
+                        // 0J   <same as above>
+                        // 1J   clears from cursor to beginning of display
+                        // 2J   clears entire display
+                        // ?J   DECSCA Erase all erasable characters from the cursor position to end of display (line attr become single width / height on erased lines), does not affect video char attr or video line attr (SGR)
+                        // ?0J  DECSCA <same as above>
+                        // ?1J  DECSCA Erase all erasable characters from cursor to beginning of display, does not affect video char attr or video line attr (SGR)
+                        // ?2J  DECSCA Erase all erasable characters entire display, does not affect video char attr or video line attr (SGR)
 
     CMD_EL      = 75,   // Erase in Line
-                        // CSI K    Erase to end of current line (including at cursor position)
-                        // CSI 0K   <same as above>
-                        // CSI 1K   clears from cursor to start of line
-                        // CSI 2K   clears entire line
-                        // CSI ?K   DECSCA Erase all erasable characters to end of current line (including at cursor position), does not affect video char attr or video line attr (SGR)
-                        // CSI ?0K  DECSCA <same as above>
-                        // CSI ?1K  DECSCA Erase all erasable characters from cursor to start of line, does not affect video char attr or video line attr (SGR)
-                        // CSI ?2K  DECSCA Erase all erasable characters entire line, does not affect video char attr or video line attr (SGR)
-    CMD_IL      = 76,   // CSI #L   Inserts # Lines at the cursor.  If fewer than # lines remain from the current line to the end of the scrolling region, the number of lines inserted is the lesser number.  Lines within the scrolling region at and below the cursor is moved down. Lines moved past the bottom margin are lost.  The cursor is reset to the first column. sequence is ignore outisde of the sscrolling rtegion.
-    CMD_DL      = 77,    // CSI #M   Deletes # lines starting at the line with the cursor.  If fewer than # lines remain from the current line to the end of the scrolling region, the number of lines deleted is the lesser number. As lines are deleted, lines within the scrolling region and below the cursor move up, and blank lines are added at the bottom of the scrolling region. The cursor is reset to the first column. This sequence is ignored when the cursor is outside the scrolling region.
-    CMD_ICH     = 64,   // CSI{#@   Insert # blank characters at the cursor position, with the character attributes set to normal. The cursor does not move and remains at the beginning of the inserted blank characters. A parameter of 0 or 1 inserts one blank character. Data on the line is shifted forward as in character insertion.
-    CMD_SS2     = 78,   // CSI #N   Single Shift 2 = Get a character from G2 character set
-    CMD_SS3     = 79,   // CSI #O   Single Shift 3 = Get a character from G3 character set
-    CMD_DCH     = 80,   // CSI #P   Deletes # characters starting with the character at the cursor position. When a character is deleted, all characters to the right of the cursor move to the left. This creates a space character at the right margin for each character deleted. Character attributes move with the characters. The spaces created at the end of the line have all their character attributes off.
-                        // pagegroup Position Absolute (PPA)     CSI #SPP
-    CMD_PPR     = 81,   // pagegroup Position Relative (PPR)     CSI #SPQ
-    CMD_CPR     = 82,   // CSI #;#R Report cursor position
-                        // pagegroup Position Backward (PPB)     CSI #SPR
-    CMD_SU      = 83,   // CSI #S   Scroll window up by n lines (pan down)
-    CMD_SD      = 84,   // CSI #T   Scroll window down by n lines (pan up)
-    CMD_NP      = 85,   // CSI #U   Next pagegroup
-    CMD_PP      = 86,   // CSI #V   Previous pagegroup
-    CMD_SOS     = 88,   // CSI {arg}X   Start Of String (String Control Sequence)
-    CMD_IDENT   = 90,   // CSI Z    Identify what the terminal is
-    CMD_VPA     = 100,  // CSI #d   Vertical Line Position Absolute: Where # is the column number (move cursor to line #)
-    CMD_VPR     = 101,  // CSI #e   Vertical Position Relative: Where # is the # of columns to move cursor    
-    CMD_HVP     = 102,  // Horizontal Vertical Position: CSI {line};{column}f	moves cursor to line #, column #
-    CMD_TBC     = 103,  // CSI g (or 0g)  Clear horizontal tab stop at cursor position
-                        // CSI 3g   Clear all horizontal tab stops
-    CMD_SETMODE = 104,  // CSI 3h   Set Show Control Character mode
-                        // CSI 12h  Local Echo off
-                        // CSI ={value}h	Changes the screen width or type to the mode specified by value.
-                        // CSI =0h  40 x 25 monochrome (text)                // CSI =1h	40 x 25 color (text)
-                        // CSI =2h  80 x 25 monochrome (text)                // CSI =3h	80 x 25 color (text)
-                        // CSI =4h  320 x 200 4-color (graphics)             // CSI =5h	320 x 200 monochrome (graphics)
-                        // CSI =6h  640 x 200 monochrome (graphics)
-                        // CSI =7h  Enables line wrapping
-                        // CSI =13h	320 x 200 color (graphics)               // CSI =14h    640 x 200 color (16-color graphics)
-                        // CSI =15h	640 x 350 monochrome (2-color graphics)  // CSI =16h    640 x 350 color (16-color graphics)
-                        // CSI =17h	640 x 480 monochrome (2-color graphics)  // CSI =18h    640 x 480 color (16-color graphics)
-                        // CSI =19h	320 x 200 color (256-color graphics)
-                        // CSI ?3h  Set to 132 column mode
-                        // CSI ?4h  enable scrolling
-                        // CSI ?5h  enable display
-                        // CSI ?6h  Enable Origin
-                        // CSI ?7h  Enbable auto wrap
-                        // CSI ?8h  Enable auto repeat (some keys do not repeat: Alt, Caps Lock, Ctrl, Enter, Scroll Lock, Num Lock, Shift)
-                        // CSI ?25h	make cursor visible
-                        // CSI ?34h Cursor direction right to left
-                        // CSI ?47h	save screen
-                        // CSI ?66h engage numlock
-                        // CSI ?67h set backspace key for back arrow
-                        // CSI ?69h engage vertical split screen
-                        // CSI ?97h enable screen saver
-                        // CSI ?100h set enables auto answerback
-                        // CSI ?101h Conceal answerback message
-                        // CSI ?103h Set Half-Duplex mode
-                        // CSI ?109h    Set caps lock
-                        // CSI ?110h    Set keyboard LED's host indicator mode
-                        // CSI ?1049h	enables the alternative buffer
-    CMD_RESMODE = 108,  // CSI 3l   Reset Interpret Control Character
-                        // CSI 12l  Local Echo on
-                        // CSI ={value}l    Resets the mode by using the same values that Set Mode uses, except for 7, which disables line wrapping.
-                        // CSI =0l  40 x 25 monochrome (text)                // CSI =1l 40 x 25 color (text)
-                        // CSI =2l  80 x 25 monochrome (text)                // CSI =3l 80 x 25 color (text)
-                        // CSI =4l  320 x 200 4-color (graphics)             // CSI =5l 320 x 200 monochrome (graphics)
-                        // CSI =6l  640 x 200 monochrome (graphics)
-                        // CSI =7l  Disable line wrapping
-                        // CSI =13l	320 x 200 color (graphics)               // CSI =14l    640 x 200 color (16-color graphics)
-                        // CSI =15l	640 x 350 monochrome (2-color graphics)  // CSI =16l    640 x 350 color (16-color graphics)
-                        // CSI =17l	640 x 480 monochrome (2-color graphics)  // CSI =18l    640 x 480 color (16-color graphics)
-                        // CSI =19l	320 x 200 color (256-color graphics)
-                        // CSI ?3l  set to 80 column mode
-                        // CSI ?4l  disable scrolling
-                        // CSI ?5l  disable display
-                        // CSI ?6l  disable Origin
-                        // CSI ?7l  disable auto wrap
-                        // CSI ?8l  disable auto repeat
-                        // CSI ?25l	make cursor invisible
-                        // CSI ?34l Cursor direction left to right
-                        // CSI ?47l	restore screen
-                        // CSI ?66l disengage numlock
-                        // CSI ?67l set delete key for back arrow (reset)
-                        // CSI ?69l disengage vertical split screen
-                        // CSI ?97l disable screen saver
-                        // CSI ?100l reset disables auto answerback
-                        // CSI ?101l do not conceal answerback message
-                        // CSI ?103l Set Full-Duplex mode
-                        // CSI ?109l    Reset caps lock
-                        // CSI ?110h    Reset keyboard LED's host indicator mode
-                        // CSI ?1049l	disables the alternative buffer
-    CMD_SGR    = 109,   // CSI 1;34;{...}m	Select Graphic Rendition; set appearance of following characters (values separated by semicolon (;)).
-                        // CSI 0m   (Reset or Normal) All Attributes off
-                        // CSI 1m   (Bold or increased Intensity) set bold mode
-                        // CSI 2m   (Faint, decreased intensity or dim) set dim/faint mode
-                        // CSI 3m   (Italic) set italic mode
-                        // CSI 4m   (Underline) set underline mode
-                        // CSI 5m   (Slow Blink) set blinking mode, less than 150 per minute
-                        // CSI 6m   (Rapid Blink) set blinking mode, more than 150 per minute
-                        // CSI 7m   (Reverse Video or Invert) set inverse/reverse mode
-                        // CSI 8m   (Conceal or Hide) set invisible mode
-                        // CSI 9m   (Crossed-out, strike) set strikethrough mode.
-                        // CSI 10m  (Primary (Default) font)
-                        // CSI 11-19m   (Alternative font) - Select Alternative font n - 10
-                        // CSI 20m      (Blackletter font)
-                        // CSI 21m  (Doubly underlined, or not bold)
-                        // CSI 22m  (Normal Intensity - Neither bold nor faint)
-                        // CSI 23m  (neither Italic, nor blackletter)
-                        // CSI 24m  (not underlined - Neither singly nor doubly underlined)
-                        // CSI 25m  (not blinking)
-                        // CSI 26m  (Proportional spacing)
-                        // CSI 27m  (Not reversed)
-                        // CSI 28m  (Reveal - not concealed)
-                        // CSI 29m  (not crossed out)
-                        // CSI 30-37m   Set text color from the basic color palette of 0-7
-                        // CSI 38;5;{ID}m	Set foreground color
-                        // CSI 38;2;{r};{g};{b}m	Set foreground color as RGB
-                        // CSI 39m  Default foreground color
-                        // CSI 40-47m   Set background color from the basic color palette of 0-7
-                        // CSI 48;5;{ID}m	Set background color
-                        // CSI 48;2;{r};{g};{b}m	Set background color as RGB
-                        // CSI 49m  Default background color
-                        // CSI 50m  Disable proportional spacing
-                        // CSI 51m  Framed
-                        // CSI 52m  Encircled
-                        // CSI 53m  Overlined
-                        // CSI 54m  Neither framed Nor Circled
-                        // CSI 55m  Not overlined
-                        // CSI 58{arg}m     Set Underline Color (Next arguments are 5;n or 2;r;g;b.)
-                        // CSI 59m  Default underline color
-                        // CSI 60m  Ideogram underline or right side line
-                        // CSI 61m  Ideogram double underline or douible line on the right side
-                        // CSI 62m  Ideogram overline or left side line
-                        // CSI 63m  Ideogram double overline, or double lilne on the left side
-                        // CSI 64m  Ideogram stress marking
-                        // CSI 65m  No ideogram attributes / Reset the effects of all of 60-64
-                        // CSI 73m  Superscript
-                        // CSI 74m  Subscript
-                        // CSI 75m  Neither subscript or superscript
-                        // CSI 90-97m       Set bright foreground color
-                        // CSI 100-107m     Set bright background color
-    CMD_DSR     = 110,  // Device Status Report Call: CSI 5n
-                        // Response: CSI 0n = terminal is ok
-                        // Response: CSI 3n = terminal is not ok
-                        // CSI 6n   Cursor Position Report : request cursor position, Response: CSI #;#R
-    CMD_STRING  = 112,  // CSI {code};{string};{...}p
-    CMD_DECSCA  = 113,  // CSI #q   (0=All attributes off.(Does not apply to SGR.)1=not erasable by DECSEL/DECSED. 2=Designate character as erasable by DECSEL/DECSED. (Attribute off.)))
-    CMD_DECSTBM = 114,  // CSI #;#r   This sequence selects top and bottom margins defining the scrolling region
-                        // Change Attributes in Rectangular Area    CSI Pt; Pl; Pb; Pr;Ps1; . . . Psn $r
+                        // K    Erase to end of current line (including at cursor position)
+                        // 0K   <same as above>
+                        // 1K   clears from cursor to start of line
+                        // 2K   clears entire line
+                        // ?K   DECSCA Erase all erasable characters to end of current line (including at cursor position), does not affect video char attr or video line attr (SGR)
+                        // ?0K  DECSCA <same as above>
+                        // ?1K  DECSCA Erase all erasable characters from cursor to start of line, does not affect video char attr or video line attr (SGR)
+                        // ?2K  DECSCA Erase all erasable characters entire line, does not affect video char attr or video line attr (SGR)
+    CMD_IL      = 76,   // #L   Inserts # Lines at the cursor.  If fewer than # lines remain from the current line to the end of the scrolling region, the number of lines inserted is the lesser number.  Lines within the scrolling region at and below the cursor is moved down. Lines moved past the bottom margin are lost.  The cursor is reset to the first column. sequence is ignore outisde of the sscrolling rtegion.
+    CMD_DL      = 77,    // #M   Deletes # lines starting at the line with the cursor.  If fewer than # lines remain from the current line to the end of the scrolling region, the number of lines deleted is the lesser number. As lines are deleted, lines within the scrolling region and below the cursor move up, and blank lines are added at the bottom of the scrolling region. The cursor is reset to the first column. This sequence is ignored when the cursor is outside the scrolling region.
+    CMD_ICH     = 64,   // {#@   Insert # blank characters at the cursor position, with the character attributes set to normal. The cursor does not move and remains at the beginning of the inserted blank characters. A parameter of 0 or 1 inserts one blank character. Data on the line is shifted forward as in character insertion.
+    CMD_SS2     = 78,   // #N   Single Shift 2 = Get a character from G2 character set
+    CMD_SS3     = 79,   // #O   Single Shift 3 = Get a character from G3 character set
+    CMD_DCH     = 80,   // #P   Deletes # characters starting with the character at the cursor position. When a character is deleted, all characters to the right of the cursor move to the left. This creates a space character at the right margin for each character deleted. Character attributes move with the characters. The spaces created at the end of the line have all their character attributes off.
+                        // page Position Absolute (PPA) #SPP
+    CMD_PPR     = 81,   // page Position Relative (PPR) #SPQ
+    CMD_CPR     = 82,   // #;#R Report cursor position
+                        // page Position Backward (PPB) #SPR
+    CMD_SU      = 83,   // #S   Scroll window up by n lines (pan down)
+    CMD_SD      = 84,   // #T   Scroll window down by n lines (pan up)
+    CMD_NP      = 85,   // #U   Next page
+    CMD_PP      = 86,   // #V   Previous page
+    CMD_SOS     = 88,   // {arg}X   Start Of String (String Control Sequence)
+    CMD_IDENT   = 90,   // Z    Identify what the terminal is
+    CMD_VPA     = 100,  // #d   Vertical Line Position Absolute: Where # is the column number (move cursor to line #)
+    CMD_VPR     = 101,  // #e   Vertical Position Relative: Where # is the # of columns to move cursor    
+    CMD_HVP     = 102,  // Horizontal Vertical Position:  {line};{column}f	moves cursor to line #, column #
+    CMD_TBC     = 103,  // g (or 0g)  Clear horizontal tab stop at cursor position
+                        // 3g   Clear all horizontal tab stops
+    CMD_SETMODE = 104,  // 3h   Set Show Control Character mode
+                        // 12h  Local Echo off
+                        // ={value}h	Changes the screen width or type to the mode specified by value.
+                        // =0h  40 x 25 monochrome (text)                //  =1h    40 x 25 color (text)
+                        // =2h  80 x 25 monochrome (text)                //  =3h    80 x 25 color (text)
+                        // =4h  320 x 200 4-color (graphics)             //  =5h    320 x 200 monochrome (graphics)
+                        // =6h  640 x 200 monochrome (graphics)
+                        // =7h  Enables line wrapping
+                        // =13h	320 x 200 color (graphics)               //  =14h   640 x 200 color (16-color graphics)
+                        // =15h	640 x 350 monochrome (2-color graphics)  //  =16h   640 x 350 color (16-color graphics)
+                        // =17h	640 x 480 monochrome (2-color graphics)  //  =18h   640 x 480 color (16-color graphics)
+                        // =19h	320 x 200 color (256-color graphics)
+                        // ?3h  Set to 132 column mode
+                        // ?4h  enable scrolling
+                        // ?5h  enable display
+                        // ?6h  Enable Origin
+                        // ?7h  Enable auto wrap
+                        // ?8h  Enable auto repeat (some keys do not repeat: Alt, Caps Lock, Ctrl, Enter, Scroll Lock, Num Lock, Shift)
+                        // ?25h	make cursor visible
+                        // ?34h Cursor direction right to left
+                        // ?47h	save screen
+                        // ?66h engage numlock
+                        // ?67h set backspace key for back arrow
+                        // ?69h engage vertical split screen
+                        // ?97h enable screen saver
+                        // ?100h set enables auto answerback
+                        // ?101h Conceal answerback message
+                        // ?103h Set Half-Duplex mode
+                        // ?109h Set caps lock
+                        // ?110h Set keyboard LED's host indicator mode
+                        // ?1049h enables the alternative buffer
+    CMD_RESMODE = 108,  // 3l   Reset Interpret Control Character
+                        // 12l  Local Echo on
+                        // ={value}l    Resets the mode by using the same values that Set Mode uses, except for 7, which disables line wrapping.
+                        // =0l  40 x 25 monochrome (text)                // =1l 40 x 25 color (text)
+                        // =2l  80 x 25 monochrome (text)                // =3l 80 x 25 color (text)
+                        // =4l  320 x 200 4-color (graphics)             // =5l 320 x 200 monochrome (graphics)
+                        // =6l  640 x 200 monochrome (graphics)
+                        // =7l  Disable line wrapping
+                        // =13l	320 x 200 color (graphics)               // =14l 640 x 200 color (16-color graphics)
+                        // =15l	640 x 350 monochrome (2-color graphics)  // =16l 640 x 350 color (16-color graphics)
+                        // =17l	640 x 480 monochrome (2-color graphics)  // =18l 640 x 480 color (16-color graphics)
+                        // =19l	320 x 200 color (256-color graphics)
+                        // ?3l  set to 80 column mode
+                        // ?4l  disable scrolling
+                        // ?5l  disable display
+                        // ?6l  disable Origin
+                        // ?7l  disable auto wrap
+                        // ?8l  disable auto repeat
+                        // ?25l	make cursor invisible
+                        // ?34l Cursor direction left to right
+                        // ?47l	restore screen
+                        // ?66l disengage numlock
+                        // ?67l set delete key for back arrow (reset)
+                        // ?69l disengage vertical split screen
+                        // ?97l disable screen saver
+                        // ?100l    reset disables auto answerback
+                        // ?101l    do not conceal answerback message
+                        // ?103l    Set Full-Duplex mode
+                        // ?109l    Reset caps lock
+                        // ?110h    Reset keyboard LED's host indicator mode
+                        // ?1049l	disables the alternative buffer
+    CMD_SGR    = 109,   // 1;34;{...}m	Select Graphic Rendition; set appearance of following characters (values separated by semicolon (;)).
+                        // 0m   (Reset or Normal) All Attributes off
+                        // 1m   (Bold or increased Intensity) set bold mode
+                        // 2m   (Faint, decreased intensity or dim) set dim/faint mode
+                        // 3m   (Italic) set italic mode
+                        // 4m   (Underline) set underline mode
+                        // 5m   (Slow Blink) set blinking mode, less than 150 per minute
+                        // 6m   (Rapid Blink) set blinking mode, more than 150 per minute
+                        // 7m   (Reverse Video or Invert) set inverse/reverse mode
+                        // m    (Conceal or Hide) set invisible mode
+                        // 9m   (Crossed-out, strike) set strikethrough mode.
+                        // 10m  (Primary (Default) font)
+                        // 11-19m (Alternative font) - Select Alternative font n - 10
+                        // 20m  (Blackletter font)
+                        // 21m  (Doubly underlined, or not bold)
+                        // 22m  (Normal Intensity - Neither bold nor faint)
+                        // 23m  (neither Italic, nor blackletter)
+                        // 24m  (not underlined - Neither singly nor doubly underlined)
+                        // 25m  (not blinking)
+                        // 26m  (Proportional spacing)
+                        // 27m  (Not reversed)
+                        // 28m  (Reveal - not concealed)
+                        // 29m  (not crossed out)
+                        // 30-37m   Set text color from the basic color palette of 0-7
+                        // 38;5;{ID}m	Set foreground color
+                        // 38;2;{r};{g};{b}m	Set foreground color as RGB
+                        // 39m  Default foreground color
+                        // 40-47m   Set background color from the basic color palette of 0-7
+                        // 48;5;{ID}m	Set background color
+                        // 48;2;{r};{g};{b}m	Set background color as RGB
+                        // 49m  Default background color
+                        // 50m  Disable proportional spacing
+                        // 51m  Framed
+                        // 52m  Encircled
+                        // 53m  Overlined
+                        // 54m  Neither framed Nor Circled
+                        // 55m  Not overlined
+                        // 58{arg}m     Set Underline Color (Next arguments are 5;n or 2;r;g;b.)
+                        // 59m  Default underline color
+                        // 60m  Ideogram underline or right side line
+                        // 61m  Ideogram double underline or double line on the right side
+                        // 62m  Ideogram overline or left side line
+                        // 63m  Ideogram double overline, or double line on the left side
+                        // 64m  Ideogram stress marking
+                        // 65m  No ideogram attributes / Reset the effects of all of 60-64
+                        // 73m  Superscript
+                        // 74m  Subscript
+                        // 75m  Neither subscript or superscript
+                        // 90-97m       Set bright foreground color
+                        // 100-107m     Set bright background color
+    CMD_DSR     = 110,  // Device Status Report Call:  5n
+                        // Response:  0n = terminal is ok
+                        // Response:  3n = terminal is not ok
+                        // 6n   Cursor Position Report : request cursor position, Response:  #;#R
+    CMD_STRING  = 112,  // {code};{string};{...}p
+    CMD_DECSCA  = 113,  // #q   (0=All attributes off.(Does not apply to SGR.)1=not erasable by DECSEL/DECSED. 2=Designate character as erasable by DECSEL/DECSED. (Attribute off.)))
+    CMD_DECSTBM = 114,  // #;#r   This sequence selects top and bottom margins defining the scrolling region
+                        // Change Attributes in Rectangular Area     Pt; Pl; Pb; Pr;Ps1; . . . Psn $r
                         // Source rectangle to change: Pt = Top Line, Pl = Left column, Pb = bottom line, Pr = right column, Ps1 = Select attribute to change
                         // 0 (default)	Attributes off (no bold, no underline, no blink, positive image)
                         // 1    Bold        // 4    Underline           // 5    Blink       // 7    Negative image
                         // 22   No bold     // 24   No underline        // 25   No blink    // 27   Positive image
-    CMD_SCP     = 115,  // CSI s    Save Current Cursor Position
-    CMD_RCP     = 117,  // CSI u    Restore Saved Cursor Position
-    CMD_DECCRA  = 118,  // Copy Rectangular area CSI Pts; Pls; Pbs; Prs; Pps; Ptd; Pld; Ppd$v
-                        // Source rectangle to copy: Pts = Top Line, Pls = Left column, Pbs = bottom line, Prs = right column, Pps = pagegroup number
-                        // Destination: Ptd = top line border, Pld = Left column border, Ppd = pagegroup number
-    CMD_DECFRA  = 120,  // Fill Rectangular Area CSI Pch;Pt; Pl; Pb; Pr $x
+    CMD_SCP     = 115,  // s    Save Current Cursor Position
+    CMD_RCP     = 117,  // u    Restore Saved Cursor Position
+    CMD_DECCRA  = 118,  // Copy Rectangular area  Pts; Pls; Pbs; Prs; Pps; Ptd; Pld; Ppd$v
+                        // Source rectangle to copy: Pts = Top Line, Pls = Left column, Pbs = bottom line, Prs = right column, Pps = page number
+                        // Destination: Ptd = top line border, Pld = Left column border, Ppd = page number
+    CMD_DECFRA  = 120,  // Fill Rectangular Area  Pch;Pt; Pl; Pb; Pr $x
                         // Pch is the ascii value of the fill character
                         // Fill rectangle: Pt = Top Line, Pl = Left column, Pb = bottom line, Pr = right column
-    CMD_DECTST  = 121,  // CSI 4;Ps;...;Psy
-                        //  0	Test 1, 2, 3 and 6          1	Power-up self test          2	EIA port data loopback test
-                        //  3	Printer port loopback test  4	Not used    5	Not used    6	EIA port modem control line loopback test
-                        //  7	20 mA port loopback test    8	Not used                    9	Repeat any selected test continuously until power-off or failure
-    CMD_DECINVM = 122,  // CSI#*z Invoke Macro (# is the macro id)
-    CMD_DECIC   = 125,  // CSI#'}   Insert column in scrolling region from cursor column
-    CMD_DECDC   = 126   // CSI #'~  Delete # of columns, shift columns of Righrt side to the left
+    CMD_DECTST  = 121,  // 4;Ps;...;Psy
+                        // 0	Test 1, 2, 3 and 6          1	Power-up self test          2	EIA port data loopback test
+                        // 3	Printer port loopback test  4	Not used    5	Not used    6	EIA port modem control line loopback test
+                        // 7	20 mA port loopback test    8	Not used                    9	Repeat any selected test continuously until power-off or failure
+    CMD_DECINVM = 122,  // #*z Invoke Macro (# is the macro id)
+    CMD_DECIC   = 125,  // #'}   Insert column in scrolling region from cursor column
+    CMD_DECDC   = 126   // #'~  Delete # of columns, shift columns of Right side to the left
 } ansi_commands;
 
-#define TERM_TOTALPAGES  8
+typedef enum {
+    TCAPS_R32               = 0b10000000000000000000000000000000,
+    TCAPS_BOLD              = 0b01000000000000000000000000000000,
+    TCAPS_FAINT             = 0b00100000000000000000000000000000,
+    TCAPS_ENCIRCLED         = 0b00010000000000000000000000000000,
+    TCAPS_FRAMED            = 0b00001000000000000000000000000000,
+    TCAPS_OVERLINED         = 0b00000100000000000000000000000000,
+    TCAPS_DSTRIKEOUT        = 0b00000010000000000000000000000000,
+    TCAPS_STRIKEOUT         = 0b00000001000000000000000000000000,
+    TCAPS_UNDERLINE         = 0b00000000100000000000000000000000,
+    TCAPS_SUPERSCRIPT       = 0b00000000010000000000000000000000,
+    TCAPS_SUBSCRIPT         = 0b00000000001000000000000000000000,
+    TCAPS_RVIDEO            = 0b00000000000100000000000000000000,
+    TCAPS_STRESSMARK        = 0b00000000000010000000000000000000,
+    TCAPS_ITALIC            = 0b00000000000001000000000000000000,
+    TCAPS_BLINK             = 0b00000000000000100000000000000000,
+    TCAPS_SCREENSAVER       = 0b00000000000000010000000000000000,
+    TCAPS_NUMLOCK           = 0b00000000000000001000000000000000,
+    TCAPS_CAPSLOCK          = 0b00000000000000000100000000000000,
+    TCAPS_INSLOCK           = 0b00000000000000000010000000000000,
+    TCAPS_SHOW_HOSTLEDS     = 0b00000000000000000001000000000000,
+    TCAPS_SHOW_CURSOR       = 0b00000000000000000000100000000000,
+    TCAPS_SHOW_MOUSE        = 0b00000000000000000000010000000000,
+    TCAPS_SHOW_COMMAND      = 0b00000000000000000000001000000000,
+    TCAPS_CURSOR_RTOL       = 0b00000000000000000000000100000000,
+    TCAPS_AUTO_WRAP         = 0b00000000000000000000000010000000,
+    TCAPS_AUTO_REPEAT       = 0b00000000000000000000000001000000,
+    TCAPS_AUTO_SCROLL       = 0b00000000000000000000000000100000,
+    TCAPS_HALF_DUPLEX       = 0b00000000000000000000000000010000,
+    TCAPS_LOCAL_ECHO        = 0b00000000000000000000000000001000,
+    TCAPS_HSPLIT            = 0b00000000000000000000000000000100,
+    TCAPS_VSPLIT            = 0b00000000000000000000000000000010,
+    TCAPS_DISPLAY           = 0b00000000000000000000000000000001,
+    TCAPS_DEFAULT_MASK      = 0b00000000000000010001111011101001
+} termninal_capabilities;
+
+
+static void init_page(uint16_t page_id, Vector2 size) {
+    EX_page *page = &sys.terminal.page[page_id];
+    page->state             = TCAPS_DEFAULT_MASK;
+    page->text_blink_rate   = 0;
+    page->margin_left       = 0;
+    page->margin_right      = size.x - 1;
+    page->margin_top        = 0;
+    page->margin_bottom     = size.y - 1;
+    page->page_split        = {0,0};
+    page->cursor_position   = {0,0};
+
+    // set default font, background color, text color 
+}
+
+static void write_to_page() {
+
+}
 
 static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     int16_t status;
     flip_frame_buffer(TERMINALDISPLAY, false);
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
     uint16_t display = sys.video.current_virtual;
-    uint32_t pagegroup_state = 0;
-    uint64_t page_state = GRFE_DEFAULT4;
-    uint64_t cell_state = GRFE_DEFAULT4;
-    sys.terminal.pagegroup_id = sys.video.current_virtual; // A single pagegroup per Virtual Display
-    status = init_pagegroup(sys.terminal.pagegroup_id, (Vector2){64, 28}, TERM_TOTALPAGES, pagegroup_state, page_state, cell_state, tileset_id, palette_id);
+    uint32_t canvasgroup_state = 0;
+    uint64_t canvas_state = CVFE_DEFAULT4;
+    uint64_t cell_state = CVFE_DEFAULT4;
+    sys.terminal.canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
+
+    Vector2 size = {64,28};
+    for (page_id = 0, page_id < TERM_TOTALPAGES; ++page_id) {
+        init_page(page_id, size);
+    }
+    status = init_canvasgroup(sys.terminal.canvasgroup_id, size, TERM_TOTALPAGES, canvasgroup_state, canvas_state, cell_state, tileset_id, palette_id);
     sys.terminal.current_page_id = 0;
     flip_frame_buffer(sys.video.previous_virtual, false);
     return status;
 }
 
+// https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-oemkeyscan
 // Establish keyboard management / buffer
 // Establish mouse management (old x,y / current x,y)
 void update_terminal(void) {
@@ -3567,10 +3654,10 @@ void update_terminal(void) {
 }
 
 void show_terminal(void) {
-    // aimed at displaying the terminal pagegroup only
+    // aimed at displaying the terminal canvasgroup only
     flip_frame_buffer(TERMINALDISPLAY, false);
 
-    render_pagegroup(sys.terminal.current_page_id); /////// ******************************************
+    render_canvasgroup(sys.terminal.current_page_id); /////// ******************************************
 
     flip_frame_buffer(sys.video.previous_virtual, false);
 }
@@ -3654,6 +3741,19 @@ void display_all_res(void) {
     };
 }
 
+void display_state(uint64_t state, uint16_t length, uint16_t size, Vector2 position) {
+    uint16_t y = position.y - size;
+    uint16_t x = position.x + length * size;
+    uint64_t bit_tested = 1;
+    for (uint64_t i = 0; i < length; i++) {
+        uint64_t bit = sys.temporal.osc & bit_tested;
+        Color col;
+        if (bit) col = GREEN; else col = ORANGE;
+        DrawRectangle(x - (i * size), y, size, size, col);
+        bit_tested = bit_tested << 1;
+    }
+}
+
 void update_debug(bool show_options) {
     uint16_t size = 80;
     uint16_t x = 0, y = 0;
@@ -3730,17 +3830,7 @@ void update_debug(bool show_options) {
         DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 260, 20, DARKGRAY);
         DrawText(TextFormat("     cos = %f", cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 280, 20, DARKGRAY);
 
-        uint16_t s = 30;
-        uint16_t y = sys.video.screen[sys.video.display_id].y - s;
-        uint16_t x = TEMPORAL_ARRAY_SIZE * s;
-        uint64_t bit_tested = 1;
-        for (uint64_t i = 0; i < TEMPORAL_ARRAY_SIZE; i++) {
-            uint64_t bit = sys.temporal.osc & bit_tested;
-            Color col;
-            if (bit) col = GREEN; else col = ORANGE;
-            DrawRectangle(x - (i * s), y, s, s, col);
-            bit_tested = bit_tested << 1;
-        }
+        display_state(sys.temporal.osc, TEMPORAL_ARRAY_SIZE, 30, (Vector2) {0.f, sys.video.screen[sys.video.display_id].y - 30});
         show_options = false;
     }
 
@@ -3968,8 +4058,8 @@ static int16_t deinit_system(void) {
     remove_service(CTRL_ASSETS_INITIALIZED);
     debug_console_out("---------- ASSETS_UNLOADED", status);
 
-    status = unload_all_pagegroups();
-    debug_console_out("---------- PAGES_UNLOADED", status);
+    status = unload_all_canvasgroups();
+    debug_console_out("---------- CANVASES_UNLOADED", status);
 
     shutdown_terminal();
     remove_service(CTRL_TERMINAL_INITIALIZED);
@@ -4008,7 +4098,7 @@ void display_initialize_splash(void) {
 }
 
 void manage_program() {
-    debug_console_out( control_state_literal(sys.program.ctrlstate & CTRL_SWITCHBOARD_MASK) , 0);
+    debug_console_out( control_state_literal(sys.program.ctrlstate & CTRL_SWITCHBOARD_MASK), 0);
 
     if (sys.program.ctrlstate & CTRL_OFF_FOCUS)
         game_off_focus_scene();
@@ -4103,7 +4193,7 @@ int16_t process_system(uint32_t ctrlstate, uint32_t pmsnstate, const char* name)
             }
             if (IsKeyDown(KEY_RIGHT_CONTROL)) {
                 if (sys.program.ctrlstate & CTRL_SHOW_TERMINAL) {
-                    show_terminal();
+                    show_terminal(); // this freezes the current video and does nothing else ******************* ISSUE
                 }
             }
             update_system();
