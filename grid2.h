@@ -422,6 +422,7 @@ void DrawRectanglePro2(Rectangle rec, Vector2 origin, Vector2 skew, float rotati
     const static inline Texture   texShapes = { 1, 1, 1, 1, 7 };
     const static inline Rectangle texShapesRec = { 0, 0, 1, 1 };
 
+    skew = (Vector2){skew.x * rec.width, skew.y * rec.height};
     Vector2 topLeft = { 0 }, topRight = { 0 }, bottomLeft = { 0 }, bottomRight = { 0 };
 
     if (rotation == 0.0f) {
@@ -432,20 +433,20 @@ void DrawRectanglePro2(Rectangle rec, Vector2 origin, Vector2 skew, float rotati
         bottomLeft = (Vector2){ x, y + rec.height };
         bottomRight = (Vector2){ x + rec.width, y + rec.height };
     } else {
-        float sinRotation = sinf(rotation*DEG2RAD);
-        float cosRotation = cosf(rotation*DEG2RAD);
+        float sinRotation = sinf(rotation * DEG2RAD);
+        float cosRotation = cosf(rotation * DEG2RAD);
         float x = rec.x;
         float y = rec.y;
         float dx = -origin.x;
         float dy = -origin.y;
-        topLeft.x = x + dx*cosRotation - dy*sinRotation;
-        topLeft.y = y + dx*sinRotation + dy*cosRotation;
-        topRight.x = x + (dx + rec.width)*cosRotation - dy*sinRotation;
-        topRight.y = y + (dx + rec.width)*sinRotation + dy*cosRotation;
-        bottomLeft.x = x + dx*cosRotation - (dy + rec.height)*sinRotation;
-        bottomLeft.y = y + dx*sinRotation + (dy + rec.height)*cosRotation;
-        bottomRight.x = x + (dx + rec.width)*cosRotation - (dy + rec.height)*sinRotation;
-        bottomRight.y = y + (dx + rec.width)*sinRotation + (dy + rec.height)*cosRotation;
+        topLeft.x       = x + dx * cosRotation - dy * sinRotation;
+        topLeft.y       = y + dx * sinRotation + dy * cosRotation;
+        topRight.x      = x + (dx + rec.width) * cosRotation - dy * sinRotation;
+        topRight.y      = y + (dx + rec.width) * sinRotation + dy * cosRotation;
+        bottomLeft.x    = x + dx * cosRotation - (dy + rec.height) * sinRotation;
+        bottomLeft.y    = y + dx * sinRotation + (dy + rec.height) * cosRotation;
+        bottomRight.x   = x + (dx + rec.width) * cosRotation - (dy + rec.height) * sinRotation;
+        bottomRight.y   = y + (dx + rec.width) * sinRotation + (dy + rec.height) * cosRotation;
     }
 
     rlSetTexture(texShapes.id);
@@ -481,6 +482,7 @@ void DrawTexturePro2 (Texture texture, Rectangle source, Rectangle dest, Vector2
         if (source.width < 0) { flipX = true; source.width *= -1; }
         if (source.height < 0) source.y -= source.height;
 
+        skew = (Vector2){skew.x * dest.width, skew.y * dest.height};
         Vector2 topLeft = { 0 }, topRight = { 0 }, bottomLeft = { 0 }, bottomRight = { 0 };
 
         if (rotation == 0.0f) { // do not calculate rotation
@@ -491,20 +493,20 @@ void DrawTexturePro2 (Texture texture, Rectangle source, Rectangle dest, Vector2
             bottomLeft = (Vector2){ x, y + dest.height };
             bottomRight = (Vector2){ x + dest.width, y + dest.height };
         } else {  // calculate rotation
-            float sinRotation = sinf(rotation*DEG2RAD);
-            float cosRotation = cosf(rotation*DEG2RAD);
+            float sinRotation = sinf(rotation * DEG2RAD);
+            float cosRotation = cosf(rotation * DEG2RAD);
             float x = dest.x;
             float y = dest.y;
             float dx = -origin.x;
             float dy = -origin.y;
-            topLeft.x = x + dx*cosRotation - dy*sinRotation;
-            topLeft.y = y + dx*sinRotation + dy*cosRotation;
-            topRight.x = x + (dx + dest.width)*cosRotation - dy*sinRotation;
-            topRight.y = y + (dx + dest.width)*sinRotation + dy*cosRotation;
-            bottomLeft.x = x + dx*cosRotation - (dy + dest.height)*sinRotation;
-            bottomLeft.y = y + dx*sinRotation + (dy + dest.height)*cosRotation;
-            bottomRight.x = x + (dx + dest.width)*cosRotation - (dy + dest.height)*sinRotation;
-            bottomRight.y = y + (dx + dest.width)*sinRotation + (dy + dest.height)*cosRotation;
+            topLeft.x       = x + dx * cosRotation - dy * sinRotation;
+            topLeft.y       = y + dx * sinRotation + dy * cosRotation;
+            topRight.x      = x + (dx + dest.width) * cosRotation - dy * sinRotation;
+            topRight.y      = y + (dx + dest.width) * sinRotation + dy * cosRotation;
+            bottomLeft.x    = x + dx * cosRotation - (dy + dest.height) * sinRotation;
+            bottomLeft.y    = y + dx * sinRotation + (dy + dest.height) * cosRotation;
+            bottomRight.x   = x + (dx + dest.width) * cosRotation - (dy + dest.height) * sinRotation;
+            bottomRight.y   = y + (dx + dest.width) * sinRotation + (dy + dest.height) * cosRotation;
         }
 
         rlSetTexture(texture.id);
@@ -730,36 +732,47 @@ typedef struct EX_video {
 
 // **************************************************************************************** T E R M I N A L   S T R U C T U R E S
 
-#define IOBUFFERSIZE    8192
-#define TERM_MAXPAGES   8
-#define TERM_MAXFONTS   8
+#define TERM_MAXPAGES       8
+#define TERM_MAXFONTS       8
+#define TERM_MAXPALETTES    8
+#define IOBUFFERSIZE        8192
+#define MAXTOKENS           1024
 
 typedef struct EX_page {
     uint32_t    state;
     Vector2     cursor_position;
-    uint16_t    default_font;
-    uint16_t    current_font;
+    uint16_t    default_font, previous_font, current_font;
+    uint16_t    default_palette, previous_palette, current_palette;
+    uint16_t    current_color;
     uint16_t    text_blink_rate;
-    uint16_t    margin_left;
-    uint16_t    margin_right;
-    uint16_t    margin_top;
-    uint16_t    margin_bottom;
+    uint16_t    margin_left, margin_right, margin_top, margin_bottom;
     Vector2     page_split;     // Horizontal and vertical page split position (usually center)
 } EX_page;
 
+typedef struct EX_token {
+    uint16_t    position;
+    uint16_t    len;
+} EX_token;
+
 typedef struct EX_terminal {
-    uint32_t    state;
+    uint32_t    state;  // to be elaborated
     uint16_t    asset_id;
     uint16_t    canvasgroup_id; // Where all terminal canvases reside
-    uint16_t    current_page_id;
-    uint16_t    previous_page_id;
+    uint16_t    previous_page_id, current_page_id;
+
+    uint16_t    font_id[TERM_MAXFONTS];
+    uint16_t    fonts;
+    uint16_t    palette_id[TERM_MAXPALETTES];
+    uint16_t    palettes;
+
+    EX_page     page[TERM_MAXPAGES];
+
     uint8_t     input_buffer[IOBUFFERSIZE];
     uint8_t     output_buffer[IOBUFFERSIZE];
     uint32_t    input_buffer_pos;
     uint32_t    output_buffer_pos;
-    EX_page     page[TERM_MAXPAGES];
-    uint16_t    font_id[TERM_MAXFONTS];
-    uint16_t    fonts;
+    EX_token    token[MAXTOKENS];
+
 } EX_terminal;
 
 
@@ -1148,6 +1161,7 @@ Rectangle get_tilezone_from_code(uint16_t asset_id, uint16_t code) {
     return (Rectangle) {px * tilesize->x, py * tilesize->y,  tilesize->x, tilesize->y};
 }
 
+
 //        plot_character(ex_scrolltext[s].font, ch, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].colorbg, colorln, state);
 void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, uint64_t state) {
     //add logic for out of bound position
@@ -1362,12 +1376,12 @@ void set_cell_state(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targe
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1380,12 +1394,12 @@ void clear_cell_state(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle tar
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1398,12 +1412,12 @@ void set_cell_colorfg(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle tar
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1416,12 +1430,12 @@ void set_cell_colorbg(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle tar
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1434,12 +1448,12 @@ void set_cell_colorln(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle tar
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1452,12 +1466,12 @@ void set_cell_color_mask(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle 
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1470,12 +1484,12 @@ void set_cell_color_shadow_mask(uint16_t canvasgroup_id, uint16_t canvas_id, Rec
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1488,12 +1502,12 @@ void set_cell_offset(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targ
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1506,12 +1520,12 @@ void set_cell_angle(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targe
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1524,12 +1538,12 @@ void set_cell_scale(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targe
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
     if ((target.y + target.height) > lsy) target.height = lsy - target.y;
 
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             linear_offset = lsx * y + x;
@@ -1537,6 +1551,29 @@ void set_cell_scale(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targe
         }
     }
 }
+
+uint16_t get_cell_colorfg(uint16_t canvas_id, Vector2 target) {
+    uint16_t canvasgroup_id = sys.video.current_virtual;
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    if (target.x >= lsx || target.y >= lsy || target.x < 0 || target.y < 0) return;
+
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
+    uint16_t linear_offset = lsx * target.y + target.x;
+    return target_cell[linear_offset].colorfg_id;
+}
+
+uint16_t get_cell_colorbg(uint16_t canvas_id, Vector2 target) {
+    uint16_t canvasgroup_id = sys.video.current_virtual;
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    if (target.x >= lsx || target.y >= lsy || target.x < 0 || target.y < 0) return;
+
+    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
+    uint16_t linear_offset = lsx * target.y + target.x;
+    return target_cell[linear_offset].colorbg_id;
+}
+
 
 // iterate through charracter ascii codes, if font pixels then copy desired source_cell information to the canvas
 void plot_big_characters(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 target, uint64_t state, uint16_t font_id, uint8_t *ch) {
@@ -3581,47 +3618,76 @@ typedef enum {
 } ansi_commands;
 
 typedef enum {
-    TCAPS_R32               = 0b10000000000000000000000000000000,
-    TCAPS_BOLD              = 0b01000000000000000000000000000000,
-    TCAPS_FAINT             = 0b00100000000000000000000000000000,
-    TCAPS_ENCIRCLED         = 0b00010000000000000000000000000000,
-    TCAPS_FRAMED            = 0b00001000000000000000000000000000,
-    TCAPS_OVERLINED         = 0b00000100000000000000000000000000,
-    TCAPS_DSTRIKEOUT        = 0b00000010000000000000000000000000,
-    TCAPS_STRIKEOUT         = 0b00000001000000000000000000000000,
-    TCAPS_UNDERLINE         = 0b00000000100000000000000000000000,
-    TCAPS_SUPERSCRIPT       = 0b00000000010000000000000000000000,
-    TCAPS_SUBSCRIPT         = 0b00000000001000000000000000000000,
-    TCAPS_RVIDEO            = 0b00000000000100000000000000000000,
-    TCAPS_STRESSMARK        = 0b00000000000010000000000000000000,
-    TCAPS_ITALIC            = 0b00000000000001000000000000000000,
-    TCAPS_BLINK             = 0b00000000000000100000000000000000,
-    TCAPS_SCREENSAVER       = 0b00000000000000010000000000000000,
-    TCAPS_NUMLOCK           = 0b00000000000000001000000000000000,
-    TCAPS_CAPSLOCK          = 0b00000000000000000100000000000000,
-    TCAPS_INSLOCK           = 0b00000000000000000010000000000000,
-    TCAPS_SHOW_HOSTLEDS     = 0b00000000000000000001000000000000,
-    TCAPS_SHOW_CURSOR       = 0b00000000000000000000100000000000,
-    TCAPS_SHOW_MOUSE        = 0b00000000000000000000010000000000,
-    TCAPS_SHOW_COMMAND      = 0b00000000000000000000001000000000,
-    TCAPS_CURSOR_RTOL       = 0b00000000000000000000000100000000,
-    TCAPS_AUTO_WRAP         = 0b00000000000000000000000010000000,
-    TCAPS_AUTO_REPEAT       = 0b00000000000000000000000001000000,
-    TCAPS_AUTO_SCROLL       = 0b00000000000000000000000000100000,
-    TCAPS_HALF_DUPLEX       = 0b00000000000000000000000000010000,
-    TCAPS_LOCAL_ECHO        = 0b00000000000000000000000000001000,
-    TCAPS_HSPLIT            = 0b00000000000000000000000000000100,
-    TCAPS_VSPLIT            = 0b00000000000000000000000000000010,
-    TCAPS_DISPLAY           = 0b00000000000000000000000000000001,
-    TCAPS_DEFAULT_MASK      = 0b00000000000000010001111011101001
+    TCAPS_R32               = 0b10000000000000000000000000000000, // 
+    TCAPS_BOLD              = 0b01000000000000000000000000000000, // turns foreground color 2 * brightness
+    TCAPS_FAINT             = 0b00100000000000000000000000000000, // turns foreground color .5 * brightness
+    TCAPS_ENCIRCLED         = 0b00010000000000000000000000000000, // puts a circle around character
+    TCAPS_FRAMED            = 0b00001000000000000000000000000000, // puts a box around character
+    TCAPS_OVERLINED         = 0b00000100000000000000000000000000, // draws a line on top of character
+    TCAPS_DSTRIKEOUT        = 0b00000010000000000000000000000000, // draws a double line through character
+    TCAPS_STRIKEOUT         = 0b00000001000000000000000000000000, // draws a line through character
+    TCAPS_UNDERLINED        = 0b00000000100000000000000000000000, // draws a line under character
+    TCAPS_SUPERSCRIPT       = 0b00000000010000000000000000000000, // shifts character upwards
+    TCAPS_SUBSCRIPT         = 0b00000000001000000000000000000000, // shifts character downwards
+    TCAPS_RVIDEO            = 0b00000000000100000000000000000000, // reverse colors between froeground a background
+    TCAPS_STRESSMARK        = 0b00000000000010000000000000000000, // 
+    TCAPS_ITALIC            = 0b00000000000001000000000000000000, // uses skew to pent characters
+    TCAPS_BLINK             = 0b00000000000000100000000000000000, // set character to blink
+    TCAPS_SCREENSAVER       = 0b00000000000000010000000000000000, // allows screen to go in screensaver mode
+    TCAPS_NUMLOCK           = 0b00000000000000001000000000000000, // numeric lock keyboard state
+    TCAPS_CAPSLOCK          = 0b00000000000000000100000000000000, // caps lock keyboard state
+    TCAPS_INSLOCK           = 0b00000000000000000010000000000000, // insert lock keyboard state
+    TCAPS_SHOW_HOSTLEDS     = 0b00000000000000000001000000000000, // allows to show or hide led status lights on keyboard
+    TCAPS_SHOW_CURSOR       = 0b00000000000000000000100000000000, // show cursor on page
+    TCAPS_SHOW_MOUSE        = 0b00000000000000000000010000000000, // show mouse on page
+    TCAPS_SHOW_COMMAND      = 0b00000000000000000000001000000000, // show terminal commands (default is hidden)
+    TCAPS_CURSOR_RTOL       = 0b00000000000000000000000100000000, // set cursor to move from right to left (default is left to right)
+    TCAPS_AUTO_WRAP         = 0b00000000000000000000000010000000, // automatically wraps around screen when at end of line
+    TCAPS_AUTO_REPEAT       = 0b00000000000000000000000001000000, // keyboard auto repeat last character pressed
+    TCAPS_AUTO_SCROLL       = 0b00000000000000000000000000100000, // scroll page when moving past last line (new line)
+    TCAPS_HALF_DUPLEX       = 0b00000000000000000000000000010000, // 
+    TCAPS_LOCAL_ECHO        = 0b00000000000000000000000000001000, // locally show characters typed
+    TCAPS_HSPLIT            = 0b00000000000000000000000000000100, // horizontal page split
+    TCAPS_VSPLIT            = 0b00000000000000000000000000000010, // vertical page split
+    TCAPS_DISPLAY           = 0b00000000000000000000000000000001, // turn on page display (default is on)
+    TCAPS_DEFAULT_MASK      = 0b00000000000000010001111011101001  // 
 } termninal_capabilities;
 
+static uint16_t get_page_font() {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    uint16_t font = page->current_font;
+    return sys.terminal.font_id[font];
+}
+
+static uint16_t get_page_palette() {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    uint16_t palette = page->current_palette;
+    return sys.terminal.palette_id[palette];
+}
+
+static void set_page_font(uint16_t font) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    page->previous_font = page->current_font;
+    page->current_font = font;
+}
+
+static void set_page_palette(uint16_t palette) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    page->previous_palette = page->current_palette;
+    page->current_palette = palette;
+}
 
 static void init_page(uint16_t page_id, Vector2 size) {
     EX_page *page = &sys.terminal.page[page_id];
     page->state             = TCAPS_DEFAULT_MASK;
     page->default_font      = 0;
-    page->current_font      = page->default_font;
+    page->current_font      = 0;
+    page->current_color     = 7;
+    page->current_palette   = 0;
     page->text_blink_rate   = 0;
     page->margin_left       = 0;
     page->margin_right      = size.x - 1;
@@ -3629,6 +3695,11 @@ static void init_page(uint16_t page_id, Vector2 size) {
     page->margin_bottom     = size.y - 1;
     page->cursor_position   = (Vector2){page->margin_left, page->margin_top};
     page->page_split        = (Vector2){0,0};
+
+//    uint16_t    default_palette;
+//    uint16_t    current_palette;
+//    uint16_t    default_color;
+
 
     // background color, text color 
 }
@@ -3639,22 +3710,21 @@ static bool write_to_cell(uint8_t value) {
     //    sys.terminal.canvasgroup_id
     // pass on all graphics rendition to the cell template
     EX_cell cell;
-    cell.asset_id = page->current_font;
+    cell.state = CVFE_DEFAULT4;
+    cell.asset_id = get_page_font();
     cell.value = value;
-    cell.state = 0x0000000000000000;
-    // in reserse attribute, the colors are swapped between fg and bg
-    cell.colorfg_id = 0;
-    cell.colorbg_id = 0;
+    cell.palette_id = get_page_palette();
+    cell.colorfg_id = page->current_color;
+//    cell.colorbg_id = 0; // should not be altered unless reverse video
+
 //    state |= 0; // assign corresponding lines based on some states (underline, strikeout, box, ...)
-/*
-    state |= CVFE_LINE_TOP           // turn on line top
-    state |= CVFE_LINE_BOT           // turn on line bottom
-    state |= CVFE_LINE_LEF           // turn on line left
-    state |= CVFE_LINE_RIG           // turn on line right
-    state |= CVFE_LINE_HOR           // turn on line center horizontal
-    state |= CVFE_LINE_VER           // turn on line center vertical
-*/
-    cell.skew = (Vector2) {0,0};     // determine with italic flag
+
+    if (page->state & TCAPS_OVERLINED) cell.state |= CVFE_LINE_TOP;
+    if (page->state & TCAPS_UNDERLINED) cell.state |= CVFE_LINE_BOT;
+    if (page->state & TCAPS_STRIKEOUT) cell.state |= CVFE_LINE_HOR;
+    if (page->state & TCAPS_FRAMED) cell.state |= (CVFE_LINE_BOT | CVFE_LINE_TOP | CVFE_LINE_LEF | CVFE_LINE_RIG);
+
+    if (page->state & TCAPS_ITALIC) cell.skew = (Vector2) {0.25,0}; else  cell.skew = (Vector2) {0,0};
     cell.offset = (Vector2){0,0};    // set offset for superscript or subscript
     plot_cell(TERMINALDISPLAY, page_id, &cell, page->cursor_position);
     return true; // mostly if writing to the cell worked
@@ -3677,14 +3747,24 @@ static void write_string_to_page(uint8_t* s, uint16_t length) {
     }
 }
 
-static void set_terminal_fonts(void) {
-    uint16_t tfont = 0;
+static void set_terminal_assets(void) {
+    uint16_t tfont = 0, tpalette = 0;
     sys.terminal.fonts = 0;
+    sys.terminal.palettes = 0;
     for (uint16_t i = 0; i < MAXASSETS; ++i) {
         if (sys.asset.state[i] & ASSET_FONT) {
-            sys.terminal.font_id[tfont] = i;
-            ++sys.terminal.fonts;
-            ++tfont; if (tfont > TERM_MAXFONTS) break;
+            if (tfont > TERM_MAXFONTS) {
+                sys.terminal.font_id[tfont] = i;
+                ++sys.terminal.fonts;
+                ++tfont;
+            }
+        } else
+        if (sys.asset.state[i] & ASSET_PALETTE) {
+            if (tfont > TERM_MAXPALETTES) {
+                sys.terminal.font_id[tpalette] = i;
+                ++sys.terminal.palettes;
+                ++tpalette;
+            }
         }
     }    
 }
@@ -3694,7 +3774,7 @@ static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     flip_frame_buffer(TERMINALDISPLAY, false);
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
     uint16_t display = sys.video.current_virtual;
-    set_terminal_fonts();
+    set_terminal_assets();
     uint32_t canvasgroup_state = 0;
     uint64_t canvas_state = CVFE_DEFAULT4;
     uint64_t cell_state = CVFE_DEFAULT4;
@@ -4004,14 +4084,14 @@ void game_init_title(void) {
 	bubbles[7] = init_particle(sys.asset.tex[22], (Vector2) {-32,-32}, (Vector2){0.3,0.2});
 
     init_scrolltext(0, 25, 11, 5, 2.0, (Vector2){32,10}, (Vector2){0,0}, 255);
-    init_scrolltext(1, 24, 11, 5, 3.0, (Vector2){16,6}, (Vector2){32,0}, 255);
-    init_scrolltext(2, 27, 11, 5, 2.9, (Vector2){16,5}, (Vector2){32,0}, 32);
-    init_scrolltext(3, 28, 11, 5, 2.8, (Vector2){16,4}, (Vector2){32,0}, 64);
-    init_scrolltext(4, 29, 11, 5, 2.7, (Vector2){16,3}, (Vector2){32,0}, 96);
-    init_scrolltext(5, 27, 11, 5, 2.6, (Vector2){16,2}, (Vector2){32,0}, 96);
-    init_scrolltext(6, 28, 11, 5, 2.5, (Vector2){16,1}, (Vector2){32,0}, 64);
-    init_scrolltext(7, 27, 11, 5, 2.4, (Vector2){16,0}, (Vector2){32,0}, 32);
-    init_scrolltext(8, 26, 11, 5, 0.0, (Vector2){0,6}, (Vector2){32,0}, 255);
+    init_scrolltext(1, 24, 11, 5, 3.0, (Vector2){16,6}, (Vector2){1,0}, 255);
+    init_scrolltext(2, 27, 11, 5, 2.9, (Vector2){16,5}, (Vector2){1,0}, 32);
+    init_scrolltext(3, 28, 11, 5, 2.8, (Vector2){16,4}, (Vector2){1,0}, 64);
+    init_scrolltext(4, 29, 11, 5, 2.7, (Vector2){16,3}, (Vector2){1,0}, 96);
+    init_scrolltext(5, 27, 11, 5, 2.6, (Vector2){16,2}, (Vector2){1,0}, 96);
+    init_scrolltext(6, 28, 11, 5, 2.5, (Vector2){16,1}, (Vector2){1,0}, 64);
+    init_scrolltext(7, 27, 11, 5, 2.4, (Vector2){16,0}, (Vector2){1,0}, 32);
+    init_scrolltext(8, 26, 11, 5, 0.0, (Vector2){0,6}, (Vector2){1,0}, 255);
 
     init_canopy(11, 5, (Vector2){36, 12}, (Vector2){8.0f, 8.0f}, 0.0f, 0.0f, (Vector2){0, 0.166}, 41, 57);
 
