@@ -740,13 +740,13 @@ typedef struct EX_video {
 
 typedef struct EX_page {
     uint32_t    state;
-    Vector2     cursor_position;
+    Vector2     cursor_home_position, cursor_previous_position, cursor_position;
     uint16_t    default_font, previous_font, current_font;
     uint16_t    default_palette, previous_palette, current_palette;
     uint16_t    current_color;
     uint16_t    text_blink_rate;
     uint16_t    margin_left, margin_right, margin_top, margin_bottom;
-    Vector2     page_split;     // Horizontal and vertical page split position (usually center)
+    Vector2     page_split;                             // Horizontal and vertical page split position (usually center)
 } EX_page;
 
 typedef struct EX_token {
@@ -755,17 +755,18 @@ typedef struct EX_token {
 } EX_token;
 
 typedef struct EX_terminal {
-    uint32_t    state;  // to be elaborated
+    uint32_t    state;                                  // to be elaborated
     uint16_t    asset_id;
-    uint16_t    canvasgroup_id; // Where all terminal canvases reside
+    uint16_t    canvasgroup_id;                         // Where all terminal canvases reside
     uint16_t    previous_page_id, current_page_id;
-
     uint16_t    font_id[TERM_MAXFONTS];
     uint16_t    fonts;
     uint16_t    palette_id[TERM_MAXPALETTES];
     uint16_t    palettes;
 
-    EX_page     page[TERM_MAXPAGES];
+    EX_page     page[TERM_MAXPAGES];                    // space for all terminal pages
+    uint32_t    screensaver_delay;                      // time in seconds before scerensaver kicks in
+    uint32_t    screensaver_count;                      // countdown before screensaver takes effect
 
     uint8_t     input_buffer[IOBUFFERSIZE];
     uint8_t     output_buffer[IOBUFFERSIZE];
@@ -785,11 +786,11 @@ typedef struct EX_terminal {
 
 typedef struct EX_temporal {
     char        datetime[20];
-    double      period_table[TEMPORAL_ARRAY_SIZE];
-    uint64_t    prev_osc;
-    uint64_t    osc;
-    uint64_t    osc_count[TEMPORAL_ARRAY_SIZE];     // counts are on full cycles
-    double      osc_next_frame[TEMPORAL_ARRAY_SIZE];  // calculated following frame to trigger a state change
+    double      period_table[TEMPORAL_ARRAY_SIZE];      // time slice period per oscillator
+    uint64_t    prev_osc;                               // previous oscillator bits
+    uint64_t    osc;                                    // all oscillator bits
+    uint64_t    osc_count[TEMPORAL_ARRAY_SIZE];         // number of cycles since start of program (counts are on full cycles)
+    double      osc_next_frame[TEMPORAL_ARRAY_SIZE];    // trigger for oscillator state update (calculated following frame)
 } EX_temporal;
 
 typedef struct EX_player {
@@ -1988,12 +1989,6 @@ void render_canvas(uint16_t canvas_id, Vector2 rendersize) {
 //RLAPI Vector2 GetMousePosition(void);                         // Get mouse position XY
 }
 
-// does the execution of the modifiers
-void process_canvas(uint16_t canvas_id) {
-    // modifiers logic
-    // temporal considerations
-}
-
 void render_canvasgroup(void) {
     uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
     EX_canvasgroup  *canvasgroup  = &sys.video.canvasgroup[canvasgroup_id];
@@ -2007,10 +2002,15 @@ void render_canvasgroup(void) {
     end_draw();
 }
 
+// does the execution of the modifiers
+void process_canvas(uint16_t canvas_id) {
+    // modifiers logic
+    // temporal considerations
+}
+
 void process_canvasgroup(uint16_t canvasgroup_id) {
     uint16_t canvas_id = 0;
-    //process_canvasgroup();
-    render_canvasgroup();
+    process_canvas(canvas_id);
 }
 
 
@@ -2674,7 +2674,9 @@ void update_display(void) {
             sys.video.screen_refresh = false;
         };
         draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[display]], (Vector2) {0,0});
-
+        if (sys.program.ctrlstate & CTRL_SHOW_TERMINAL) {
+            draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[TERMINALDISPLAY]], (Vector2) {0,0});
+        }
         if (sys.program.ctrlstate & CTRL_DEBUG) {
             // if debug functionalities activated
             // DISPLAY MANAGE DEBUG INFORMATION
@@ -3618,40 +3620,91 @@ typedef enum {
 } ansi_commands;
 
 typedef enum {
-    TCAPS_R32               = 0b10000000000000000000000000000000, // 
-    TCAPS_BOLD              = 0b01000000000000000000000000000000, // turns foreground color 2 * brightness
-    TCAPS_FAINT             = 0b00100000000000000000000000000000, // turns foreground color .5 * brightness
-    TCAPS_ENCIRCLED         = 0b00010000000000000000000000000000, // puts a circle around character
-    TCAPS_FRAMED            = 0b00001000000000000000000000000000, // puts a box around character
-    TCAPS_OVERLINED         = 0b00000100000000000000000000000000, // draws a line on top of character
-    TCAPS_DSTRIKEOUT        = 0b00000010000000000000000000000000, // draws a double line through character
-    TCAPS_STRIKEOUT         = 0b00000001000000000000000000000000, // draws a line through character
-    TCAPS_UNDERLINED        = 0b00000000100000000000000000000000, // draws a line under character
-    TCAPS_SUPERSCRIPT       = 0b00000000010000000000000000000000, // shifts character upwards
-    TCAPS_SUBSCRIPT         = 0b00000000001000000000000000000000, // shifts character downwards
-    TCAPS_RVIDEO            = 0b00000000000100000000000000000000, // reverse colors between froeground a background
-    TCAPS_STRESSMARK        = 0b00000000000010000000000000000000, // 
-    TCAPS_ITALIC            = 0b00000000000001000000000000000000, // uses skew to pent characters
-    TCAPS_BLINK             = 0b00000000000000100000000000000000, // set character to blink
+    TCAPS_PAGE8             = 0b10000000000000000000000000000000, // enable page 8
+    TCAPS_PAGE7             = 0b01000000000000000000000000000000, // enable page 7
+    TCAPS_PAGE6             = 0b00100000000000000000000000000000, // enable page 6
+    TCAPS_PAGE5             = 0b00010000000000000000000000000000, // enable page 5
+    TCAPS_PAGE4             = 0b00001000000000000000000000000000, // enable page 4
+    TCAPS_PAGE3             = 0b00000100000000000000000000000000, // enable page 3
+    TCAPS_PAGE2             = 0b00000010000000000000000000000000, // enable page 2
+    TCAPS_PAGE1             = 0b00000001000000000000000000000000, // enable page 1
+    TCAPS_R24               = 0b00000000100000000000000000000000, // 
+    TCAPS_R23               = 0b00000000010000000000000000000000, // 
+    TCAPS_R22               = 0b00000000001000000000000000000000, // 
+    TCAPS_R21               = 0b00000000000100000000000000000000, // 
+    TCAPS_R20               = 0b00000000000010000000000000000000, // 
+    TCAPS_R19               = 0b00000000000001000000000000000000, // 
+    TCAPS_R18               = 0b00000000000000100000000000000000, // 
     TCAPS_SCREENSAVER       = 0b00000000000000010000000000000000, // allows screen to go in screensaver mode
     TCAPS_NUMLOCK           = 0b00000000000000001000000000000000, // numeric lock keyboard state
     TCAPS_CAPSLOCK          = 0b00000000000000000100000000000000, // caps lock keyboard state
     TCAPS_INSLOCK           = 0b00000000000000000010000000000000, // insert lock keyboard state
     TCAPS_SHOW_HOSTLEDS     = 0b00000000000000000001000000000000, // allows to show or hide led status lights on keyboard
-    TCAPS_SHOW_CURSOR       = 0b00000000000000000000100000000000, // show cursor on page
-    TCAPS_SHOW_MOUSE        = 0b00000000000000000000010000000000, // show mouse on page
-    TCAPS_SHOW_COMMAND      = 0b00000000000000000000001000000000, // show terminal commands (default is hidden)
-    TCAPS_CURSOR_RTOL       = 0b00000000000000000000000100000000, // set cursor to move from right to left (default is left to right)
-    TCAPS_AUTO_WRAP         = 0b00000000000000000000000010000000, // automatically wraps around screen when at end of line
-    TCAPS_AUTO_REPEAT       = 0b00000000000000000000000001000000, // keyboard auto repeat last character pressed
-    TCAPS_AUTO_SCROLL       = 0b00000000000000000000000000100000, // scroll page when moving past last line (new line)
-    TCAPS_HALF_DUPLEX       = 0b00000000000000000000000000010000, // 
-    TCAPS_LOCAL_ECHO        = 0b00000000000000000000000000001000, // locally show characters typed
-    TCAPS_HSPLIT            = 0b00000000000000000000000000000100, // horizontal page split
-    TCAPS_VSPLIT            = 0b00000000000000000000000000000010, // vertical page split
-    TCAPS_DISPLAY           = 0b00000000000000000000000000000001, // turn on page display (default is on)
-    TCAPS_DEFAULT_MASK      = 0b00000000000000010001111011101001  // 
-} termninal_capabilities;
+    TCAPS_R12               = 0b00000000000000000000100000000000, // 
+    TCAPS_R11               = 0b00000000000000000000010000000000, // 
+    TCAPS_R10               = 0b00000000000000000000001000000000, // 
+    TCAPS_R9                = 0b00000000000000000000000100000000, // 
+    TCAPS_R8                = 0b00000000000000000000000010000000, // 
+    TCAPS_SWITCH_PAGE       = 0b00000000000000000000000001000000, // enable switching pages
+    TCAPS_R6                = 0b00000000000000000000000000100000, // 
+    TCAPS_R5                = 0b00000000000000000000000000010000, // 
+    TCAPS_MOUSE_INPUT       = 0b00000000000000000000000000001000, // enable mouse input
+    TCAPS_KEYBOARD_INPUT    = 0b00000000000000000000000000000100, // enable keyboard input
+    TCAPS_R2                = 0b00000000000000000000000000000010, // 
+    TCAPS_DISPLAY           = 0b00000000000000000000000000000001, // enable terminal display
+    TCAPS_DEFAULT_MASK      = 0b00000001000000010001000001001101  // 
+} terminal_capabilities;
+
+typedef enum {
+    PCAPS_R32               = 0b10000000000000000000000000000000, // 
+    PCAPS_BOLD              = 0b01000000000000000000000000000000, // turns foreground color 2 * brightness
+    PCAPS_FAINT             = 0b00100000000000000000000000000000, // turns foreground color .5 * brightness
+    PCAPS_ENCIRCLED         = 0b00010000000000000000000000000000, // puts a circle around character
+    PCAPS_FRAMED            = 0b00001000000000000000000000000000, // puts a box around character
+    PCAPS_OVERLINED         = 0b00000100000000000000000000000000, // draws a line on top of character
+    PCAPS_DSTRIKEOUT        = 0b00000010000000000000000000000000, // draws a double line through character
+    PCAPS_STRIKEOUT         = 0b00000001000000000000000000000000, // draws a line through character
+    PCAPS_UNDERLINED        = 0b00000000100000000000000000000000, // draws a line under character
+    PCAPS_SUPERSCRIPT       = 0b00000000010000000000000000000000, // shifts character upwards
+    PCAPS_SUBSCRIPT         = 0b00000000001000000000000000000000, // shifts character downwards
+    PCAPS_RVIDEO            = 0b00000000000100000000000000000000, // reverse colors between froeground a background
+    PCAPS_STRESSMARK        = 0b00000000000010000000000000000000, // 
+    PCAPS_ITALIC            = 0b00000000000001000000000000000000, // uses skew to pent characters
+    PCAPS_BLINK             = 0b00000000000000100000000000000000, // set character to blink
+    PCAPS_R17               = 0b00000000000000010000000000000000,
+    PCAPS_R14               = 0b00000000000000001000000000000000,
+    PCAPS_R13               = 0b00000000000000000100000000000000,
+    PCAPS_SHOW_CURSOR       = 0b00000000000000000010000000000000, // show cursor on page
+    PCAPS_SHOW_MOUSE        = 0b00000000000000000001000000000000, // show mouse on page
+    PCAPS_SHOW_COMMAND      = 0b00000000000000000000100000000000, // show terminal commands (default is hidden)
+    PCAPS_CURSOR_RTOL       = 0b00000000000000000000010000000000, // set cursor to move from right to left (default is left to right)
+    PCAPS_AUTO_WRAP         = 0b00000000000000000000001000000000, // automatically wraps around screen when at end of line
+    PCAPS_AUTO_REPEAT       = 0b00000000000000000000000100000000, // keyboard auto repeat last character pressed
+    PCAPS_AUTO_SCROLL       = 0b00000000000000000000000010000000, // scroll page when moving past last line (new line)
+    PCAPS_HALF_DUPLEX       = 0b00000000000000000000000001000000, // 
+    PCAPS_HSPLIT            = 0b00000000000000000000000000100000, // horizontal page split
+    PCAPS_VSPLIT            = 0b00000000000000000000000000010000, // vertical page split
+    PCAPS_MOUSE_INPUT       = 0b00000000000000000000000000001000, // enable mouse input
+    PCAPS_KEYBOARD_INPUT    = 0b00000000000000000000000000000100, // enable keyboard input
+    PCAPS_LOCAL_ECHO        = 0b00000000000000000000000000000010, // locally show characters typed
+    PCAPS_DISPLAY           = 0b00000000000000000000000000000001, // turn on page display (default is on)
+    PCAPS_DEFAULT_MASK      = 0b00000000000000010001111011101001  // 
+} page_capabilities;
+
+static void set_terminal_state(uint32_t state) { BITS_ON(sys.terminal.state, state); }
+static void clear_terminal_state(uint32_t state) { BITS_OFF(sys.terminal.state, state); }
+
+static void set_page_state(uint32_t state) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    BITS_ON(page->state, state);
+}
+
+static void clear_page_state(uint32_t state) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    BITS_OFF(page->state, state);
+}
 
 static uint16_t get_page_font() {
     uint16_t page_id = sys.terminal.current_page_id;
@@ -3667,23 +3720,70 @@ static uint16_t get_page_palette() {
     return sys.terminal.palette_id[palette];
 }
 
-static void set_page_font(uint16_t font) {
+static bool set_page_font(uint16_t font) {
     uint16_t page_id = sys.terminal.current_page_id;
     EX_page *page = &sys.terminal.page[page_id];
+    if (font >= TERM_MAXFONTS) return true;
     page->previous_font = page->current_font;
     page->current_font = font;
+    return false;
 }
 
-static void set_page_palette(uint16_t palette) {
+static bool set_page_palette(uint16_t palette) {
     uint16_t page_id = sys.terminal.current_page_id;
     EX_page *page = &sys.terminal.page[page_id];
+    if (palette >= TERM_MAXPALETTES) return true;
     page->previous_palette = page->current_palette;
     page->current_palette = palette;
+    return false;
+}
+
+static void move_keyboard_cursor_position(Vector2 value) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    Vector2 position = {page->cursor_position.x + value.x, page->cursor_position.y + value.y};
+    if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
+    page->cursor_previous_position = page->cursor_position;
+    page->cursor_position = position;
+    return false;
+}
+
+static bool set_keyboard_cursor_position(Vector2 position) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
+    page->cursor_previous_position = page->cursor_position;
+    page->cursor_position = position;
+    return false;
+}
+
+static Vector2 get_keyboard_cursor_position(void) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    return page->cursor_position;
+}
+
+static bool set_cursor_home_position(Vector2 position) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
+    page->cursor_home_position = position;
+    return false;
+}
+
+static bool move_cursor_home(void) {
+    uint16_t page_id = sys.terminal.current_page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    return set_keyboard_cursor_position(page->cursor_home_position);
+}
+
+static bool set_writing_blink_rate(uint16_t rate) {
 }
 
 static void init_page(uint16_t page_id, Vector2 size) {
+    uint16_t status;
     EX_page *page = &sys.terminal.page[page_id];
-    page->state             = TCAPS_DEFAULT_MASK;
+    set_page_state(PCAPS_DEFAULT_MASK);
     page->default_font      = 0;
     page->current_font      = 0;
     page->current_color     = 7;
@@ -3693,7 +3793,8 @@ static void init_page(uint16_t page_id, Vector2 size) {
     page->margin_right      = size.x - 1;
     page->margin_top        = 0;
     page->margin_bottom     = size.y - 1;
-    page->cursor_position   = (Vector2){page->margin_left, page->margin_top};
+    status += set_cursor_home_position((Vector2){page->margin_left, page->margin_top});
+    status += move_cursor_home();
     page->page_split        = (Vector2){0,0};
 
 //    uint16_t    default_palette;
@@ -3719,12 +3820,12 @@ static bool write_to_cell(uint8_t value) {
 
 //    state |= 0; // assign corresponding lines based on some states (underline, strikeout, box, ...)
 
-    if (page->state & TCAPS_OVERLINED) cell.state |= CVFE_LINE_TOP;
-    if (page->state & TCAPS_UNDERLINED) cell.state |= CVFE_LINE_BOT;
-    if (page->state & TCAPS_STRIKEOUT) cell.state |= CVFE_LINE_HOR;
-    if (page->state & TCAPS_FRAMED) cell.state |= (CVFE_LINE_BOT | CVFE_LINE_TOP | CVFE_LINE_LEF | CVFE_LINE_RIG);
+    if (page->state & PCAPS_OVERLINED) cell.state |= CVFE_LINE_TOP;
+    if (page->state & PCAPS_UNDERLINED) cell.state |= CVFE_LINE_BOT;
+    if (page->state & PCAPS_STRIKEOUT) cell.state |= CVFE_LINE_HOR;
+    if (page->state & PCAPS_FRAMED) cell.state |= (CVFE_LINE_BOT | CVFE_LINE_TOP | CVFE_LINE_LEF | CVFE_LINE_RIG);
 
-    if (page->state & TCAPS_ITALIC) cell.skew = (Vector2) {0.25,0}; else  cell.skew = (Vector2) {0,0};
+    if (page->state & PCAPS_ITALIC) cell.skew = (Vector2) {0.25,0}; else  cell.skew = (Vector2) {0,0};
     cell.offset = (Vector2){0,0};    // set offset for superscript or subscript
     plot_cell(TERMINALDISPLAY, page_id, &cell, page->cursor_position);
     return true; // mostly if writing to the cell worked
@@ -3769,12 +3870,16 @@ static void set_terminal_assets(void) {
     }    
 }
 
+void show_terminal(void) {remove_service(CTRL_SHOW_TERMINAL);}
+void hide_terminal(void) {add_service(CTRL_SHOW_TERMINAL);}
+
 static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     int16_t status;
     flip_frame_buffer(TERMINALDISPLAY, false);
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
     uint16_t display = sys.video.current_virtual;
     set_terminal_assets();
+    set_terminal_state(TCAPS_DEFAULT_MASK);
     uint32_t canvasgroup_state = 0;
     uint64_t canvas_state = CVFE_DEFAULT4;
     uint64_t cell_state = CVFE_DEFAULT4;
@@ -3790,21 +3895,35 @@ static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     return status;
 }
 
-// https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-oemkeyscan
+
+void process_keyboard(void) {
 // Establish keyboard management / buffer
-// Establish mouse management (old x,y / current x,y)
-void update_terminal(void) {
-// RLAPI void PollInputEvents(void);                             // Register all input events
 // RLAPI int GetKeyPressed(void);                                // Get key pressed (keycode), call it multiple times for keys queued
 // RLAPI int GetCharPressed(void);                               // Get char pressed (unicode), call it multiple times for chars queued
+}
+
+// Establish mouse management (old x,y / current x,y)
+void process_mouse(void) {
 // RLAPI bool IsMouseButtonPressed(int button);                  // Check if a mouse button has been pressed once
 // RLAPI bool IsMouseButtonDown(int button);                     // Check if a mouse button is being pressed
 // RLAPI bool IsMouseButtonReleased(int button);                 // Check if a mouse button has been released once
 // RLAPI bool IsMouseButtonUp(int button);                       // Check if a mouse button is NOT being pressed
+}
+
+// https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-oemkeyscan
+void update_terminal(void) {
+// RLAPI void PollInputEvents(void);                             // Register all input events
+
+    process_keyboard();
+    process_mouse();
+
+//            if (IsKeyDown(KEY_RIGHT_CONTROL)) {
+    write_char_to_page(65);
+    process_canvasgroup(TERMINALDISPLAY);
 
 }
 
-void show_terminal(void) {
+void render_terminal(void) {
     // aimed at displaying the terminal canvasgroup only
     flip_frame_buffer(TERMINALDISPLAY, false);
 
@@ -3815,6 +3934,7 @@ void show_terminal(void) {
 }
 
 void shutdown_terminal(void) {
+    hide_terminal();
 }
 
 // ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** E N D
@@ -4330,7 +4450,7 @@ int16_t process_system(uint32_t ctrlstate, uint32_t pmsnstate, const char* name)
     set_permission(pmsnstate);
     add_service(ctrlstate);
 
-    debug_console_out(">>>~~~>>> P R O G R A M   S T A R T <<<~~~<<<", 0);
+    debug_console_out(">>>~~~>>> P R O C E S S   S Y S T E M <<<~~~<<<", 0);
 
     commute_to(CTRL_INITIALIZE);
     add_service(CTRL_RUNNING);
@@ -4347,10 +4467,8 @@ int16_t process_system(uint32_t ctrlstate, uint32_t pmsnstate, const char* name)
             // something special happening while game is paused
             // DISPLAY PAUSE MESSAGE
             }
-            if (IsKeyDown(KEY_RIGHT_CONTROL)) {
-                if (sys.program.ctrlstate & CTRL_SHOW_TERMINAL) {
-                    show_terminal(); // this freezes the current video and does nothing else ******************* ISSUE
-                }
+            if (sys.program.ctrlstate & CTRL_SHOW_TERMINAL) {
+                render_terminal(); // this freezes the current video and does nothing else ******************* ISSUE
             }
             update_system();
         }
