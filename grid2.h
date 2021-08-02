@@ -743,7 +743,7 @@ typedef struct EX_page {
     Vector2     cursor_home_position, cursor_previous_position, cursor_position;
     uint16_t    default_font, previous_font, current_font;
     uint16_t    default_palette, previous_palette, current_palette;
-    uint16_t    current_color;
+    uint16_t    default_colorfg, default_colorbg, colorfg, colorbg;
     uint16_t    text_blink_rate;
     uint16_t    margin_left, margin_right, margin_top, margin_bottom;
     Vector2     page_split;                             // Horizontal and vertical page split position (usually center)
@@ -1056,9 +1056,9 @@ void update_temporal() {
     }
 }
 
-// ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
-// ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
-// ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** B E G I N
+// ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** B E G I N
+// ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** B E G I N
+// ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** B E G I N
 
 typedef enum {
     CVFE_LINE_TOP           = 0b1000000000000000000000000000000000000000000000000000000000000000, // turn on line top
@@ -2014,9 +2014,9 @@ void process_canvasgroup(uint16_t canvasgroup_id) {
 }
 
 
-// ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** E N D
-// ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** E N D
-// ********** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** G R I D   S Y S T E M  ***** E N D
+// ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** E N D
+// ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** E N D
+// ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** E N D
 
 // ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
 // ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
@@ -2291,6 +2291,7 @@ uint16_t load_palette(Vector2 count, const char* fileName, const char* fileType,
     return asset_id;
 }
 
+uint16_t get_palette_color_count(asset_id) { sys.asset.tileset[asset_id].total; }
 
 uint16_t load_tileset(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t ascii_start) {
 
@@ -3650,13 +3651,13 @@ typedef enum {
     TCAPS_R5                = 0b00000000000000000000000000010000, // 
     TCAPS_MOUSE_INPUT       = 0b00000000000000000000000000001000, // enable mouse input
     TCAPS_KEYBOARD_INPUT    = 0b00000000000000000000000000000100, // enable keyboard input
-    TCAPS_R2                = 0b00000000000000000000000000000010, // 
-    TCAPS_DISPLAY           = 0b00000000000000000000000000000001, // enable terminal display
-    TCAPS_DEFAULT_MASK      = 0b00000001000000010001000001001101  // 
+    TCAPS_DISPLAY           = 0b00000000000000000000000000000010, // enable terminal display
+    TCAPS_INITIALIZED       = 0b00000000000000000000000000000001, // terminal was initialized
+    TCAPS_DEFAULT_MASK      = 0b00000001000000010001000001001111  // 
 } terminal_capabilities;
 
 typedef enum {
-    PCAPS_R32               = 0b10000000000000000000000000000000, // 
+    PCAPS_RVIDEO            = 0b10000000000000000000000000000000, // reverse colors between froeground a background
     PCAPS_BOLD              = 0b01000000000000000000000000000000, // turns foreground color 2 * brightness
     PCAPS_FAINT             = 0b00100000000000000000000000000000, // turns foreground color .5 * brightness
     PCAPS_ENCIRCLED         = 0b00010000000000000000000000000000, // puts a circle around character
@@ -3667,12 +3668,12 @@ typedef enum {
     PCAPS_UNDERLINED        = 0b00000000100000000000000000000000, // draws a line under character
     PCAPS_SUPERSCRIPT       = 0b00000000010000000000000000000000, // shifts character upwards
     PCAPS_SUBSCRIPT         = 0b00000000001000000000000000000000, // shifts character downwards
-    PCAPS_RVIDEO            = 0b00000000000100000000000000000000, // reverse colors between froeground a background
+    PCAPS_R21               = 0b00000000000100000000000000000000, // 
     PCAPS_STRESSMARK        = 0b00000000000010000000000000000000, // 
     PCAPS_ITALIC            = 0b00000000000001000000000000000000, // uses skew to pent characters
     PCAPS_BLINK             = 0b00000000000000100000000000000000, // set character to blink
     PCAPS_R17               = 0b00000000000000010000000000000000,
-    PCAPS_R14               = 0b00000000000000001000000000000000,
+    PCAPS_LOCAL_ECHO        = 0b00000000000000001000000000000000, // locally show characters typed
     PCAPS_R13               = 0b00000000000000000100000000000000,
     PCAPS_SHOW_CURSOR       = 0b00000000000000000010000000000000, // show cursor on page
     PCAPS_SHOW_MOUSE        = 0b00000000000000000001000000000000, // show mouse on page
@@ -3686,61 +3687,85 @@ typedef enum {
     PCAPS_VSPLIT            = 0b00000000000000000000000000010000, // vertical page split
     PCAPS_MOUSE_INPUT       = 0b00000000000000000000000000001000, // enable mouse input
     PCAPS_KEYBOARD_INPUT    = 0b00000000000000000000000000000100, // enable keyboard input
-    PCAPS_LOCAL_ECHO        = 0b00000000000000000000000000000010, // locally show characters typed
-    PCAPS_DISPLAY           = 0b00000000000000000000000000000001, // turn on page display (default is on)
-    PCAPS_DEFAULT_MASK      = 0b00000000000000010001111011101001  // 
+    PCAPS_DISPLAY           = 0b00000000000000000000000000000010, // turn on page display (default is on)
+    PCAPS_INITIALIZED       = 0b00000000000000000000000000000001, // page was initialized
+    PCAPS_DEFAULT_MASK      = 0b00000000000000010001111011101011, // 
+    PCAPS_COL_NORMAL_MASK   = 0b11100000000000000000000000000000, // 
+    PCAPS_TF_NORMAL_MASK    = 0b00000000011011100000000000000000  // 
 } page_capabilities;
 
 static void set_terminal_state(uint32_t state) { BITS_ON(sys.terminal.state, state); }
 static void clear_terminal_state(uint32_t state) { BITS_OFF(sys.terminal.state, state); }
 
-static void set_page_state(uint32_t state) {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
-    BITS_ON(page->state, state);
+static void set_page_state(uint32_t state) { BITS_ON(sys.terminal.page[sys.terminal.current_page_id].state, state); }
+static void clear_page_state(uint32_t state) { BITS_OFF(sys.terminal.page[sys.terminal.current_page_id].state, state); }
+
+static bool enable_page(uint16_t page_id) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    // return error is page not PCAPS_INITIALIZED
 }
 
-static void clear_page_state(uint32_t state) {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
-    BITS_OFF(page->state, state);
-}
-
-static uint16_t get_page_font() {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
-    uint16_t font = page->current_font;
+static uint16_t get_page_font_id(void) {
+    uint16_t font = sys.terminal.page[sys.terminal.current_page_id].current_font;
     return sys.terminal.font_id[font];
 }
 
-static uint16_t get_page_palette() {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
-    uint16_t palette = page->current_palette;
+static uint16_t get_page_palette_id(void) {
+    uint16_t palette = sys.terminal.page[sys.terminal.current_page_id].current_palette;
     return sys.terminal.palette_id[palette];
 }
 
 static bool set_page_font(uint16_t font) {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
     if (font >= TERM_MAXFONTS) return true;
     page->previous_font = page->current_font;
     page->current_font = font;
     return false;
 }
 
+static bool set_page_default_font(uint16_t font) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    if (font >= TERM_MAXFONTS) return true;
+    page->default_font = font;
+    return false;
+}
+
 static bool set_page_palette(uint16_t palette) {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
     if (palette >= TERM_MAXPALETTES) return true;
     page->previous_palette = page->current_palette;
     page->current_palette = palette;
     return false;
 }
 
+static bool set_page_margins(uint16_t top, uint16_t bottom, uint16_t left, uint16_t right) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+// need to verify if exceeds canvas
+    page->margin_left       = left;
+    page->margin_right      = right;
+    page->margin_top        = top;
+    page->margin_bottom     = bottom;
+    return false;
+}
+
+static bool set_page_default_foreground_color(uint16_t color_id) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    uint16_t colors = get_palette_color_count(get_page_palette_id());
+    if (color_id < 0 || color_id >= colors) return true;
+    page->default_colorfg = color_id;
+    return false;
+}
+
+static bool set_page_default_background_color(uint16_t color_id) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    uint16_t colors = get_palette_color_count(get_page_palette_id());
+    if (color_id < 0 || color_id >= colors) return true;
+    page->default_colorbg = color_id;
+    return false;
+}
+
 static void move_keyboard_cursor_position(Vector2 value) {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
     Vector2 position = {page->cursor_position.x + value.x, page->cursor_position.y + value.y};
     if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
     page->cursor_previous_position = page->cursor_position;
@@ -3749,8 +3774,7 @@ static void move_keyboard_cursor_position(Vector2 value) {
 }
 
 static bool set_keyboard_cursor_position(Vector2 position) {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
     if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
     page->cursor_previous_position = page->cursor_position;
     page->cursor_position = position;
@@ -3758,51 +3782,89 @@ static bool set_keyboard_cursor_position(Vector2 position) {
 }
 
 static Vector2 get_keyboard_cursor_position(void) {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
     return page->cursor_position;
 }
 
 static bool set_cursor_home_position(Vector2 position) {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
     if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
     page->cursor_home_position = position;
     return false;
 }
 
 static bool move_cursor_home(void) {
-    uint16_t page_id = sys.terminal.current_page_id;
-    EX_page *page = &sys.terminal.page[page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
     return set_keyboard_cursor_position(page->cursor_home_position);
 }
 
-static bool set_writing_blink_rate(uint16_t rate) {
+static bool set_writing_blinking_rate(uint16_t rate) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    // establish blinking rates / temporal
+    page->text_blink_rate = rate;
 }
 
-static void init_page(uint16_t page_id, Vector2 size) {
-    uint16_t status;
-    EX_page *page = &sys.terminal.page[page_id];
+static bool set_writing_foreground_color(uint16_t color_id) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    uint16_t colors = get_palette_color_count(get_page_palette_id());
+    if (color_id < 0 || color_id >= colors) return true;
+    page->colorbg = color_id;
+    return false;
+}
+
+static bool set_writing_background_color(uint16_t color_id) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    uint16_t colors = get_palette_color_count(get_page_palette_id());
+    if (color_id < 0 || color_id >= colors) return true;
+    page->colorbg = color_id;
+    return false;
+}
+
+static uint16_t get_writing_foreground_color(void) {return sys.terminal.page[sys.terminal.current_page_id].colorfg;}
+static uint16_t get_writing_background_color(void) {return sys.terminal.page[sys.terminal.current_page_id].colorbg;}
+
+static void set_writing_colors_reverse(void)        {set_page_state(PCAPS_RVIDEO);}
+static void set_writing_colors_bold(void)           {set_page_state(PCAPS_BOLD);}     // unclear yet how to handle colors for this
+static void set_writing_colors_faint(void)          {set_page_state(PCAPS_FAINT);}    // unclear yet how to handle colors for this
+static void set_writing_colors_normal(void)         {clear_page_state(PCAPS_COL_NORMAL_MASK);}
+static void set_writing_typeface_subscript(void)    {set_page_state(PCAPS_SUBSCRIPT);}
+static void set_writing_typeface_superscript(void)  {set_page_state(PCAPS_SUPERSCRIPT);}
+static void set_writing_typeface_italic(void)       {set_page_state(PCAPS_ITALIC);}
+static void set_writing_typeface_overlined(void)    {set_page_state(PCAPS_OVERLINED);}
+static void set_writing_typeface_underlined(void)   {set_page_state(PCAPS_UNDERLINED);}
+static void set_writing_typeface_normal(void)       {clear_page_state(PCAPS_TF_NORMAL_MASK);}
+static void set_writing_cursor_rtol(void)           {set_page_state(PCAPS_CURSOR_RTOL);}
+static void set_writing_cursor_ltor(void)           {clear_page_state(PCAPS_CURSOR_RTOL);}
+
+static uint16_t init_page(uint16_t page_id, Vector2 size) {
+    uint16_t status = 0;
     set_page_state(PCAPS_DEFAULT_MASK);
-    page->default_font      = 0;
-    page->current_font      = 0;
-    page->current_color     = 7;
-    page->current_palette   = 0;
-    page->text_blink_rate   = 0;
-    page->margin_left       = 0;
-    page->margin_right      = size.x - 1;
-    page->margin_top        = 0;
-    page->margin_bottom     = size.y - 1;
+    status += set_page_default_font(0);
+    status += set_page_font(0);
+    status += set_page_default_foreground_color(7);
+    status += set_page_default_background_color(0);
+    status += set_writing_foreground_color(7);
+    status += set_writing_background_color(0);
+    status += set_page_palette(0);
+    status += set_writing_blinking_rate(0);
+    status += set_page_margins(0, size.y - 1, 0, size.x - 1);
+    EX_page *page = &sys.terminal.page[page_id];
     status += set_cursor_home_position((Vector2){page->margin_left, page->margin_top});
     status += move_cursor_home();
     page->page_split        = (Vector2){0,0};
+    return status;
+}
 
-//    uint16_t    default_palette;
-//    uint16_t    current_palette;
-//    uint16_t    default_color;
+static void page_scroll_up(void) {
+// copy within margins 1 up on canvas
+}
 
-
-    // background color, text color 
+static bool page_clear_line(uint16_t line) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    if (line >= page->margin_top || line <= page->margin_bottom) {
+    // ok to clear row on canvas
+    }
+    return false;
 }
 
 static bool write_to_cell(uint8_t value) {
@@ -3812,12 +3874,11 @@ static bool write_to_cell(uint8_t value) {
     // pass on all graphics rendition to the cell template
     EX_cell cell;
     cell.state = CVFE_DEFAULT4;
-    cell.asset_id = get_page_font();
+    cell.asset_id = get_page_font_id();
     cell.value = value;
-    cell.palette_id = get_page_palette();
-    cell.colorfg_id = page->current_color;
-//    cell.colorbg_id = 0; // should not be altered unless reverse video
-
+    cell.palette_id = get_page_palette_id();
+    cell.colorfg_id = get_writing_foreground_color();
+    cell.colorbg_id = get_writing_background_color();
 //    state |= 0; // assign corresponding lines based on some states (underline, strikeout, box, ...)
 
     if (page->state & PCAPS_OVERLINED) cell.state |= CVFE_LINE_TOP;
@@ -3839,6 +3900,9 @@ static void write_char_to_page(uint8_t value) {
     // if the status did not return ok, then react accordingly
     // then move cursor + 1 (to left or right)
     // check for borders, protected cell, move to new line (check borders)
+    // check if beyond last row, and if scroll then copy content of whole page 1 up then
+    // page_scroll_up();
+    // page_clear_line(page->margin_bottom);
 }
 
 static void write_string_to_page(uint8_t* s, uint16_t length) {
@@ -3859,8 +3923,7 @@ static void set_terminal_assets(void) {
                 ++sys.terminal.fonts;
                 ++tfont;
             }
-        } else
-        if (sys.asset.state[i] & ASSET_PALETTE) {
+        } else if (sys.asset.state[i] & ASSET_PALETTE) {
             if (tfont > TERM_MAXPALETTES) {
                 sys.terminal.font_id[tpalette] = i;
                 ++sys.terminal.palettes;
@@ -3870,8 +3933,8 @@ static void set_terminal_assets(void) {
     }    
 }
 
-void show_terminal(void) {remove_service(CTRL_SHOW_TERMINAL);}
-void hide_terminal(void) {add_service(CTRL_SHOW_TERMINAL);}
+static void show_terminal(void) {remove_service(CTRL_SHOW_TERMINAL);}
+static void hide_terminal(void) {add_service(CTRL_SHOW_TERMINAL);}
 
 static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     int16_t status;
