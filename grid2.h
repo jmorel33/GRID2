@@ -395,6 +395,20 @@ typedef union Vector4 {
 	float f[4];
 } Vector4;
 */
+
+// SET buffer aspect ratio
+// RLAPI void rlOrtho(double left, double right, double bottom, double top, double znear, double zfar);
+
+static Vector2 ratio_info(float x, float y) {
+    Vector2 p;
+
+    float gcd_res = gcdi(x,y);
+    p.x = x / gcd_res;
+    p.y = y / gcd_res;
+    return p;
+}
+
+
 // **************************************************************************************** R A Y L I B   E X T E N S I O N S
 
 void DrawTextImage(Texture texture, uint8_t* txt, Vector2 position) {
@@ -803,110 +817,114 @@ typedef struct EX_game {
 } EX_game;
 
 typedef enum {
-    CTRL_DEINIT                 = 0b10000000000000000000000000000000,
-    CTRL_INITIALIZE             = 0b01000000000000000000000000000000,
-    CTRL_EXIT                   = 0b00100000000000000000000000000000,
-    CTRL_INIT_TITLE             = 0b00010000000000000000000000000000,
-    CTRL_IN_TITLE               = 0b00001000000000000000000000000000,
-    CTRL_INIT_MENU1             = 0b00000100000000000000000000000000,
-    CTRL_IN_MENU1               = 0b00000010000000000000000000000000,
-    CTRL_INIT_MENU2             = 0b00000001000000000000000000000000,
-    CTRL_IN_MENU2               = 0b00000000100000000000000000000000,
-    CTRL_INIT_MENU3             = 0b00000000010000000000000000000000,
-    CTRL_IN_MENU3               = 0b00000000001000000000000000000000,
-    CTRL_INIT_MENU4             = 0b00000000000100000000000000000000,
-    CTRL_IN_MENU4               = 0b00000000000010000000000000000000,
-    CTRL_GAME_RESUME            = 0b00000000000001000000000000000000,
-    CTRL_GAME_PLAY              = 0b00000000000000100000000000000000,
-    CTRL_INIT_GAME              = 0b00000000000000010000000000000000,
-    CTRL_GAME_NEXT              = 0b00000000000000001000000000000000,
-    CTRL_GAMEOVER               = 0b00000000000000000100000000000000,
-    CTRL_GAME_DEATH             = 0b00000000000000000010000000000000,
-    CTRL_R13                    = 0b00000000000000000001000000000000,
-    CTRL_OFF_FOCUS              = 0b00000000000000000000100000000000,
-    CTRL_DEBUG                  = 0b00000000000000000000010000000000,
-    CTRL_SHOW_TERMINAL          = 0b00000000000000000000001000000000,
-    CTRL_GAME_PAUSED            = 0b00000000000000000000000100000000,
-    CTRL_R8                     = 0b00000000000000000000000010000000,
-    CTRL_IN_GAME                = 0b00000000000000000000000001000000,
-    CTRL_RUNNING                = 0b00000000000000000000000000100000,
-    CTRL_TEMPORAL_INITIALIZED   = 0b00000000000000000000000000010000,
-    CTRL_AUDIO_INITIALIZED      = 0b00000000000000000000000000001000,
-    CTRL_TERMINAL_INITIALIZED   = 0b00000000000000000000000000000100,
-    CTRL_ASSETS_INITIALIZED     = 0b00000000000000000000000000000010,
-    CTRL_VIDEO_INITIALIZED      = 0b00000000000000000000000000000001,
-    CTRL_SWITCHBOARD_MASK       = 0b11111111111111111111000000000000, // to filter out base states
-    CTRL_SERVICES_MASK          = 0b00000000000000000000111111111111, // to filter out switchboard states
+    CTRL_DEINIT                 = 0b10000000000000000000000000000000, // 
+    CTRL_INITIALIZE             = 0b01000000000000000000000000000000, // 
+    CTRL_EXIT                   = 0b00100000000000000000000000000000, // 
+    CTRL_INIT_TITLE             = 0b00010000000000000000000000000000, // 
+    CTRL_IN_TITLE               = 0b00001000000000000000000000000000, // 
+    CTRL_INIT_MENU1             = 0b00000100000000000000000000000000, // 
+    CTRL_IN_MENU1               = 0b00000010000000000000000000000000, // 
+    CTRL_INIT_MENU2             = 0b00000001000000000000000000000000, // 
+    CTRL_IN_MENU2               = 0b00000000100000000000000000000000, // 
+    CTRL_INIT_MENU3             = 0b00000000010000000000000000000000, // 
+    CTRL_IN_MENU3               = 0b00000000001000000000000000000000, // 
+    CTRL_INIT_MENU4             = 0b00000000000100000000000000000000, // 
+    CTRL_IN_MENU4               = 0b00000000000010000000000000000000, // 
+    CTRL_GAME_RESUME            = 0b00000000000001000000000000000000, // 
+    CTRL_GAME_PLAY              = 0b00000000000000100000000000000000, // 
+    CTRL_INIT_GAME              = 0b00000000000000010000000000000000, // 
+    CTRL_GAME_NEXT              = 0b00000000000000001000000000000000, // 
+    CTRL_GAMEOVER               = 0b00000000000000000100000000000000, // 
+    CTRL_GAME_DEATH             = 0b00000000000000000010000000000000, // 
+    CTRL_BOOTSTRAP_TRACE        = 0b00000000000000000001000000000000, // 
+    CTRL_OFF_FOCUS              = 0b00000000000000000000100000000000, // 
+    CTRL_DEBUG                  = 0b00000000000000000000010000000000, // 
+    CTRL_TERMINAL               = 0b00000000000000000000001000000000, // 
+    CTRL_GAME_PAUSED            = 0b00000000000000000000000100000000, // 
+    CTRL_IN_GAME                = 0b00000000000000000000000010000000, // 
+    CTRL_RUNNING                = 0b00000000000000000000000001000000, // 
+    CTRL_TEMPORAL_INITIALIZED   = 0b00000000000000000000000000100000, // 
+    CTRL_AUDIO_INITIALIZED      = 0b00000000000000000000000000010000, // 
+    CTRL_TERMINAL_INITIALIZED   = 0b00000000000000000000000000001000, // 
+    CTRL_ASSETS_INITIALIZED     = 0b00000000000000000000000000000100, // 
+    CTRL_VIDEO_INITIALIZED      = 0b00000000000000000000000000000010, // 
+    CTRL_DEBUG_INITIALIZED      = 0b00000000000000000000000000000001, // 
+    CTRL_SWITCHBOARD_MASK       = 0b11111111111111111110000000000000, // to filter out base states
+    CTRL_SERVICES_MASK          = 0b00000000000000000001111111111111, // to filter out switchboard states
     CTRL_NULL                   = 0b00000000000000000000000000000000  // in case that happens... (should never)
 } control_state;
 
 const char* control_state_literal(uint32_t state) {
     switch (state) {
-    case CTRL_DEINIT:              return "SWITCHBOARD: CTRL_DEINIT";
-    case CTRL_INITIALIZE:          return "SWITCHBOARD: CTRL_INITIALIZE";
-    case CTRL_EXIT:                return "SWITCHBOARD: CTRL_EXIT";
-    case CTRL_INIT_TITLE:          return "SWITCHBOARD: CTRL_INIT_TITLE";
-    case CTRL_IN_TITLE:            return "SWITCHBOARD: CTRL_IN_TITLE";
-    case CTRL_INIT_MENU1:          return "SWITCHBOARD: CTRL_INIT_MENU1";
-    case CTRL_IN_MENU1:            return "SWITCHBOARD: CTRL_IN_MENU1";
-    case CTRL_INIT_MENU2:          return "SWITCHBOARD: CTRL_INIT_MENU2";
-    case CTRL_IN_MENU2:            return "SWITCHBOARD: CTRL_IN_MENU2";
-    case CTRL_INIT_MENU3:          return "SWITCHBOARD: CTRL_INIT_MENU3";
-    case CTRL_IN_MENU3:            return "SWITCHBOARD: CTRL_IN_MENU3";
-    case CTRL_INIT_MENU4:          return "SWITCHBOARD: CTRL_INIT_MENU4";
-    case CTRL_IN_MENU4:            return "SWITCHBOARD: CTRL_IN_MENU4";
-    case CTRL_GAME_RESUME:         return "SWITCHBOARD: CTRL_GAME_RESUME";
-    case CTRL_GAME_PLAY:           return "SWITCHBOARD: CTRL_GAME_PLAY";
-    case CTRL_INIT_GAME:           return "SWITCHBOARD: CTRL_INIT_GAME";
-    case CTRL_GAME_NEXT:           return "SWITCHBOARD: CTRL_GAME_NEXT";
-    case CTRL_GAMEOVER:            return "SWITCHBOARD: CTRL_GAMEOVER";
-    case CTRL_GAME_DEATH:          return "SWITCHBOARD: CTRL_GAME_DEATH";
-    case CTRL_OFF_FOCUS:           return "BASE STATES: CTRL_OFF_FOCUS";
-    case CTRL_DEBUG:               return "BASE STATES: CTRL_DEBUG";
-    case CTRL_SHOW_TERMINAL:       return "BASE STATES: CTRL_SHOW_TERMINAL";
-    case CTRL_GAME_PAUSED:         return "BASE STATES: CTRL_GAME_PAUSED";
-    case CTRL_IN_GAME:             return "BASE STATES: CTRL_IN_GAME";
-    case CTRL_RUNNING:             return "BASE STATES: CTRL_RUNNING";
-    case CTRL_AUDIO_INITIALIZED:   return "BASE STATES: CTRL_AUDIO_INITIALIZED";
-    case CTRL_TERMINAL_INITIALIZED:return "BASE STATES: CTRL_TERMINAL_INITIALIZED";
-    case CTRL_ASSETS_INITIALIZED:  return "BASE STATES: CTRL_ASSETS_INITIALIZED";
-    case CTRL_VIDEO_INITIALIZED:   return "BASE STATES: CTRL_VIDEO_INITIALIZED";
+    case CTRL_DEINIT:               return "SWITCHBOARD: CTRL_DEINIT";
+    case CTRL_INITIALIZE:           return "SWITCHBOARD: CTRL_INITIALIZE";
+    case CTRL_EXIT:                 return "SWITCHBOARD: CTRL_EXIT";
+    case CTRL_INIT_TITLE:           return "SWITCHBOARD: CTRL_INIT_TITLE";
+    case CTRL_IN_TITLE:             return "SWITCHBOARD: CTRL_IN_TITLE";
+    case CTRL_INIT_MENU1:           return "SWITCHBOARD: CTRL_INIT_MENU1";
+    case CTRL_IN_MENU1:             return "SWITCHBOARD: CTRL_IN_MENU1";
+    case CTRL_INIT_MENU2:           return "SWITCHBOARD: CTRL_INIT_MENU2";
+    case CTRL_IN_MENU2:             return "SWITCHBOARD: CTRL_IN_MENU2";
+    case CTRL_INIT_MENU3:           return "SWITCHBOARD: CTRL_INIT_MENU3";
+    case CTRL_IN_MENU3:             return "SWITCHBOARD: CTRL_IN_MENU3";
+    case CTRL_INIT_MENU4:           return "SWITCHBOARD: CTRL_INIT_MENU4";
+    case CTRL_IN_MENU4:             return "SWITCHBOARD: CTRL_IN_MENU4";
+    case CTRL_GAME_RESUME:          return "SWITCHBOARD: CTRL_GAME_RESUME";
+    case CTRL_GAME_PLAY:            return "SWITCHBOARD: CTRL_GAME_PLAY";
+    case CTRL_INIT_GAME:            return "SWITCHBOARD: CTRL_INIT_GAME";
+    case CTRL_GAME_NEXT:            return "SWITCHBOARD: CTRL_GAME_NEXT";
+    case CTRL_GAMEOVER:             return "SWITCHBOARD: CTRL_GAMEOVER";
+    case CTRL_GAME_DEATH:           return "SWITCHBOARD: CTRL_GAME_DEATH";
+    case CTRL_BOOTSTRAP_TRACE:      return "SWITCHBOARD: CTRL_BOOTSTRAP_TRACE";
+    case CTRL_OFF_FOCUS:            return "BASE STATES: CTRL_OFF_FOCUS";
+    case CTRL_DEBUG:                return "BASE STATES: CTRL_DEBUG";
+    case CTRL_TERMINAL:             return "BASE STATES: CTRL_TERMINAL";
+    case CTRL_GAME_PAUSED:          return "BASE STATES: CTRL_GAME_PAUSED";
+    case CTRL_IN_GAME:              return "BASE STATES: CTRL_IN_GAME";
+    case CTRL_RUNNING:              return "BASE STATES: CTRL_RUNNING";
+    case CTRL_TEMPORAL_INITIALIZED: return "BASE STATES: CTRL_TEMPORAL_INITIALIZED";
+    case CTRL_AUDIO_INITIALIZED:    return "BASE STATES: CTRL_AUDIO_INITIALIZED";
+    case CTRL_TERMINAL_INITIALIZED: return "BASE STATES: CTRL_TERMINAL_INITIALIZED";
+    case CTRL_ASSETS_INITIALIZED:   return "BASE STATES: CTRL_ASSETS_INITIALIZED";
+    case CTRL_VIDEO_INITIALIZED:    return "BASE STATES: CTRL_VIDEO_INITIALIZED";
+    case CTRL_DEBUG_INITIALIZED:    return "BASE STATES: CTRL_DEBUG_INITIALIZED";
     default: return NULL;
     }
 }
 
 typedef enum {
-    PMSN_INFINITE_LIVES     = 0b10000000000000000000000000000000,
-    PMSN_INFINITE_POWER     = 0b01000000000000000000000000000000,
-    PMSN_INFINITE_TIME      = 0b00100000000000000000000000000000,
-    PMSN_NO_COLLISION       = 0b00010000000000000000000000000000,
-    PMSN_POWERUPS           = 0b00001000000000000000000000000000,
-    PMSN_NAVIGATE_LEVELS    = 0b00000100000000000000000000000000,
-    PMSN_DEATH              = 0b00000010000000000000000000000000,
-    PMSN_SUMMON             = 0b00000001000000000000000000000000,
-    PMSN_END_GAME           = 0b00000000100000000000000000000000,
-    PMSN_BENCHMARK          = 0b00000000000001000000000000000000,
-    PMSN_ATTRACT            = 0b00000000000000100000000000000000,
-    PMSN_R17                = 0b00000000000000010000000000000000,
-    PMSN_TRACE              = 0b00000000000000001000000000000000,
-    PMSN_R15                = 0b00000000000000000100000000000000,
-    PMSN_R14                = 0b00000000000000000010000000000000,
-    PMSN_R13                = 0b00000000000000000001000000000000,
-    PMSN_R12                = 0b00000000000000000000100000000000,
-    PMSN_R11                = 0b00000000000000000000010000000000,
-    PMSN_R10                = 0b00000000000000000000001000000000,
-    PMSN_R9                 = 0b00000000000000000000000100000000,
-    PMSN_R8                 = 0b00000000000000000000000010000000,
-    PMSN_R7                 = 0b00000000000000000000000001000000,
-    PMSN_EDITOR_ADMIN       = 0b00000000000000000000000000100000,
-    PMSN_EDITOR_USER        = 0b00000000000000000000000000010000,
-    PMSN_TERMINAL_ADMIN     = 0b00000000000000000000000000001000,
-    PMSN_TERMINAL_USER      = 0b00000000000000000000000000000100,
-    PMSN_DEBUG_ADMIN        = 0b00000000000000000000000000000010,
-    PMSN_DEBUG_USER         = 0b00000000000000000000000000000001,
-    PMSN_OFF                = 0b00000000000000000000000000000000,
-    PMSN_GAME_MASK          = 0b11111111111111110000000000000000,
-    PMSN_GODMODE_MASK       = 0b11111111111111111111111111111111
+    PMSN_INFINITE_LIVES     = 0b10000000000000000000000000000000, // 
+    PMSN_INFINITE_POWER     = 0b01000000000000000000000000000000, // 
+    PMSN_INFINITE_TIME      = 0b00100000000000000000000000000000, // 
+    PMSN_NO_COLLISION       = 0b00010000000000000000000000000000, // 
+    PMSN_POWERUPS           = 0b00001000000000000000000000000000, // 
+    PMSN_NAVIGATE_LEVELS    = 0b00000100000000000000000000000000, // 
+    PMSN_DEATH              = 0b00000010000000000000000000000000, // 
+    PMSN_SUMMON             = 0b00000001000000000000000000000000, // 
+    PMSN_END_GAME           = 0b00000000100000000000000000000000, // 
+    PMSN_BENCHMARK          = 0b00000000000001000000000000000000, // 
+    PMSN_ATTRACT            = 0b00000000000000100000000000000000, // 
+    PMSN_R17                = 0b00000000000000010000000000000000, // 
+    PMSN_DEBUG_TRACE        = 0b00000000000000001000000000000000, // 
+    PMSN_DEBUG_AUDIO        = 0b00000000000000000100000000000000, // 
+    PMSN_DEBUG_FPS          = 0b00000000000000000010000000000000, // 
+    PMSN_DEBUG_VIDEO        = 0b00000000000000000001000000000000, // 
+    PMSN_DEBUG_CONTROLS     = 0b00000000000000000000100000000000, // 
+    PMSN_DEBUG_DATA         = 0b00000000000000000000010000000000, // 
+    PMSN_DEBUG_EXIT         = 0b00000000000000000000001000000000, // 
+    PMSN_R9                 = 0b00000000000000000000000100000000, // 
+    PMSN_R8                 = 0b00000000000000000000000010000000, // 
+    PMSN_R7                 = 0b00000000000000000000000001000000, // 
+    PMSN_EDITOR_ADMIN       = 0b00000000000000000000000000100000, // 
+    PMSN_EDITOR_USER        = 0b00000000000000000000000000010000, // 
+    PMSN_TERMINAL_ADMIN     = 0b00000000000000000000000000001000, // 
+    PMSN_TERMINAL_USER      = 0b00000000000000000000000000000100, // 
+    PMSN_R2                 = 0b00000000000000000000000000000010, // 
+    PMSN_DEBUG              = 0b00000000000000000000000000000001, // 
+    PMSN_OFF                = 0b00000000000000000000000000000000, // 
+    PMSN_GAME_MASK          = 0b11111111111111110000000000000000, // 
+    PMSN_DEBUG_OPTIONS      = 0b00000000000000001111111000111101, // 
+    PMSN_GODMODE_MASK       = 0b11111111111111111111111111111111  // 
 } permission_state;
 
 const char* permission_state_literal(uint32_t state) {
@@ -922,13 +940,18 @@ const char* permission_state_literal(uint32_t state) {
     case PMSN_END_GAME:         return "PMSN_END_GAME";
     case PMSN_BENCHMARK:        return "PMSN_BENCHMARK";
     case PMSN_ATTRACT:          return "PMSN_ATTRACT";
-    case PMSN_TRACE:            return "PMSN_TRACE";
+    case PMSN_DEBUG_TRACE:      return "PMSN_DEBUG_TRACE";
+    case PMSN_DEBUG_AUDIO:      return "PMSN_DEBUG_AUDIO";
+    case PMSN_DEBUG_FPS:        return "PMSN_DEBUG_FPS";
+    case PMSN_DEBUG_VIDEO:      return "PMSN_DEBUG_VIDEO";
+    case PMSN_DEBUG_CONTROLS:   return "PMSN_DEBUG_CONTROLS";
+    case PMSN_DEBUG_DATA:       return "PMSN_DEBUG_DATA";
+    case PMSN_DEBUG_EXIT:       return "PMSN_DEBUG_EXIT";
     case PMSN_EDITOR_ADMIN:     return "PMSN_EDITOR_ADMIN";
     case PMSN_EDITOR_USER:      return "PMSN_EDITOR_USER";
     case PMSN_TERMINAL_ADMIN:   return "PMSN_TERMINAL_ADMIN";
     case PMSN_TERMINAL_USER:    return "PMSN_TERMINAL_USER";
-    case PMSN_DEBUG_ADMIN:      return "PMSN_DEBUG_ADMIN";
-    case PMSN_DEBUG_USER:       return "PMSN_DEBUG_USER";
+    case PMSN_DEBUG:            return "PMSN_DEBUG";
     default: return NULL;
     }
 }
@@ -941,6 +964,10 @@ typedef struct EX_program {
         uint32_t    status;
 } EX_program;
 
+typedef struct EX_debug {
+    uint32_t    state;
+} EX_debug;
+
 
 // **************************************************************************************** S Y S T E M   S T R U C T U R E S
 
@@ -951,19 +978,26 @@ typedef struct EX_system {
     EX_audio        audio;
     EX_video        video;
     EX_program      program;
+    EX_debug        debug;
 } EX_system;
-                // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
-EX_system sys;  // / / > > > > >   G l o b a l   W o r k i n g   S t o r a g e   < < < < < / / //
-                // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
+                /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+EX_system sys;  /* / / > > > > >   G l o b a l   W o r k i n g   S t o r a g e   < < < < < / / */
+                /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-void set_permission(uint32_t state)     {BITS_ON(sys.program.pmsnstate, state);}
-void unset_permission(uint32_t state)   {BITS_OFF(sys.program.pmsnstate, state);}
-void flip_permission(uint32_t state)    {BITS_FLIP(sys.program.pmsnstate, state);}
-uint32_t permission_valid(uint32_t state)   {return BITS_TEST(sys.program.pmsnstate, state);}
+void add_debugging(uint32_t state)          {BITS_ON(sys.debug.state, state);}
+void remove_debugging(uint32_t state)       {BITS_OFF(sys.debug.state, state);}
+void flip_debugging(uint32_t state)         {BITS_FLIP(sys.debug.state, state);}
+uint32_t active_debugging(uint32_t state)   {return BITS_TEST(sys.debug.state, state);}
 
-void add_service(uint32_t state)        {BITS_ON(sys.program.ctrlstate, state);}
-void remove_service(uint32_t state)     {BITS_OFF(sys.program.ctrlstate, state);}
-uint32_t service_active(uint32_t state)     {return BITS_TEST(sys.program.ctrlstate, state);}
+void set_permission(uint32_t state)         {BITS_ON(sys.program.pmsnstate, state);}
+void unset_permission(uint32_t state)       {BITS_OFF(sys.program.pmsnstate, state);}
+void flip_permission(uint32_t state)        {BITS_FLIP(sys.program.pmsnstate, state);}
+uint32_t valid_permission(uint32_t state)   {return BITS_TEST(sys.program.pmsnstate, state);}
+
+void add_service(uint32_t state)            {BITS_ON(sys.program.ctrlstate, state);}
+void remove_service(uint32_t state)         {BITS_OFF(sys.program.ctrlstate, state);}
+void flip_service(uint32_t state)           {BITS_FLIP(sys.program.ctrlstate, state);}
+uint32_t active_service(uint32_t state)     {return BITS_TEST(sys.program.ctrlstate, state);}
 
 void commute_to(uint32_t state) {
     BITS_OFF(sys.program.ctrlstate_prev, CTRL_SWITCHBOARD_MASK);
@@ -1038,7 +1072,7 @@ uint16_t init_temporal() {
     return osc;
 }
 
-void update_temporal() {
+int16_t update_temporal(void) {
 
     datetime_literal(&sys.temporal.datetime);
 
@@ -1055,6 +1089,417 @@ void update_temporal() {
         }
     }
 }
+
+// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
+// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
+// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
+
+typedef enum {
+    ASSET_RESERVED      = 0b10000000000000000000000000000000, //
+    ASSET_ICON          = 0b01000000000000000000000000000000, // image loaded as Game Icon
+    ASSET_PALETTE       = 0b00100000000000000000000000000000, // image loaded as palette
+    ASSET_TEXTURE       = 0b00010000000000000000000000000000, // image loaded as texture
+    ASSET_FONT          = 0b00001000000000000000000000000000, // image loaded as font
+    ASSET_TILESET       = 0b00000100000000000000000000000000, // image loaded as tileset
+    ASSET_FRAMEBUFFER   = 0b00000010000000000000000000000000, // image created as frame buffer
+    ASSET_XM            = 0b00000001000000000000000000000000, // music loaded xm tracker
+    ASSET_WAV           = 0b00000000100000000000000000000000, // sound loaded wav 
+    ASSET_MP3           = 0b00000000010000000000000000000000, // sound loaded mp3
+    ASSET_AUDIOSTREAM   = 0b00000000001000000000000000000000, // audio stream created
+    ASSET_TEXT          = 0b00000000000100000000000000000000, // text content loaded
+    ASSET_SHADER        = 0b00000000000010000000000000000000, // shader program
+    ASSET_JSON          = 0b00000000000001000000000000000000, // scripted JSON content
+    ASSET_SCRIPT        = 0b00000000000000100000000000000000, // scripted content loaded (not decided on language)
+    ASSET_DATA          = 0b00000000000000010000000000000000, // data content loaded
+    ASSET_RESERVED2     = 0b00000000000000001000000000000000, // 
+    ASSET_COPY          = 0b00000000000000000100000000000000, // is a copy
+    ASSET_REMOVE        = 0b00000000000000000010000000000000, // flagged for removal
+    ASSET_UPDATE        = 0b00000000000000000001000000000000, // flagged for update
+    ASSET_RUN           = 0b00000000000000000000100000000000, // flagged for execution (scripts)
+    ASSET_STOP          = 0b00000000000000000000010000000000, // flagged for a stop (scripts)
+    ASSET_UNLOADED      = 0b00000000000000000000001000000000, // was unloaded
+    ASSET_LOADED        = 0b00000000000000000000000100000000, // was loaded
+    ASSET_COMPRESSED    = 0b00000000000000000000000010000000, // uses raylib's compression method
+    ASSET_DECOMPRESSED  = 0b00000000000000000000000001000000, // was compressed
+    ASSET_EXPIRED       = 0b00000000000000000000000000100000, // not used anymore
+    ASSET_ISSUE         = 0b00000000000000000000000000010000, // found an issue with the asset
+    ASSET_LOCKED        = 0b00000000000000000000000000001000, // inaccessible
+    ASSET_UPDATED       = 0b00000000000000000000000000000100, // was updated
+    ASSET_ACTIVE        = 0b00000000000000000000000000000010, // can actively be used
+    ASSET_INITIALIZED   = 0b00000000000000000000000000000001, // passed through the initialisation process successfully
+    ASSET_TYPE_UNKNOWN  = 0b00000000000000000000000000000000, // not assigned = unknown
+    ASSET_TYPE_MASK     = 0b11111111111111110000000000000000, // All asset type definitions
+    ASSET_STATUS_MASK   = 0b00000000000000001111111111111111, 
+    ASSET_NULL          = 0b00000000000000000000000000000000  
+} asset_state;
+
+uint32_t asset_type(uint32_t state) {
+    return (state & ASSET_TYPE_MASK);
+}
+
+int16_t update_assets(void) {
+    for (uint16_t id = 0; id < sys.asset.total_assets; id++) {
+        if ((sys.asset.state[id] & ASSET_UPDATE) && (sys.asset.state[id] & ASSET_ACTIVE)) {
+            switch (sys.asset.asset_type[id]) {
+                case ASSET_ICON : // assigns window icon for operating system
+                SetWindowIcon(sys.asset.img[id]);
+                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
+                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
+                break;
+
+                case ASSET_PALETTE : // palette is also loaded as texture
+                sys.asset.palette[id] = LoadImagePalette(sys.asset.img[id], MAXPALETTECOLORS, &sys.asset.palette_colors[id]);
+                UpdateTexture(sys.asset.tex[id], sys.asset.img[id].data);
+                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
+                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
+                break;
+
+                case ASSET_TEXTURE :
+                UpdateTexture(sys.asset.tex[id], sys.asset.img[id].data);
+                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
+                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
+                break;
+
+                case ASSET_FONT :
+                UpdateTexture(sys.asset.font[id].texture, sys.asset.img[id].data);
+                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
+                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
+                break;
+
+                case ASSET_TILESET :
+                UpdateTexture(sys.asset.tileset[id].tex, sys.asset.img[id].data);
+                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
+                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
+                break;
+
+                case ASSET_FRAMEBUFFER :
+                //sys.asset.framebuffer[id] = LoadRenderTexture( sys.video.virtual_res[sys.video.current_virtual].x, sys.video.virtual_res[sys.video.current_virtual].y );
+                //LoadTextureFromImage(sys.asset.tileset[id].texture, sys.asset.img[id].data);
+                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
+                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
+                break;
+                
+                default: // THIS IS AN ISSUE!!!!!
+                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
+                BITS_ON(sys.asset.state[id], ASSET_ISSUE); // scheduled for update but unknown asset in updater process, trigger issue
+
+                break;
+            }
+       }
+    }    
+}
+
+uint16_t load_asset (uint32_t assettype, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
+    uint16_t id = sys.asset.total_assets;
+    debug_console_out("load_asset", id);
+
+    BITS_INIT(sys.asset.state[id], ASSET_INITIALIZED | assettype);
+
+    if (fileName > NULL) strcpy(sys.asset.name, fileName);
+
+    uint32_t dataSize_decompressed = 0;
+    uint8_t *fileData_decompressed;
+    if (pak) {
+        BITS_ON(sys.asset.state[id], ASSET_COMPRESSED);
+        fileData_decompressed = DecompressData(fileData, dataSize, &dataSize_decompressed);
+        fileData = fileData_decompressed;
+        dataSize = dataSize_decompressed;
+    }
+
+    switch (assettype) {
+            case ASSET_ICON : // assigns icon for window operating system
+            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+         	SetWindowIcon(sys.asset.img[id]);
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_PALETTE : // palette is also loaded as texture
+            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.palette_colors[id] = 0;
+            sys.asset.palette[id] = LoadImagePalette(sys.asset.img[id], MAXPALETTECOLORS, &sys.asset.palette_colors[id]);
+            sys.asset.tex[id] = LoadTextureFromImage(sys.asset.img[id]);
+            BITS_ON(sys.asset.state[id], ASSET_TEXTURE);
+            sys.asset.tileset[id].tex = sys.asset.tex[id];
+            BITS_ON(sys.asset.state[id], ASSET_TILESET);
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_TEXTURE :
+            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.tex[id] = LoadTextureFromImage(sys.asset.img[id]);
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_FONT :
+            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.font[id].texture = LoadTextureFromImage(sys.asset.img[id]);
+            BITS_ON(sys.asset.state[id], ASSET_TEXTURE);
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_TILESET :
+            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.tex[id] = LoadTextureFromImage(sys.asset.img[id]);
+            BITS_ON(sys.asset.state[id], ASSET_TEXTURE);
+            sys.asset.tileset[id].tex = sys.asset.tex[id];
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_FRAMEBUFFER : // set current_virtual prior to use
+            sys.asset.framebuffer[id] = LoadRenderTexture(get_current_virtual_size().x, get_current_virtual_size().y);
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            SetTextureFilter(sys.asset.framebuffer[id].texture, FILTER_POINT);
+            sys.asset.data_size[id] = dataSize; // ??????????? WRONG !! There is no dataSize passed... so that is a NULL
+            sys.video.virtual_asset[sys.video.current_virtual] = id;
+            sys.asset.asset_type[id] = assettype;  
+            break;
+
+            case ASSET_SHADER :
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            // sys.asset.shader[id] = LoadShaderFromMemory(const char *vsCode, const char *fsCode)
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_XM :
+            sys.asset.music[id] = LoadMusicStreamFromMemory(fileType, fileData, dataSize);
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_WAV : // incomplete*********************************** get raylib functionality
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_MP3 : // incomplete*********************************** get raylib functionality
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_AUDIOSTREAM :
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+            
+            case ASSET_TEXT :
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            case ASSET_DATA :
+            BITS_ON(sys.asset.state[id], ASSET_LOADED);
+            sys.asset.data[id] = fileData;
+            BITS_ON(sys.asset.state[id], ASSET_DATA);
+            sys.asset.data_size[id] = dataSize;
+            sys.asset.asset_type[id] = assettype;
+            break;
+
+            default :
+            BITS_ON(sys.asset.state[id], ASSET_ISSUE); // scheduled for initialisation but unknown asset in process, trigger issue
+    }
+
+    BITS_ON(sys.asset.state[id], ASSET_ACTIVE);
+
+    //if (dataSize_decompressed) {
+    if (pak) {
+        MemFree(fileData_decompressed);
+        BITS_ON(sys.asset.state[id], ASSET_DECOMPRESSED);
+    };
+
+    sys.asset.total_assets += 1;
+    return id;
+}
+
+
+uint16_t load_palette(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
+    uint16_t asset_id = load_asset(ASSET_PALETTE, fileName, fileType, fileData, dataSize, pak);
+    float width = (float)sys.asset.img[asset_id].width;
+    float height = (float)sys.asset.img[asset_id].height;
+
+    sys.asset.tileset[asset_id].ascii_start = 0;
+    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
+    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
+    sys.asset.tileset[asset_id].count.x = count.x;
+    sys.asset.tileset[asset_id].count.y = count.y;
+    sys.asset.tileset[asset_id].total = count.x * count.y;
+
+    //debug_console_out(sprintf("load_palette ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
+    return asset_id;
+}
+
+uint16_t get_palette_color_count(asset_id) { sys.asset.tileset[asset_id].total; }
+
+uint16_t load_tileset(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t ascii_start) {
+
+    uint16_t asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
+    float width = (float)sys.asset.img[asset_id].width;
+    float height = (float)sys.asset.img[asset_id].height;
+
+    sys.asset.tileset[asset_id].ascii_start = ascii_start;
+    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
+    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
+    sys.asset.tileset[asset_id].count.x = count.x;
+    sys.asset.tileset[asset_id].count.y = count.y;
+    sys.asset.tileset[asset_id].total = count.x * count.y;
+
+    //debug_console_out(sprintf("load_tileset ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
+    return asset_id;
+}
+
+static int16_t unload_asset(uint32_t id) {
+    int16_t status = 0;
+    if (BITS_TEST(sys.asset.state[id], ASSET_ACTIVE)) {
+        sys.asset.state[id] |= ASSET_EXPIRED;
+        uint32_t assettype = asset_type(sys.asset.asset_type[id]);
+        switch (assettype) {
+            case ASSET_ICON :
+            UnloadImage(sys.asset.img[id]);
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_PALETTE :
+            UnloadImage(sys.asset.img[id]);
+            UnloadImagePalette(sys.asset.palette[id]);
+            UnloadTexture(sys.asset.tex[id]);
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_TEXTURE :
+            UnloadImage(sys.asset.img[id]);
+            UnloadTexture(sys.asset.tex[id]);
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_FONT :
+            UnloadImage(sys.asset.img[id]);
+            UnloadTexture(sys.asset.font[id].texture);
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_TILESET :
+            UnloadImage(sys.asset.img[id]);
+            UnloadTexture(sys.asset.tileset[id].tex);
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_FRAMEBUFFER :
+            UnloadRenderTexture(sys.asset.framebuffer[id]);
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_SHADER :
+            UnloadShader(sys.asset.shader[id]);
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_XM :
+            StopMusicStream(sys.asset.music[id]); // in case it is still playing
+            UnloadMusicStream(sys.asset.music[id]);
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_WAV : // incomplete*********************************** get raylib functionality
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_MP3 : // incomplete*********************************** get raylib functionality
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_AUDIOSTREAM :
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_TEXT :
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            case ASSET_DATA :
+            sys.asset.asset_type[id] = NULL;
+            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
+            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
+            ++status; break;
+
+            default :
+            BITS_ON(sys.asset.state[id], ASSET_ISSUE); // unknown asset, trigger issue
+        };
+        sys.asset.total_assets -= 1;
+    };
+    return status;
+}
+
+uint16_t unload_all_assets(void) {
+    uint16_t count = 0;
+    for(uint16_t asset = 0; asset < MAXASSETS; asset++)
+        count += unload_asset(asset);
+
+    return count;
+}
+
+
+// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** E N D
+// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** E N D
+// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** E N D
 
 // ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** B E G I N
 // ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** B E G I N
@@ -1232,7 +1677,7 @@ static void plot_cell(uint16_t canvasgroup_id, uint16_t canvas_id, EX_cell* cell
     target_cell[linear_offset] = *cell;
 }
 
-bool init_cell_linear(EX_cell *cell, uint64_t cell_state, uint32_t color_id, uint32_t colorbg_id) {
+int16_t init_cell_linear(EX_cell *cell, uint64_t cell_state, uint32_t color_id, uint32_t colorbg_id) {
     cell->state = cell_state;
     cell->value = 0;
     cell->colorfg_id = color_id;
@@ -1312,7 +1757,7 @@ uint16_t init_canvasgroup(uint32_t canvasgroup_id, Vector2 size, uint16_t canvas
 // This functionality requires setting a bunch of stuff afterwards;
 // - per cell states
 // - per canvas asset
-bool init_canvasgroup_multicanvas(Vector2 size, uint32_t canvasgroup_state, uint64_t canvas_state[]) {
+int16_t init_canvasgroup_multicanvas(Vector2 size, uint32_t canvasgroup_state, uint64_t canvas_state[]) {
     uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
 
     sys.video.canvasgroup[canvasgroup_id].state = canvasgroup_state;
@@ -2008,7 +2453,7 @@ void process_canvas(uint16_t canvas_id) {
     // temporal considerations
 }
 
-void process_canvasgroup(uint16_t canvasgroup_id) {
+int16_t process_canvasgroup(uint16_t canvasgroup_id) {
     uint16_t canvas_id = 0;
     process_canvas(canvas_id);
 }
@@ -2017,724 +2462,6 @@ void process_canvasgroup(uint16_t canvasgroup_id) {
 // ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** E N D
 // ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** E N D
 // ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** E N D
-
-// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
-// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
-// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
-
-typedef enum {
-    ASSET_RESERVED      = 0b10000000000000000000000000000000, //
-    ASSET_ICON          = 0b01000000000000000000000000000000, // image loaded as Game Icon
-    ASSET_PALETTE       = 0b00100000000000000000000000000000, // image loaded as palette
-    ASSET_TEXTURE       = 0b00010000000000000000000000000000, // image loaded as texture
-    ASSET_FONT          = 0b00001000000000000000000000000000, // image loaded as font
-    ASSET_TILESET       = 0b00000100000000000000000000000000, // image loaded as tileset
-    ASSET_FRAMEBUFFER   = 0b00000010000000000000000000000000, // image created as frame buffer
-    ASSET_XM            = 0b00000001000000000000000000000000, // music loaded xm tracker
-    ASSET_WAV           = 0b00000000100000000000000000000000, // sound loaded wav 
-    ASSET_MP3           = 0b00000000010000000000000000000000, // sound loaded mp3
-    ASSET_AUDIOSTREAM   = 0b00000000001000000000000000000000, // audio stream created
-    ASSET_TEXT          = 0b00000000000100000000000000000000, // text content loaded
-    ASSET_SHADER        = 0b00000000000010000000000000000000, // shader program
-    ASSET_JSON          = 0b00000000000001000000000000000000, // scripted JSON content
-    ASSET_SCRIPT        = 0b00000000000000100000000000000000, // scripted content loaded (not decided on language)
-    ASSET_DATA          = 0b00000000000000010000000000000000, // data content loaded
-    ASSET_RESERVED2     = 0b00000000000000001000000000000000, // 
-    ASSET_COPY          = 0b00000000000000000100000000000000, // is a copy
-    ASSET_REMOVE        = 0b00000000000000000010000000000000, // flagged for removal
-    ASSET_UPDATE        = 0b00000000000000000001000000000000, // flagged for update
-    ASSET_RUN           = 0b00000000000000000000100000000000, // flagged for execution (scripts)
-    ASSET_STOP          = 0b00000000000000000000010000000000, // flagged for a stop (scripts)
-    ASSET_UNLOADED      = 0b00000000000000000000001000000000, // was unloaded
-    ASSET_LOADED        = 0b00000000000000000000000100000000, // was loaded
-    ASSET_COMPRESSED    = 0b00000000000000000000000010000000, // uses raylib's compression method
-    ASSET_DECOMPRESSED  = 0b00000000000000000000000001000000, // was compressed
-    ASSET_EXPIRED       = 0b00000000000000000000000000100000, // not used anymore
-    ASSET_ISSUE         = 0b00000000000000000000000000010000, // found an issue with the asset
-    ASSET_LOCKED        = 0b00000000000000000000000000001000, // inaccessible
-    ASSET_UPDATED       = 0b00000000000000000000000000000100, // was updated
-    ASSET_ACTIVE        = 0b00000000000000000000000000000010, // can actively be used
-    ASSET_INITIALIZED   = 0b00000000000000000000000000000001, // passed through the initialisation process successfully
-    ASSET_TYPE_UNKNOWN  = 0b00000000000000000000000000000000, // not assigned = unknown
-    ASSET_TYPE_MASK     = 0b11111111111111110000000000000000, // All asset type definitions
-    ASSET_STATUS_MASK   = 0b00000000000000001111111111111111, 
-    ASSET_NULL          = 0b00000000000000000000000000000000  
-} asset_state;
-
-uint32_t asset_type(uint32_t state) {
-    return (state & ASSET_TYPE_MASK);
-}
-
-void update_assets(void) {
-    for (uint16_t id = 0; id < sys.asset.total_assets; id++) {
-        if ((sys.asset.state[id] & ASSET_UPDATE) && (sys.asset.state[id] & ASSET_ACTIVE)) {
-            switch (sys.asset.asset_type[id]) {
-                case ASSET_ICON : // assigns window icon for operating system
-                SetWindowIcon(sys.asset.img[id]);
-                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
-                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
-                break;
-
-                case ASSET_PALETTE : // palette is also loaded as texture
-                sys.asset.palette[id] = LoadImagePalette(sys.asset.img[id], MAXPALETTECOLORS, &sys.asset.palette_colors[id]);
-                UpdateTexture(sys.asset.tex[id], sys.asset.img[id].data);
-                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
-                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
-                break;
-
-                case ASSET_TEXTURE :
-                UpdateTexture(sys.asset.tex[id], sys.asset.img[id].data);
-                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
-                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
-                break;
-
-                case ASSET_FONT :
-                UpdateTexture(sys.asset.font[id].texture, sys.asset.img[id].data);
-                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
-                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
-                break;
-
-                case ASSET_TILESET :
-                UpdateTexture(sys.asset.tileset[id].tex, sys.asset.img[id].data);
-                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
-                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
-                break;
-
-                case ASSET_FRAMEBUFFER :
-                //sys.asset.framebuffer[id] = LoadRenderTexture( sys.video.virtual_res[sys.video.current_virtual].x, sys.video.virtual_res[sys.video.current_virtual].y );
-                //LoadTextureFromImage(sys.asset.tileset[id].texture, sys.asset.img[id].data);
-                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
-                BITS_ON(sys.asset.state[id], ASSET_UPDATED);
-                break;
-                
-                default: // THIS IS AN ISSUE!!!!!
-                BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
-                BITS_ON(sys.asset.state[id], ASSET_ISSUE); // scheduled for update but unknown asset in updater process, trigger issue
-
-                break;
-            }
-       }
-    }    
-}
-
-uint16_t load_asset (uint32_t assettype, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
-    uint16_t id = sys.asset.total_assets;
-    debug_console_out("load_asset", id);
-
-    BITS_INIT(sys.asset.state[id], ASSET_INITIALIZED | assettype);
-
-    if (fileName > NULL) strcpy(sys.asset.name, fileName);
-
-    uint32_t dataSize_decompressed = 0;
-    uint8_t *fileData_decompressed;
-    if (pak) {
-        BITS_ON(sys.asset.state[id], ASSET_COMPRESSED);
-        fileData_decompressed = DecompressData(fileData, dataSize, &dataSize_decompressed);
-        fileData = fileData_decompressed;
-        dataSize = dataSize_decompressed;
-    }
-
-    switch (assettype) {
-            case ASSET_ICON : // assigns icon for window operating system
-            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-         	SetWindowIcon(sys.asset.img[id]);
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_PALETTE : // palette is also loaded as texture
-            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.palette_colors[id] = 0;
-            sys.asset.palette[id] = LoadImagePalette(sys.asset.img[id], MAXPALETTECOLORS, &sys.asset.palette_colors[id]);
-            sys.asset.tex[id] = LoadTextureFromImage(sys.asset.img[id]);
-            BITS_ON(sys.asset.state[id], ASSET_TEXTURE);
-            sys.asset.tileset[id].tex = sys.asset.tex[id];
-            BITS_ON(sys.asset.state[id], ASSET_TILESET);
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_TEXTURE :
-            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.tex[id] = LoadTextureFromImage(sys.asset.img[id]);
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_FONT :
-            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.font[id].texture = LoadTextureFromImage(sys.asset.img[id]);
-            BITS_ON(sys.asset.state[id], ASSET_TEXTURE);
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_TILESET :
-            sys.asset.img[id] = LoadImageFromMemory(fileType, fileData, dataSize);
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.tex[id] = LoadTextureFromImage(sys.asset.img[id]);
-            BITS_ON(sys.asset.state[id], ASSET_TEXTURE);
-            sys.asset.tileset[id].tex = sys.asset.tex[id];
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_FRAMEBUFFER : // set current_virtual prior to use
-            sys.asset.framebuffer[id] = LoadRenderTexture(get_current_virtual_size().x, get_current_virtual_size().y);
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            SetTextureFilter(sys.asset.framebuffer[id].texture, FILTER_POINT);
-            sys.asset.data_size[id] = dataSize; // ??????????? WRONG !! There is no dataSize passed... so that is a NULL
-            sys.video.virtual_asset[sys.video.current_virtual] = id;
-            sys.asset.asset_type[id] = assettype;  
-            break;
-
-            case ASSET_SHADER :
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            // sys.asset.shader[id] = LoadShaderFromMemory(const char *vsCode, const char *fsCode)
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_XM :
-            sys.asset.music[id] = LoadMusicStreamFromMemory(fileType, fileData, dataSize);
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_WAV : // incomplete*********************************** get raylib functionality
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_MP3 : // incomplete*********************************** get raylib functionality
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_AUDIOSTREAM :
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-            
-            case ASSET_TEXT :
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            case ASSET_DATA :
-            BITS_ON(sys.asset.state[id], ASSET_LOADED);
-            sys.asset.data[id] = fileData;
-            BITS_ON(sys.asset.state[id], ASSET_DATA);
-            sys.asset.data_size[id] = dataSize;
-            sys.asset.asset_type[id] = assettype;
-            break;
-
-            default :
-            BITS_ON(sys.asset.state[id], ASSET_ISSUE); // scheduled for initialisation but unknown asset in process, trigger issue
-    }
-
-    BITS_ON(sys.asset.state[id], ASSET_ACTIVE);
-
-    //if (dataSize_decompressed) {
-    if (pak) {
-        MemFree(fileData_decompressed);
-        BITS_ON(sys.asset.state[id], ASSET_DECOMPRESSED);
-    };
-
-    sys.asset.total_assets += 1;
-    return id;
-}
-
-
-uint16_t load_palette(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
-    uint16_t asset_id = load_asset(ASSET_PALETTE, fileName, fileType, fileData, dataSize, pak);
-    float width = (float)sys.asset.img[asset_id].width;
-    float height = (float)sys.asset.img[asset_id].height;
-
-    sys.asset.tileset[asset_id].ascii_start = 0;
-    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
-    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
-    sys.asset.tileset[asset_id].count.x = count.x;
-    sys.asset.tileset[asset_id].count.y = count.y;
-    sys.asset.tileset[asset_id].total = count.x * count.y;
-
-    //debug_console_out(sprintf("load_palette ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
-    return asset_id;
-}
-
-uint16_t get_palette_color_count(asset_id) { sys.asset.tileset[asset_id].total; }
-
-uint16_t load_tileset(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t ascii_start) {
-
-    uint16_t asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
-    float width = (float)sys.asset.img[asset_id].width;
-    float height = (float)sys.asset.img[asset_id].height;
-
-    sys.asset.tileset[asset_id].ascii_start = ascii_start;
-    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
-    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
-    sys.asset.tileset[asset_id].count.x = count.x;
-    sys.asset.tileset[asset_id].count.y = count.y;
-    sys.asset.tileset[asset_id].total = count.x * count.y;
-
-    //debug_console_out(sprintf("load_tileset ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
-    return asset_id;
-}
-
-static int16_t unload_asset(uint32_t id) {
-    int16_t status = 0;
-    if (BITS_TEST(sys.asset.state[id], ASSET_ACTIVE)) {
-        sys.asset.state[id] |= ASSET_EXPIRED;
-        uint32_t assettype = asset_type(sys.asset.asset_type[id]);
-        switch (assettype) {
-            case ASSET_ICON :
-            UnloadImage(sys.asset.img[id]);
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_PALETTE :
-            UnloadImage(sys.asset.img[id]);
-            UnloadImagePalette(sys.asset.palette[id]);
-            UnloadTexture(sys.asset.tex[id]);
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_TEXTURE :
-            UnloadImage(sys.asset.img[id]);
-            UnloadTexture(sys.asset.tex[id]);
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_FONT :
-            UnloadImage(sys.asset.img[id]);
-            UnloadTexture(sys.asset.font[id].texture);
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_TILESET :
-            UnloadImage(sys.asset.img[id]);
-            UnloadTexture(sys.asset.tileset[id].tex);
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_FRAMEBUFFER :
-            UnloadRenderTexture(sys.asset.framebuffer[id]);
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_SHADER :
-            UnloadShader(sys.asset.shader[id]);
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_XM :
-            StopMusicStream(sys.asset.music[id]); // in case it is still playing
-            UnloadMusicStream(sys.asset.music[id]);
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_WAV : // incomplete*********************************** get raylib functionality
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_MP3 : // incomplete*********************************** get raylib functionality
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_AUDIOSTREAM :
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_TEXT :
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            case ASSET_DATA :
-            sys.asset.asset_type[id] = NULL;
-            BITS_OFF(sys.asset.state[id], ASSET_LOADED | assettype);
-            BITS_ON(sys.asset.state[id], ASSET_UNLOADED);
-            ++status; break;
-
-            default :
-            BITS_ON(sys.asset.state[id], ASSET_ISSUE); // unknown asset, trigger issue
-        };
-        sys.asset.total_assets -= 1;
-    };
-    return status;
-}
-
-uint16_t unload_all_assets(void) {
-    uint16_t count = 0;
-    for(uint16_t asset = 0; asset < MAXASSETS; asset++) {
-        count += unload_asset(asset);
-    };
-    return count;
-}
-
-
-// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** E N D
-// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** E N D
-// ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** E N D
-
-
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
-typedef enum {
-    TRACK_RESERVED          = 0b10000000000000000000000000000000,
-    TRACK_SWITCH_IMMEDIATE  = 0b00100000000000000000000000000000,
-    TRACK_STOP_UNFOCUSED    = 0b00010000000000000000000000000000,
-    TRACK_RESTART_ON_FOCUS  = 0b00001000000000000000000000000000,
-    TRACK_PAUSE_ON_PAUSE    = 0b00000010000000000000000000000000,
-    TRACK_PAUSE_ON_TERMINAL = 0b00000000100000000000000000000000,
-    TRACK_STOPPED           = 0b00000000000000000000000000100000,
-    TRACK_PAUSED            = 0b00000000000000000000000000010000,
-    TRACK_FINISHED          = 0b00000000000000000000000000001000,
-    TRACK_EXPIRED           = 0b00000000000000000000000000000010,
-    TRACK_ACTIVE            = 0b00000000000000000000000000000001
-};
-
-// no wav or mp3 support implemented yet (!)
-
-bool init_audio_properties(void) {
-    bool status = 0;
-    InitAudioDevice();
-    sys.audio.total_tracks = 0;
-    sys.audio.global_volume = 1.0f;
-    SetMasterVolume(sys.audio.global_volume); 
-    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
-        sys.audio.track[id].is_playing = false;
-        sys.audio.track[id].volume = 1.0f;
-        sys.audio.track[id].order_playing = 0;
-        sys.audio.track[id].total_orders = 0;
-        for (uint16_t j=0; j < MAXORDERS; j++) {
-            sys.audio.track[id].order[j] = 0;
-        }
-    }
-    if  (IsAudioDeviceReady()) return status; else return 1;
-    return status;
-}
-
-void update_audio(void) {
-    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
-        if (sys.audio.track[id].is_playing) {
-            if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
-                UpdateMusicStream(sys.asset.music[sys.audio.track[id].asset]);
-            }
-        }
-    }
-}
-
-static int16_t add_track(uint16_t display, uint32_t state, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t total_orders, uint16_t orderlist[]) {
-    uint16_t track_id = sys.audio.total_tracks;
-    sys.audio.track[track_id].virtual_display = display;
-    sys.audio.track[track_id].state = state;
-    sys.audio.track[track_id].asset = load_asset(ASSET_XM, fileName, fileType, fileData, dataSize, pak);
-    sys.audio.track[track_id].volume = 1.f;
-    //uint16_t asset = sys.audio.track[].asset_playing;
-
-    //uint16_t total_orders = sizeof(orderlist[0]) / sizeof(int);
-    for (uint16_t i = 0; i < total_orders; i++) {
-        sys.audio.track[track_id].order[i] = orderlist[i];
-    }
-    sys.audio.track[track_id].total_orders = total_orders;
-
-    sys.audio.total_tracks += 1;
-    return track_id;
-}
-
-//StopMusicStream(sys.asset.music[asset]);
-static void change_music_stream(uint16_t track_id, uint16_t order_id, bool immediate) {
-    uint16_t asset = sys.audio.track[track_id].asset;
-    sys.audio.track[track_id].order_playing = order_id;
-    
-    if (order_id < sys.audio.track[track_id].total_orders) {
-        if (!immediate) { // switches at end of pattern
-            jar_xm_pattern_jump(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id]);
-        } else { // switches immediately
-            jar_xm_pattern_jump_immediate(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id], true);
-        };
-    }
-}
-
-static void hint_restart_track(bool immediate) {
-    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
-        if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
-            if (sys.audio.track[id].state || TRACK_RESTART_ON_FOCUS) {
-                sys.audio.track[id].is_playing = true;
-                uint16_t order = sys.audio.track[id].order_playing;
-                change_music_stream(id, order, immediate);
-            }
-        }
-    }
-}
-
-static void play_track(uint16_t track_id, uint16_t order_id, bool immediate) {
-    sys.audio.track[track_id].is_playing = true;
-    uint16_t asset = sys.audio.track[track_id].asset;
-	PlayMusicStream(sys.asset.music[asset]);
-    change_music_stream(track_id, order_id, immediate);
-}
-
-static void change_track_playing(uint16_t track_id, uint16_t value) {
-    sys.audio.track[track_id].is_playing = true;
-    uint16_t proposed_order = (sys.audio.track[track_id].order_playing + value) % sys.audio.track[track_id].total_orders;
-    change_music_stream(track_id, proposed_order, true);
-}
-
-//    jar_xm_change_all_channel_volumes(sys.asset.music[asset].ctxData, (int) amount); // DO NOT USE, INSTEAD REVAMP TRACKER MIXER
-static void change_track_volume(uint16_t track, float volume) {
-    if (volume>=0.f && volume <=1.0f) sys.audio.track[track].volume = volume;
-    uint16_t asset = sys.audio.track[track].asset;
-	SetMusicVolume(sys.asset.music[asset], sys.audio.track[track].volume);
-}
-
-static void change_global_volume(float amount) {
-    sys.audio.global_volume += amount;
-    if ( sys.audio.global_volume > 1.0f) sys.audio.global_volume = 1.0f; else if ( sys.audio.global_volume < 0.0f) sys.audio.global_volume = 0.0f;
-    SetMasterVolume(sys.audio.global_volume);
-}
-
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
-
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
-
-typedef enum {
-    VIDEO_RESERVED       = 0b10000000000000000000000000000000, // 
-    VIDEO_ON_TOP         = 0b00001000000000000000000000000000, // Terminal display is above all other virtual displays
-    VIDEO_MOVE_X         = 0b00000000000000000100000000000000, // 
-    VIDEO_MOVE_Y         = 0b00000000000000000010000000000000, // 
-    VIDEO_HIDDEN         = 0b00000000000000000000000010000000, // 
-    VIDEO_FROZEN         = 0b00000000000000000000000000100000, // 
-    VIDEO_EXPIRING       = 0b00000000000000000000000000001000, // 
-    VIDEO_EXPIRED        = 0b00000000000000000000000000000010, // 
-    VIDEO_ACTIVE         = 0b00000000000000000000000000000001  // 
-};
-
-// SET buffer aspect ratio
-// RLAPI void rlOrtho(double left, double right, double bottom, double top, double znear, double zfar);
-
-static Vector2 ratio_info(float x, float y) {
-    Vector2 p;
-
-    float gcd_res = gcdi(x,y);
-    p.x = x / gcd_res;
-    p.y = y / gcd_res;
-    return p;
-}
-
-void begin_draw(bool clear) {
-    BeginTextureMode(sys.asset.framebuffer[sys.video.virtual_asset[sys.video.current_virtual]]);
-    if (clear) ClearBackground(BLACK);
-    rlDisableDepthMask();            // Disable depth writes
-    rlDisableDepthTest();            // Disable depth test for speed
-}
-
-void end_draw(void) {
-    rlEnableDepthMask();
-    rlEnableDepthTest();
-    EndTextureMode();
-}
-
-void flip_frame_buffer(uint16_t display, bool clear) {
-    sys.video.previous_virtual = sys.video.current_virtual;
-    sys.video.current_virtual = display;
-    if (clear) sys.video.screen_refresh = true;
-}
-
-static void draw_frame_buffer(RenderTexture renderer, Vector2 position) {
-	DrawTexturePro (renderer.texture,
-    (Rectangle) {0.0, 0.0, (float)renderer.texture.width, (float)-renderer.texture.height},
-    (Rectangle) {position.x, position.y, sys.video.screen[sys.video.display_id].x, sys.video.screen[sys.video.display_id].y},
-    (Vector2)   {0.0, 0.0}, 0.0f, WHITE);
-}
-
-static uint16_t init_frame_buffer(uint16_t display, Vector2 resolution) {
-    flip_frame_buffer(display, true);
-    sys.video.virtual_res[sys.video.current_virtual] = resolution;
-    sys.video.frames[sys.video.current_virtual] = 0;
-    sys.video.elapsed_time_var_ratio[sys.video.current_virtual] = 5.f;
-    sys.video.frame_time_inc[sys.video.current_virtual] = 0;
-	uint16_t asset_id = load_asset(ASSET_FRAMEBUFFER, NULL, NULL, NULL, NULL, 0);
-    flip_frame_buffer(sys.video.previous_virtual, true);
-    return asset_id;
-}
-
-bool init_display_properties(bool hide_mouse) {
-    bool status = 0;
-    BITS_INIT(sys.video.windowstate_normal, 0);
-    //sys.video.windowstate_normal = FLAG_WINDOW_UNDECORATED; // AVOID AT ALL COST (SCREEN TEARING when VSYNC)
-    BITS_ON(sys.video.windowstate_normal, FLAG_FULLSCREEN_MODE);
-    BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_ALWAYS_RUN);
-    BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_TOPMOST);
-    BITS_ON(sys.video.windowstate_normal, FLAG_MSAA_4X_HINT);
-    BITS_ON(sys.video.windowstate_normal, FLAG_VSYNC_HINT);
-
-    BITS_INIT(sys.video.windowstate_paused, 0);
-    BITS_ON(sys.video.windowstate_paused, FLAG_FULLSCREEN_MODE);
-    BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_UNFOCUSED);
-    BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_MINIMIZED);
-    BITS_ON(sys.video.windowstate_paused, FLAG_MSAA_4X_HINT);
-    BITS_ON(sys.video.windowstate_paused, FLAG_VSYNC_HINT);
-
-    SetConfigFlags(sys.video.windowstate_normal);
-    InitWindow(0, 0, sys.program.name);
-    sys.video.display_id = GetCurrentMonitor();
-    if (hide_mouse) HideCursor();
-    sys.video.screen[sys.video.display_id] = (Vector2) {GetScreenWidth(), GetScreenHeight()};
-    sys.video.screen_rate[sys.video.display_id] = GetMonitorRefreshRate(sys.video.display_id);
-    SetWindowSize(sys.video.screen[sys.video.display_id].x, sys.video.screen[sys.video.display_id].y);
-
-    if (IsWindowReady()) return status; else return 1;
-}
-
-void flip_display_state(uint32_t state) {
-    if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS)) {
-        BITS_FLIP(sys.video.windowstate_normal, state);
-    } else {
-        BITS_FLIP(sys.video.windowstate_paused, state);
-    }
-    if (IsWindowState(state)) { 
-        ClearWindowState(state);
-    } else {
-        SetWindowState(state);
-        // if (state & FLAG_VSYNC_HINT)  // ***GLFW issue with Refresh rate reset to 60 on VSYNC
-        // since this is an issue, if we really want to do this right, we would have to possibly reload all assets
-    }
-}
-
-    // The way this works right now is not proper, as we have 4-5 different virtual display, we need a way to display them all at once,
-    // or at least display the MENU + poossibly the Terminal + the game
-    // So first, the rendering to a texture part, needs to be expanded
-    // then update_system needs to take into account the different virtual displays and how to decide on;
-    // - The order in which they should be displayed
-    // - Should they display
-    // - And their alpha blending
-void update_display(void) {
-    uint16_t display = sys.video.current_virtual;
-	BeginDrawing();
-        if (sys.video.screen_refresh) {
-            ClearBackground(BLACK);
-            sys.video.screen_refresh = false;
-        };
-        draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[display]], (Vector2) {0,0});
-        if (sys.program.ctrlstate & CTRL_SHOW_TERMINAL) {
-            draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[TERMINALDISPLAY]], (Vector2) {0,0});
-        }
-        if (sys.program.ctrlstate & CTRL_DEBUG) {
-            // if debug functionalities activated
-            // DISPLAY MANAGE DEBUG INFORMATION
-            update_debug(true);
-        }
-	EndDrawing();
-
-    sys.video.window_focus = IsWindowFocused();
-
-    double next_frame = sys.video.prev_time[display] + (double)(1 / sys.video.screen_rate[sys.video.display_id]);
-    float wait = (next_frame - GetTime());
-    if (wait < 0) wait = 0;
-    WaitTime(wait * 1000.f);
-
-    double current_time = GetTime();
-
-    sys.video.elapsed_time[display] = current_time - sys.video.prev_time[display];
-    sys.video.prev_time[display] = current_time;
-
-   if (sys.video.window_focus) {        // ************** GO TO APP MODE
-        if (sys.program.ctrlstate & CTRL_OFF_FOCUS) {
-            if (GetKeyPressed() != 0) {
-                BITS_OFF(sys.program.ctrlstate, CTRL_OFF_FOCUS);
-                flip_frame_buffer(PRIMARYDISPLAY, true);
-                ClearWindowState(sys.video.windowstate_normal ^ sys.video.windowstate_paused);
-                SetWindowState(sys.video.windowstate_normal);
-                sys.video.prev_time[sys.video.current_virtual] = current_time;
-            }
-        }
-    } else {        // ************* GO TO PAUSE MODE
-        //IsWindowMinimized()
-        if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS)) {
-            BITS_ON(sys.program.ctrlstate, CTRL_OFF_FOCUS);
-            flip_frame_buffer(UNFOCUSEDDISPLAY, true);
-            ClearWindowState(sys.video.windowstate_paused ^ sys.video.windowstate_normal);
-            SetWindowState(sys.video.windowstate_paused);
-            hint_restart_track(true);
-            sys.video.prev_time[sys.video.current_virtual] = current_time;
-        };
-    };
-
-    sys.video.frame_time[display] = (float)sys.video.elapsed_time[display] * (float)sys.video.screen_rate[sys.video.display_id];
-    sys.video.frame_time_inc[display] += (float)sys.video.elapsed_time[display];
-    sys.video.elapsed_time_var[display] += (float)sys.video.elapsed_time[display] * sys.video.elapsed_time_var_ratio[display];
-    sys.video.value_anim[display] = fast_sin(fast_cos(fast_sin(sys.video.frame_time_inc[display]) * fast_sin(sys.video.elapsed_time_var[display] * 0.1) * 0.1) * fast_cos(sys.video.elapsed_time_var[display] * 0.015) * 0.1 ) * 0.05 + 0.001;
-    sys.video.frames[display]++;
-
-}
-
-void deinit_display(void) {
-    ShowCursor();
-	CloseWindow();
-}
-
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
 
 // ********** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** B E G I N
 // ********** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** P A R T I C L E   S Y S T E M  ***** B E G I N
@@ -2814,7 +2541,7 @@ particle init_particle(Texture texture, Vector2 r1, Vector2 speed) {
 	return p;
 };
 
-void update_particle(particle *particle, Vector2 velocity) {
+int16_t update_particle(particle *particle, Vector2 velocity) {
 	Vector2 res = get_current_virtual_size();
     velocity.x *= sys.video.frame_time[sys.video.current_virtual];
     velocity.y *= sys.video.frame_time[sys.video.current_virtual];
@@ -2890,16 +2617,12 @@ typedef struct EX_marquee {
 
 EX_marquee ex_marquee[MAXDISPLAYS];
 
-static void update_marquee_animation(uint16_t asset_id, uint16_t palette_id, Vector2 logosize, float transparency, Vector2 offset, float speed, float shadow_transparency) {
+static int16_t update_marquee_animation(uint16_t asset_id, uint16_t palette_id, Vector2 logosize, float transparency, Vector2 offset, float speed, float shadow_transparency) {
     uint16_t display = sys.video.current_virtual;
     Vector2 vres = get_current_virtual_size();
     if (ex_marquee[display].palptr_next_frame_time < sys.video.frame_time_inc[display]) {
         ex_marquee[display].palptr_next_frame_time = sys.video.frame_time_inc[display] + 1/absf(speed);
-        if (speed > 0.0f) {
-            ex_marquee[display].palptr += 1;
-        } else {
-            ex_marquee[display].palptr -= 1;
-        }
+        if (speed > 0.0f)  ex_marquee[display].palptr += 1;  else  ex_marquee[display].palptr -= 1;
         if (ex_marquee[display].palptr > 255) {ex_marquee[display].palptr -= 256;} else if (ex_marquee[display].palptr < 0) {ex_marquee[display].palptr += 256;};
     };
     int32_t palptr_loop = ex_marquee[display].palptr;
@@ -2983,7 +2706,7 @@ static void init_canopy (uint16_t font_id, uint16_t palette_id, Vector2 cells, V
     };
 }
 
-static void update_canopy(uint16_t asset_id) {
+static int16_t update_canopy(uint16_t asset_id) {
     Vector2 vres = get_current_virtual_size();
     ex_canopy.offset.x = (vres.x - ((ex_canopy.cells_x + 1) * ex_canopy.cell_size.x)) * 0.5f;
     ex_canopy.offset.y = 7.0f * ex_canopy.cell_size.x + (255.f - ex_canopy.transparency);
@@ -3148,7 +2871,7 @@ uint16_t scrolltext_color_pick(int16_t id) {
 #define SCROLL_TEXTNOCOLOR  125 // sylbol }
 #define SCROLL_PAUSE        126 // symbol ~
 
-static void update_scrolltext(uint16_t s, float text_scale) {
+static int16_t update_scrolltext(uint16_t s, float text_scale) {
     uint16_t palette_id = ex_scrolltext[s].palette_id;
     Vector2 vres = get_current_virtual_size();
     
@@ -3241,21 +2964,20 @@ static void update_scrolltext(uint16_t s, float text_scale) {
                     ex_scrolltext[s].text_scroll_speed = (float)sys.asset.data[ex_scrolltext[s].asset_id][i] - 96.0;
                 } else if (ch == SCROLL_FADEFLAG) { // fade in the flag
                     i++;
-                    if (sys.asset.data[ex_scrolltext[s].asset_id][i] == 97 ) { // a = fade in, any other charqacters = fade out (...)
+                    if (sys.asset.data[ex_scrolltext[s].asset_id][i] == 97 ) // a = fade in, any other charqacters = fade out (...)
                         ex_canopy.transparency_mod = 1.0f;
-                    } else {
+                    else
                         ex_canopy.transparency_mod = -1.0f;
-                    };
                 } else if (ch < 97 && ch > 31) { // let upper case letters pass and numbers and other basic characters
-                    if (ex_scrolltext[s].text_wave_flag == 1) {
+                    if (ex_scrolltext[s].text_wave_flag == 1)
                         ex_scrolltext[s].text_wave = displacement.y;
-                    } else if (ex_scrolltext[s].text_wave_flag == 2) {
+                    else if (ex_scrolltext[s].text_wave_flag == 2)
                         ex_scrolltext[s].text_wave = displacement.y * 2;
-                    } else if (ex_scrolltext[s].text_wave_flag == 3) {
+                    else if (ex_scrolltext[s].text_wave_flag == 3)
                         ex_scrolltext[s].text_wave = displacement.y * 4;
-                    } else {
+                    else
                         ex_scrolltext[s].text_wave = 0;
-                    };
+
                     if (ex_scrolltext[s].colorfg_flag == 1) {
                         ex_scrolltext[s].colorfg = (int16_t)(displacement.y * 0.5f) + 7;
                     };
@@ -3696,6 +3418,7 @@ typedef enum {
 
 static void set_terminal_state(uint32_t state) { BITS_ON(sys.terminal.state, state); }
 static void clear_terminal_state(uint32_t state) { BITS_OFF(sys.terminal.state, state); }
+static void flip_terminal_state(uint32_t state) { BITS_FLIP(sys.terminal.state, state); }
 
 static void set_page_state(uint32_t state) { BITS_ON(sys.terminal.page[sys.terminal.current_page_id].state, state); }
 static void clear_page_state(uint32_t state) { BITS_OFF(sys.terminal.page[sys.terminal.current_page_id].state, state); }
@@ -3763,6 +3486,11 @@ static bool set_page_default_background_color(uint16_t color_id) {
     page->default_colorbg = color_id;
     return false;
 }
+
+static void set_page_split_horizontal(void) {} // configure page to be horizontally split
+static void set_page_split_vertical(void) {} // configure page to be vertically split
+static void unset_page_split(void) {} // remove page split configuration
+
 
 static void move_keyboard_cursor_position(Vector2 value) {
     EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
@@ -3933,8 +3661,8 @@ static void set_terminal_assets(void) {
     }    
 }
 
-static void show_terminal(void) {remove_service(CTRL_SHOW_TERMINAL);}
-static void hide_terminal(void) {add_service(CTRL_SHOW_TERMINAL);}
+static void show_terminal(void) {remove_service(CTRL_TERMINAL);}
+static void hide_terminal(void) {add_service(CTRL_TERMINAL);}
 
 static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     int16_t status;
@@ -3974,7 +3702,8 @@ void process_mouse(void) {
 }
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-oemkeyscan
-void update_terminal(void) {
+int16_t update_terminal(void) {
+    bool status;
 // RLAPI void PollInputEvents(void);                             // Register all input events
 
     process_keyboard();
@@ -3982,7 +3711,7 @@ void update_terminal(void) {
 
 //            if (IsKeyDown(KEY_RIGHT_CONTROL)) {
     write_char_to_page(65);
-    process_canvasgroup(TERMINALDISPLAY);
+    status = process_canvasgroup(TERMINALDISPLAY);
 
 }
 
@@ -4008,41 +3737,52 @@ void shutdown_terminal(void) {
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** B E G I N
 
-typedef struct EX_debug {
-    bool audio;
-    bool video;
-    bool game_data;
-    bool controls;
-    bool fps;
-    //bool trace;
-} EX_debug;
+typedef enum {
+    DEBUG_R32                   = 0b10000000000000000000000000000000, // 
+    DEBUG_SHOW_OPTION_AUDIO     = 0b00000000000000001000000000000000, // 
+    DEBUG_SHOW_OPTION_FPS       = 0b00000000000000000100000000000000, // 
+    DEBUG_SHOW_OPTION_VIDEO     = 0b00000000000000000010000000000000, // 
+    DEBUG_SHOW_OPTION_CONTROLS  = 0b00000000000000000001000000000000, // 
+    DEBUG_SHOW_OPTION_DATA      = 0b00000000000000000000100000000000, // 
+    DEBUG_SHOW_OPTION_TRACE     = 0b00000000000000000000010000000000, // 
+    DEBUG_SHOW_OPTION_EXIT      = 0b00000000000000000000001000000000, // 
+    DEBUG_TRACE                 = 0b00000000000000000000000001000000, // 
+    DEBUG_AUDIO                 = 0b00000000000000000000000000100000, // 
+    DEBUG_FPS                   = 0b00000000000000000000000000010000, // 
+    DEBUG_VIDEO                 = 0b00000000000000000000000000001000, // 
+    DEBUG_CONTROLS              = 0b00000000000000000000000000000100, // 
+    DEBUG_DATA                  = 0b00000000000000000000000000000010, // 
+    DEBUG_EXIT                  = 0b00000000000000000000000000000001, // 
+    DEBUG_SHOW_OPTIONS_MASK     = 0b00000000000000001111111000000000, // 
+    DEBUG_OPTIONS_MASK          = 0b00000000000000000000000001111111, //
+    DEBUG_INITIALIZE_MASK       = 0b00000000000000001111111000000000  // 
+} debug_flags;
 
-static EX_debug debug; // = Init_debug();
-
-void set_debug_audio(bool s)    {debug.audio = s;}
-void set_debug_video(bool s)    {debug.video = s;}
-void set_debug_game_data(bool s){debug.game_data = s;}
-void set_debug_controls(bool s) {debug.controls = s;}
-void set_debug_fps(bool s)      {debug.fps = s;}
-//void set_debug_trace(bool s)    {debug.trace = s;}
-
-void debug_audio_flip()         {debug.audio = !debug.audio;}
-void debug_video_flip()         {debug.video = !debug.video;}
-void debug_game_data_flip()     {debug.game_data = !debug.game_data;}
-void debug_controls_flip()      {debug.controls = !debug.controls;}
-void debug_fps_flip()           {debug.fps = !debug.fps;}
-//void debug_trace_flip()         {debug.trace = !debug.trace;}
-
-void debug_display_option(bool bit, uint16_t x, uint16_t y, uint16_t size, const char* text) {
-    if (bit) {
-        DrawRectangle(x, y, size * 12, size, RED);
-    } else {
-        DrawRectangle(x, y, size * 12, size, GREEN);
+void debug_console_out(const char* message, uint32_t status) {
+    if (active_debugging(DEBUG_TRACE)) {
+        TRACELOG(LOG_INFO, "%s | %s | DEBUG = 0x%000000008X | CTRL = 0x%000000008X | PMSN = 0x%000000008X | status = 0x%000000008X <<<<< %s",
+        SOFTWARE,
+        sys.temporal.datetime,
+        sys.debug.state,
+        sys.program.ctrlstate,
+        sys.program.pmsnstate,
+        status,
+        message
+        );
     }
+}
+
+void display_debug_option(bool bit, uint16_t x, uint16_t y, uint16_t size, const char* text) {
+    sys.video.screen_refresh = true;
+    if (bit)
+        DrawRectangle(x, y, size * 12, size, RED);
+    else
+        DrawRectangle(x, y, size * 12, size, GREEN);
     DrawText(TextFormat("%s %s", text, BIT_LITERAL_ON_OFF(bit)), x, y, size, WHITE);
 }
 
 void display_keybed(void)  {
+    sys.video.screen_refresh = true;
     uint16_t keys_in_row = 24;
     for (uint16_t j = 0; j < 7; j++) {
         for (uint16_t i = 0; i < keys_in_row; i++) {
@@ -4080,144 +3820,428 @@ void display_all_res(void) {
     };
 }
 
-void display_state(uint64_t state, uint16_t length, uint16_t size, Vector2 position) {
+void show_state_bits(uint64_t state, uint16_t length, uint16_t size, Vector2 position) {
     uint16_t y = position.y - size;
     uint16_t x = position.x + length * size;
     uint64_t bit_tested = 1;
+    Color col;
     for (uint64_t i = 0; i < length; i++) {
         uint64_t bit = sys.temporal.osc & bit_tested;
-        Color col;
         if (bit) col = GREEN; else col = ORANGE;
         DrawRectangle(x - (i * size), y, size, size, col);
         bit_tested = bit_tested << 1;
     }
 }
 
-void update_debug(bool show_options) {
-    uint16_t size = 80;
+int16_t handle_data_menu(uint16_t size) {
+    sys.video.screen_refresh = true;
     uint16_t x = 0, y = 0;
+    DrawText(TextFormat("%s", sys.temporal.datetime), 1400, 0, 40, DARKGRAY);
+    DrawText(TextFormat("FRAMES=%i", (uint32_t)sys.video.frames[sys.video.display_id]), 0, 0, 20, DARKGRAY);
+    DrawText(TextFormat("prev_time = %f", (float)sys.video.prev_time[sys.video.display_id]), 0, 0, 40, DARKGRAY);
+    DrawText(TextFormat("monitors = %i, current = %i, %s", (uint16_t)GetMonitorCount(), (uint16_t)sys.video.display_id, GetMonitorName(sys.video.display_id)), 0, 60, 20, DARKGRAY);
+    DrawText(TextFormat("screen is %ix%i at %i fps", (uint16_t)sys.video.screen[sys.video.display_id].x, (uint16_t)sys.video.screen[sys.video.display_id].y, (uint16_t)sys.video.screen_rate[sys.video.display_id]), 0, 100, 20, DARKGRAY);
+    DrawText(TextFormat("screen is %ix%i mm", (uint16_t)GetMonitorPhysicalWidth(sys.video.display_id), (uint16_t)GetMonitorPhysicalHeight(sys.video.display_id)), 0, 120, 20, DARKGRAY);
+    DrawText(TextFormat("ex_canopy.adjustment.y = %f", (float)ex_canopy.adjustment.y), 0, 140, 20, DARKGRAY);
+    DrawText(TextFormat("ftime = %f and sys.video.frame_time_inc = %f",  (float)sys.video.elapsed_time[sys.video.display_id], (float)sys.video.frame_time_inc[sys.video.display_id]), 0, 160, 20, DARKGRAY);
+//    DrawText(TextFormat("text_pause = %i, text_color_flag = %i, text_wave_flag = %i", (int)text_pause, (int)text_color_flag, (int)text_wave_flag), 0, 180, 20, DARKGRAY);
+    DrawText(TextFormat("value_anim %i", (float)sys.video.value_anim[sys.video.display_id]), 0, 200, 20, DARKGRAY);
+    DrawText(TextFormat("fast_sin = %f", fast_sin(sys.video.frame_time_inc[sys.video.display_id])), 0, 220, 20, DARKGRAY);
+    DrawText(TextFormat("     sin = %f", sin(sys.video.frame_time_inc[sys.video.display_id])), 0, 240, 20, DARKGRAY);
+    DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 260, 20, DARKGRAY);
+    DrawText(TextFormat("     cos = %f", cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 280, 20, DARKGRAY);
+    show_state_bits(sys.temporal.osc, TEMPORAL_ARRAY_SIZE, 30, (Vector2) {0.f, sys.video.screen[sys.video.display_id].y - 30});
 
-    if (debug.audio) {
-        sys.video.screen_refresh = true;
-        if (IsKeyPressed(KEY_ZERO)) change_music_stream(0, 11, true);
-        if (IsKeyPressed(KEY_ONE)) change_music_stream(0, 0, true);
-        if (IsKeyPressed(KEY_TWO)) change_music_stream(0, 1, true);
-        if (IsKeyPressed(KEY_THREE)) change_music_stream(0, 2, true);
-        if (IsKeyPressed(KEY_FOUR)) change_music_stream(0, 3, true);
-        if (IsKeyPressed(KEY_FIVE)) change_music_stream(0, 4, true);
-        if (IsKeyPressed(KEY_SIX)) change_music_stream(0, 5, true);
-        if (IsKeyPressed(KEY_SEVEN)) change_music_stream(0, 6, true);
-        if (IsKeyPressed(KEY_EIGHT)) change_music_stream(0, 7, true);
-        if (IsKeyPressed(KEY_NINE)) change_music_stream(0, 8, true);
+    if (IsKeyPressed(KEY_KP_1)) {ex_canopy.adjustment.y -= 0.002;};
+    if (IsKeyPressed(KEY_KP_2)) {ex_canopy.adjustment.y += 0.002;};
+    if (IsKeyPressed(KEY_KP_3)) {ex_canopy.pal_idx_cells -= 16; if(ex_canopy.pal_idx_cells < 0) {ex_canopy.pal_idx_cells +=256;};};
+    if (IsKeyPressed(KEY_KP_4)) {ex_canopy.pal_idx_cells += 16; if(ex_canopy.pal_idx_cells > 255) {ex_canopy.pal_idx_cells -=256;};};
+    if (IsKeyPressed(KEY_KP_5)) {ex_canopy.pal_idx_text -= 16; if(ex_canopy.pal_idx_text < 0) {ex_canopy.pal_idx_text +=256;};};
+    if (IsKeyPressed(KEY_KP_6)) {ex_canopy.pal_idx_text += 16; if(ex_canopy.pal_idx_text > 255) {ex_canopy.pal_idx_text -=256;};};
+}
 
-        if (IsKeyPressed(KEY_A)) change_music_stream(1, 11, true);
-        if (IsKeyPressed(KEY_B)) change_music_stream(1, 12, true);
-        if (IsKeyPressed(KEY_C)) change_music_stream(1, 13, true);
-        if (IsKeyPressed(KEY_D)) change_music_stream(1, 14, true);
-        if (IsKeyPressed(KEY_E)) change_music_stream(1, 15, true);
-        if (IsKeyPressed(KEY_F)) change_music_stream(1, 16, true);
-        if (IsKeyPressed(KEY_G)) change_music_stream(1, 17, true);
-        if (IsKeyPressed(KEY_H)) change_music_stream(1, 18, true);
-        if (IsKeyPressed(KEY_I)) change_music_stream(1, 29, true);
-        if (IsKeyPressed(KEY_J)) change_music_stream(1, 20, true);
-        if (IsKeyPressed(KEY_K)) change_music_stream(1, 21, true);
-        if (IsKeyPressed(KEY_L)) change_music_stream(1, 22, true);
-        if (IsKeyPressed(KEY_M)) change_music_stream(1, 23, true);
-        if (IsKeyPressed(KEY_N)) change_music_stream(1, 24, true);
+int16_t handle_audio_menu(uint16_t size) {
+    sys.video.screen_refresh = true;
+    if (IsKeyPressed(KEY_ZERO)) change_music_stream(0, 11, true);
+    if (IsKeyPressed(KEY_ONE)) change_music_stream(0, 0, true);
+    if (IsKeyPressed(KEY_TWO)) change_music_stream(0, 1, true);
+    if (IsKeyPressed(KEY_THREE)) change_music_stream(0, 2, true);
+    if (IsKeyPressed(KEY_FOUR)) change_music_stream(0, 3, true);
+    if (IsKeyPressed(KEY_FIVE)) change_music_stream(0, 4, true);
+    if (IsKeyPressed(KEY_SIX)) change_music_stream(0, 5, true);
+    if (IsKeyPressed(KEY_SEVEN)) change_music_stream(0, 6, true);
+    if (IsKeyPressed(KEY_EIGHT)) change_music_stream(0, 7, true);
+    if (IsKeyPressed(KEY_NINE)) change_music_stream(0, 8, true);
 
-/*        if (IsKeyPressed(KEY_LEFT)) change_track_playing(-1);
-        if (IsKeyPressed(KEY_RIGHT)) change_track_playing(1);
-        if (IsKeyPressed(KEY_UP))   change_track_volume(16);
-        if (IsKeyPressed(KEY_DOWN)) change_track_volume(-16);
-        if (IsKeyPressed(KEY_F7))   jar_xm_flip_comp_exp(sys.asset.music[sys.audio.asset_playing].ctxData);
-        if (IsKeyPressed(KEY_F8))   jar_xm_flip_ramping(sys.asset.music[sys.audio.asset_playing].ctxData);
-        if (IsKeyPressed(KEY_F9))   jar_xm_flip_linear_interpolation(sys.asset.music[sys.audio.asset_playing].ctxData);
+    if (IsKeyPressed(KEY_A)) change_music_stream(1, 11, true);
+    if (IsKeyPressed(KEY_B)) change_music_stream(1, 12, true);
+    if (IsKeyPressed(KEY_C)) change_music_stream(1, 13, true);
+    if (IsKeyPressed(KEY_D)) change_music_stream(1, 14, true);
+    if (IsKeyPressed(KEY_E)) change_music_stream(1, 15, true);
+    if (IsKeyPressed(KEY_F)) change_music_stream(1, 16, true);
+    if (IsKeyPressed(KEY_G)) change_music_stream(1, 17, true);
+    if (IsKeyPressed(KEY_H)) change_music_stream(1, 18, true);
+    if (IsKeyPressed(KEY_I)) change_music_stream(1, 29, true);
+    if (IsKeyPressed(KEY_J)) change_music_stream(1, 20, true);
+    if (IsKeyPressed(KEY_K)) change_music_stream(1, 21, true);
+    if (IsKeyPressed(KEY_L)) change_music_stream(1, 22, true);
+    if (IsKeyPressed(KEY_M)) change_music_stream(1, 23, true);
+    if (IsKeyPressed(KEY_N)) change_music_stream(1, 24, true);
+
+/*    if (IsKeyPressed(KEY_LEFT)) change_track_playing(-1);
+    if (IsKeyPressed(KEY_RIGHT)) change_track_playing(1);
+    if (IsKeyPressed(KEY_UP))   change_track_volume(16);
+    if (IsKeyPressed(KEY_DOWN)) change_track_volume(-16);
+    if (IsKeyPressed(KEY_F7))   jar_xm_flip_comp_exp(sys.asset.music[sys.audio.asset_playing].ctxData);
+    if (IsKeyPressed(KEY_F8))   jar_xm_flip_ramping(sys.asset.music[sys.audio.asset_playing].ctxData);
+    if (IsKeyPressed(KEY_F9))   jar_xm_flip_linear_interpolation(sys.asset.music[sys.audio.asset_playing].ctxData);
 */
-//        jar_xm_debug(sys.asset.music[sys.audio.asset_playing].ctxData);
-        show_options = false;
-	}
-
-    if (debug.video) {
-        sys.video.screen_refresh = true;
-        if (IsKeyPressed(KEY_F10))  debug_fps_flip(&debug);
-        if (IsKeyDown(KEY_F9))      display_all_res();
-        if (IsKeyPressed(KEY_F11))  flip_display_state(FLAG_VSYNC_HINT);
-        show_options = false;
-    }
-
-    if (debug.game_data) {
-        sys.video.screen_refresh = true;
-        if (IsKeyPressed(KEY_KP_1)) {ex_canopy.adjustment.y -= 0.002;};
-        if (IsKeyPressed(KEY_KP_2)) {ex_canopy.adjustment.y += 0.002;};
-        if (IsKeyPressed(KEY_KP_3)) {ex_canopy.pal_idx_cells -= 16; if(ex_canopy.pal_idx_cells < 0) {ex_canopy.pal_idx_cells +=256;};};
-        if (IsKeyPressed(KEY_KP_4)) {ex_canopy.pal_idx_cells += 16; if(ex_canopy.pal_idx_cells > 255) {ex_canopy.pal_idx_cells -=256;};};
-        if (IsKeyPressed(KEY_KP_5)) {ex_canopy.pal_idx_text -= 16; if(ex_canopy.pal_idx_text < 0) {ex_canopy.pal_idx_text +=256;};};
-        if (IsKeyPressed(KEY_KP_6)) {ex_canopy.pal_idx_text += 16; if(ex_canopy.pal_idx_text > 255) {ex_canopy.pal_idx_text -=256;};};
-
-        DrawText(TextFormat("%s", sys.temporal.datetime), 1400, 0, 40, DARKGRAY);
-        DrawText(TextFormat("FRAMES=%i", (uint32_t)sys.video.frames[sys.video.display_id]), 0, 0, 20, DARKGRAY);
-        DrawText(TextFormat("prev_time = %f", (float)sys.video.prev_time[sys.video.display_id]), 0, 0, 40, DARKGRAY);
-        DrawText(TextFormat("monitors = %i, current = %i, %s", (uint16_t)GetMonitorCount(), (uint16_t)sys.video.display_id, GetMonitorName(sys.video.display_id)), 0, 60, 20, DARKGRAY);
-        DrawText(TextFormat("screen is %ix%i at %i fps", (uint16_t)sys.video.screen[sys.video.display_id].x, (uint16_t)sys.video.screen[sys.video.display_id].y, (uint16_t)sys.video.screen_rate[sys.video.display_id]), 0, 100, 20, DARKGRAY);
-        DrawText(TextFormat("screen is %ix%i mm", (uint16_t)GetMonitorPhysicalWidth(sys.video.display_id), (uint16_t)GetMonitorPhysicalHeight(sys.video.display_id)), 0, 120, 20, DARKGRAY);
-        DrawText(TextFormat("ex_canopy.adjustment.y = %f", (float)ex_canopy.adjustment.y), 0, 140, 20, DARKGRAY);
-        DrawText(TextFormat("ftime = %f and sys.video.frame_time_inc = %f",  (float)sys.video.elapsed_time[sys.video.display_id], (float)sys.video.frame_time_inc[sys.video.display_id]), 0, 160, 20, DARKGRAY);
-//        DrawText(TextFormat("text_pause = %i, text_color_flag = %i, text_wave_flag = %i", (int)text_pause, (int)text_color_flag, (int)text_wave_flag), 0, 180, 20, DARKGRAY);
-        DrawText(TextFormat("value_anim %i", (float)sys.video.value_anim[sys.video.display_id]), 0, 200, 20, DARKGRAY);
-        DrawText(TextFormat("fast_sin = %f", fast_sin(sys.video.frame_time_inc[sys.video.display_id])), 0, 220, 20, DARKGRAY);
-        DrawText(TextFormat("     sin = %f", sin(sys.video.frame_time_inc[sys.video.display_id])), 0, 240, 20, DARKGRAY);
-        DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 260, 20, DARKGRAY);
-        DrawText(TextFormat("     cos = %f", cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 280, 20, DARKGRAY);
-
-        display_state(sys.temporal.osc, TEMPORAL_ARRAY_SIZE, 30, (Vector2) {0.f, sys.video.screen[sys.video.display_id].y - 30});
-        show_options = false;
-    }
-
-    if (debug.controls) {
-        sys.video.screen_refresh = true;
-        display_keybed();
-        show_options = false;
-    }
-
-    if (debug.fps) {
-        sys.video.screen_refresh = true;
-        DrawFPS(sys.video.screen[sys.video.display_id].x - 100, 0);
-    }
-
-    if (IsKeyDown(KEY_LEFT_CONTROL)) {
-        x = (sys.video.screen[sys.video.display_id].x - 12 * size) * 0.5;
-        y = (sys.video.screen[sys.video.display_id].y - 6 * size) * 0.5;
-        if (show_options || debug.audio)     { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.audio, x, y, size, "F1 -> AUDIO");};
-        if (show_options || debug.video)     { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.video, x, y, size, "F2 -> VIDEO");};
-        if (show_options || debug.game_data) { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.game_data, x, y, size, "F3 -> DATA");};
-        if (show_options || debug.controls)  { sys.video.screen_refresh = true; y += size; debug_display_option(!debug.controls, x, y, size, "F4 -> CONTROLS");};
-        if (permission_valid(PMSN_TRACE))    { sys.video.screen_refresh = true; y += size; debug_display_option(!permission_valid(PMSN_TRACE), x, y, size, "F5 -> TRACE");};
-        if (show_options)                    { sys.video.screen_refresh = true; y += size; debug_display_option(0, x, y, size, "F8 -> EXIT");};
-        if (IsKeyPressed(KEY_F1)) debug_audio_flip();
-        if (IsKeyPressed(KEY_F2)) debug_video_flip();
-        if (IsKeyPressed(KEY_F3)) debug_game_data_flip();
-        if (IsKeyPressed(KEY_F4)) debug_controls_flip();
-        if (IsKeyPressed(KEY_F5)) flip_permission(PMSN_TRACE);
-        if (IsKeyPressed(KEY_F8)) commute_to(CTRL_DEINIT);
-    }
+//    jar_xm_debug(sys.asset.music[sys.audio.asset_playing].ctxData);
 }
 
-void debug_console_out(const char* message, uint32_t status) {
-    if (BITS_TEST(sys.program.pmsnstate, PMSN_TRACE)) {
-        TRACELOG(LOG_INFO, "%s | %s | CTRL = 0x%000000008X | PMSN = 0x%000000008X | status = 0x%000000008X <<<<< %s",
-        SOFTWARE,
-        sys.temporal.datetime,
-        sys.program.ctrlstate,
-        sys.program.pmsnstate,
-        status,
-        message
-        );
-    }
+int16_t handle_video_menu(uint16_t size) {
+    sys.video.screen_refresh = true;
+    if (IsKeyDown(KEY_F9))      display_all_res();
+    if (IsKeyPressed(KEY_F10))  flip_debugging(DEBUG_FPS);
+    if (IsKeyPressed(KEY_F11))  flip_display_state(FLAG_VSYNC_HINT);
+}
+
+int16_t handle_debug_menu(uint16_t size) {
+    debug_console_out("handle_debug_menu", size);
+    sys.video.screen_refresh = true;
+    uint16_t x = (sys.video.screen[sys.video.display_id].x - 12 * size) * 0.5;
+    uint16_t y = (sys.video.screen[sys.video.display_id].y - 6 * size) * 0.5;
+    if (valid_permission(PMSN_DEBUG_AUDIO) && active_debugging(DEBUG_SHOW_OPTION_AUDIO))         { y += size; display_debug_option(!active_debugging(DEBUG_AUDIO), x, y, size, "F1 -> AUDIO");}
+    if (valid_permission(PMSN_DEBUG_VIDEO) && active_debugging(DEBUG_SHOW_OPTION_VIDEO))         { y += size; display_debug_option(!active_debugging(DEBUG_VIDEO), x, y, size, "F2 -> VIDEO");}
+    if (valid_permission(PMSN_DEBUG_DATA) && active_debugging(DEBUG_SHOW_OPTION_DATA))           { y += size; display_debug_option(!active_debugging(DEBUG_DATA), x, y, size, "F3 -> DATA");}
+    if (valid_permission(PMSN_DEBUG_CONTROLS) && active_debugging(DEBUG_SHOW_OPTION_CONTROLS))   { y += size; display_debug_option(!active_debugging(DEBUG_CONTROLS), x, y, size, "F4 -> CONTROLS");}
+    if (valid_permission(PMSN_DEBUG_TRACE) && active_debugging(DEBUG_SHOW_OPTION_TRACE))         { y += size; display_debug_option(!active_debugging(DEBUG_TRACE), x, y, size, "F5 -> TRACE");}
+    if (valid_permission(PMSN_DEBUG_EXIT) && active_debugging(DEBUG_SHOW_OPTION_EXIT))           { y += size; display_debug_option(0, x, y, size, "F8 -> EXIT");}
+    if (valid_permission(PMSN_DEBUG_AUDIO) && IsKeyPressed(KEY_F1))       flip_debugging(DEBUG_AUDIO);
+    if (valid_permission(PMSN_DEBUG_VIDEO) && IsKeyPressed(KEY_F2))       flip_debugging(DEBUG_VIDEO);
+    if (valid_permission(PMSN_DEBUG_DATA) && IsKeyPressed(KEY_F3))        flip_debugging(DEBUG_DATA);
+    if (valid_permission(PMSN_DEBUG_CONTROLS) && IsKeyPressed(KEY_F4))    flip_debugging(DEBUG_CONTROLS);
+    if (valid_permission(PMSN_DEBUG_TRACE) && IsKeyPressed(KEY_F5))       flip_debugging(DEBUG_TRACE);
+    if (valid_permission(PMSN_DEBUG_EXIT) && IsKeyPressed(KEY_F8))        commute_to(CTRL_DEINIT);
+}
+
+int16_t init_debug(void) {
+    add_debugging(DEBUG_INITIALIZE_MASK);
+    return 0;
+}
+
+int16_t update_debug(void) {
+    uint16_t size = 80;
+
+    if (active_debugging(DEBUG_AUDIO))      handle_audio_menu(size);
+    if (active_debugging(DEBUG_VIDEO))      handle_video_menu(size);
+    if (active_debugging(DEBUG_DATA))       handle_data_menu(size);
+    if (active_debugging(DEBUG_CONTROLS))   display_keybed();
+    if (active_debugging(DEBUG_FPS))        DrawFPS(sys.video.screen[sys.video.display_id].x - 100, 0);
+    if (IsKeyDown(KEY_LEFT_CONTROL))        handle_debug_menu(size);
 }
 
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
+
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
+typedef enum {
+    TRACK_RESERVED          = 0b10000000000000000000000000000000,
+    TRACK_SWITCH_IMMEDIATE  = 0b00100000000000000000000000000000,
+    TRACK_STOP_UNFOCUSED    = 0b00010000000000000000000000000000,
+    TRACK_RESTART_ON_FOCUS  = 0b00001000000000000000000000000000,
+    TRACK_PAUSE_ON_PAUSE    = 0b00000010000000000000000000000000,
+    TRACK_PAUSE_ON_TERMINAL = 0b00000000100000000000000000000000,
+    TRACK_STOPPED           = 0b00000000000000000000000000100000,
+    TRACK_PAUSED            = 0b00000000000000000000000000010000,
+    TRACK_FINISHED          = 0b00000000000000000000000000001000,
+    TRACK_EXPIRED           = 0b00000000000000000000000000000010,
+    TRACK_ACTIVE            = 0b00000000000000000000000000000001
+};
+
+// no wav or mp3 support implemented yet (!)
+
+int16_t init_audio_properties(void) {
+    bool status = 0;
+    InitAudioDevice();
+    sys.audio.total_tracks = 0;
+    sys.audio.global_volume = 1.0f;
+    SetMasterVolume(sys.audio.global_volume); 
+    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
+        sys.audio.track[id].is_playing = false;
+        sys.audio.track[id].volume = 1.0f;
+        sys.audio.track[id].order_playing = 0;
+        sys.audio.track[id].total_orders = 0;
+        for (uint16_t j=0; j < MAXORDERS; j++) {
+            sys.audio.track[id].order[j] = 0;
+        }
+    }
+    if  (IsAudioDeviceReady()) return status; else return 1;
+    return status;
+}
+
+int16_t update_audio(void) {
+    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
+        if (sys.audio.track[id].is_playing) {
+            if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
+                UpdateMusicStream(sys.asset.music[sys.audio.track[id].asset]);
+            }
+        }
+    }
+}
+
+static int16_t add_track(uint16_t display, uint32_t state, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t total_orders, uint16_t orderlist[]) {
+    uint16_t track_id = sys.audio.total_tracks;
+    sys.audio.track[track_id].virtual_display = display;
+    sys.audio.track[track_id].state = state;
+    sys.audio.track[track_id].asset = load_asset(ASSET_XM, fileName, fileType, fileData, dataSize, pak);
+    sys.audio.track[track_id].volume = 1.f;
+    //uint16_t asset = sys.audio.track[].asset_playing;
+
+    //uint16_t total_orders = sizeof(orderlist[0]) / sizeof(int);
+    for (uint16_t i = 0; i < total_orders; i++) {
+        sys.audio.track[track_id].order[i] = orderlist[i];
+    }
+    sys.audio.track[track_id].total_orders = total_orders;
+
+    sys.audio.total_tracks += 1;
+    return track_id;
+}
+
+//StopMusicStream(sys.asset.music[asset]);
+void change_music_stream(uint16_t track_id, uint16_t order_id, bool immediate) {
+    uint16_t asset = sys.audio.track[track_id].asset;
+    sys.audio.track[track_id].order_playing = order_id;
+    
+    if (order_id < sys.audio.track[track_id].total_orders) {
+        if (!immediate) { // switches at end of pattern
+            jar_xm_pattern_jump(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id]);
+        } else { // switches immediately
+            jar_xm_pattern_jump_immediate(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id], true);
+        };
+    }
+}
+
+static void hint_restart_track(bool immediate) {
+    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
+        if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
+            if (sys.audio.track[id].state || TRACK_RESTART_ON_FOCUS) {
+                sys.audio.track[id].is_playing = true;
+                uint16_t order = sys.audio.track[id].order_playing;
+                change_music_stream(id, order, immediate);
+            }
+        }
+    }
+}
+
+static void play_track(uint16_t track_id, uint16_t order_id, bool immediate) {
+    sys.audio.track[track_id].is_playing = true;
+    uint16_t asset = sys.audio.track[track_id].asset;
+	PlayMusicStream(sys.asset.music[asset]);
+    change_music_stream(track_id, order_id, immediate);
+}
+
+static void change_track_playing(uint16_t track_id, uint16_t value) {
+    sys.audio.track[track_id].is_playing = true;
+    uint16_t proposed_order = (sys.audio.track[track_id].order_playing + value) % sys.audio.track[track_id].total_orders;
+    change_music_stream(track_id, proposed_order, true);
+}
+
+//    jar_xm_change_all_channel_volumes(sys.asset.music[asset].ctxData, (int) amount); // DO NOT USE, INSTEAD REVAMP TRACKER MIXER
+static void change_track_volume(uint16_t track, float volume) {
+    if (volume>=0.f && volume <=1.0f) sys.audio.track[track].volume = volume;
+    uint16_t asset = sys.audio.track[track].asset;
+	SetMusicVolume(sys.asset.music[asset], sys.audio.track[track].volume);
+}
+
+static void change_global_volume(float amount) {
+    sys.audio.global_volume += amount;
+    if ( sys.audio.global_volume > 1.0f) sys.audio.global_volume = 1.0f; else if ( sys.audio.global_volume < 0.0f) sys.audio.global_volume = 0.0f;
+    SetMasterVolume(sys.audio.global_volume);
+}
+
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
+
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
+
+typedef enum {
+    VIDEO_RESERVED       = 0b10000000000000000000000000000000, // 
+    VIDEO_ON_TOP         = 0b00001000000000000000000000000000, // Terminal display is above all other virtual displays
+    VIDEO_MOVE_X         = 0b00000000000000000100000000000000, // 
+    VIDEO_MOVE_Y         = 0b00000000000000000010000000000000, // 
+    VIDEO_HIDDEN         = 0b00000000000000000000000010000000, // 
+    VIDEO_FROZEN         = 0b00000000000000000000000000100000, // 
+    VIDEO_EXPIRING       = 0b00000000000000000000000000001000, // 
+    VIDEO_EXPIRED        = 0b00000000000000000000000000000010, // 
+    VIDEO_ACTIVE         = 0b00000000000000000000000000000001  // 
+};
+
+void begin_draw(bool clear) {
+    BeginTextureMode(sys.asset.framebuffer[sys.video.virtual_asset[sys.video.current_virtual]]);
+    if (clear) ClearBackground(BLACK);
+    rlDisableDepthMask();            // Disable depth writes
+    rlDisableDepthTest();            // Disable depth test for speed
+}
+
+void end_draw(void) {
+    rlEnableDepthMask();
+    rlEnableDepthTest();
+    EndTextureMode();
+}
+
+void flip_frame_buffer(uint16_t display, bool clear) {
+    sys.video.previous_virtual = sys.video.current_virtual;
+    sys.video.current_virtual = display;
+    if (clear) sys.video.screen_refresh = true;
+}
+
+static void draw_frame_buffer(RenderTexture renderer, Vector2 position) {
+	DrawTexturePro (renderer.texture,
+    (Rectangle) {0.0, 0.0, (float)renderer.texture.width, (float)-renderer.texture.height},
+    (Rectangle) {position.x, position.y, sys.video.screen[sys.video.display_id].x, sys.video.screen[sys.video.display_id].y},
+    (Vector2)   {0.0, 0.0}, 0.0f, WHITE);
+}
+
+static uint16_t init_frame_buffer(uint16_t display, Vector2 resolution) {
+    flip_frame_buffer(display, true);
+    sys.video.virtual_res[sys.video.current_virtual] = resolution;
+    sys.video.frames[sys.video.current_virtual] = 0;
+    sys.video.elapsed_time_var_ratio[sys.video.current_virtual] = 5.f;
+    sys.video.frame_time_inc[sys.video.current_virtual] = 0;
+	uint16_t asset_id = load_asset(ASSET_FRAMEBUFFER, NULL, NULL, NULL, NULL, 0);
+    flip_frame_buffer(sys.video.previous_virtual, true);
+    return asset_id;
+}
+
+int16_t init_display_properties(bool hide_mouse) {
+    int16_t status = 0;
+    BITS_INIT(sys.video.windowstate_normal, 0);
+    //sys.video.windowstate_normal = FLAG_WINDOW_UNDECORATED; // AVOID AT ALL COST (SCREEN TEARING when VSYNC)
+    BITS_ON(sys.video.windowstate_normal, FLAG_FULLSCREEN_MODE);
+    BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_ALWAYS_RUN);
+    BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_TOPMOST);
+    BITS_ON(sys.video.windowstate_normal, FLAG_MSAA_4X_HINT);
+    BITS_ON(sys.video.windowstate_normal, FLAG_VSYNC_HINT);
+
+    BITS_INIT(sys.video.windowstate_paused, 0);
+    BITS_ON(sys.video.windowstate_paused, FLAG_FULLSCREEN_MODE);
+    BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_UNFOCUSED);
+    BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_MINIMIZED);
+    BITS_ON(sys.video.windowstate_paused, FLAG_MSAA_4X_HINT);
+    BITS_ON(sys.video.windowstate_paused, FLAG_VSYNC_HINT);
+
+    SetConfigFlags(sys.video.windowstate_normal);
+    InitWindow(0, 0, sys.program.name);
+    sys.video.display_id = GetCurrentMonitor();
+    if (hide_mouse) HideCursor();
+    sys.video.screen[sys.video.display_id] = (Vector2) {GetScreenWidth(), GetScreenHeight()};
+    sys.video.screen_rate[sys.video.display_id] = GetMonitorRefreshRate(sys.video.display_id);
+    SetWindowSize(sys.video.screen[sys.video.display_id].x, sys.video.screen[sys.video.display_id].y);
+
+    if (IsWindowReady()) return status; else return 1;
+}
+
+void flip_display_state(uint32_t state) {
+    if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS))
+        BITS_FLIP(sys.video.windowstate_normal, state);
+    else
+        BITS_FLIP(sys.video.windowstate_paused, state);
+        
+    if (IsWindowState(state)) { 
+        ClearWindowState(state);
+    } else {
+        SetWindowState(state);
+        // if (state & FLAG_VSYNC_HINT)  // ***GLFW issue with Refresh rate reset to 60 on VSYNC
+        // since this is an issue, if we really want to do this right, we would have to possibly reload all assets
+    }
+}
+
+    // The way this works right now is not proper, as we have 4-5 different virtual display, we need a way to display them all at once,
+    // or at least display the MENU + poossibly the Terminal + the game
+    // So first, the rendering to a texture part, needs to be expanded
+    // then update_system needs to take into account the different virtual displays and how to decide on;
+    // - The order in which they should be displayed
+    // - Should they display
+    // - And their alpha blending
+int16_t update_display(void) {
+    int16_t status = 0;
+    uint16_t display = sys.video.current_virtual;
+	BeginDrawing();
+        if (sys.video.screen_refresh) {
+            ClearBackground(BLACK);
+            sys.video.screen_refresh = false;
+        };
+        // game app video
+        draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[display]], (Vector2) {0,0});
+
+        if (active_service(CTRL_TERMINAL | CTRL_TERMINAL_INITIALIZED)) {
+            draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[TERMINALDISPLAY]], (Vector2) {0,0});
+        }
+
+        if (active_service(CTRL_DEBUG | CTRL_DEBUG_INITIALIZED)) {
+            // if debug functionalities activated
+            // DISPLAY MANAGE DEBUG INFORMATION
+            status = update_debug();
+        }
+	EndDrawing();
+
+    sys.video.window_focus = IsWindowFocused();
+
+    double next_frame = sys.video.prev_time[display] + (double)(1 / sys.video.screen_rate[sys.video.display_id]);
+    float wait = (next_frame - GetTime());
+    if (wait < 0) wait = 0;
+    WaitTime(wait * 1000.f);
+
+    double current_time = GetTime();
+
+    sys.video.elapsed_time[display] = current_time - sys.video.prev_time[display];
+    sys.video.prev_time[display] = current_time;
+
+   if (sys.video.window_focus) {        // ************** GO TO APP MODE
+        if (sys.program.ctrlstate & CTRL_OFF_FOCUS) {
+            if (GetKeyPressed() != 0) {
+                BITS_OFF(sys.program.ctrlstate, CTRL_OFF_FOCUS);
+                flip_frame_buffer(PRIMARYDISPLAY, true);
+                ClearWindowState(sys.video.windowstate_normal ^ sys.video.windowstate_paused);
+                SetWindowState(sys.video.windowstate_normal);
+                sys.video.prev_time[sys.video.current_virtual] = current_time;
+            }
+        }
+    } else {        // ************* GO TO PAUSE MODE
+        //IsWindowMinimized()
+        if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS)) {
+            BITS_ON(sys.program.ctrlstate, CTRL_OFF_FOCUS);
+            flip_frame_buffer(UNFOCUSEDDISPLAY, true);
+            ClearWindowState(sys.video.windowstate_paused ^ sys.video.windowstate_normal);
+            SetWindowState(sys.video.windowstate_paused);
+            hint_restart_track(true);
+            sys.video.prev_time[sys.video.current_virtual] = current_time;
+        };
+    };
+
+    sys.video.frame_time[display] = (float)sys.video.elapsed_time[display] * (float)sys.video.screen_rate[sys.video.display_id];
+    sys.video.frame_time_inc[display] += (float)sys.video.elapsed_time[display];
+    sys.video.elapsed_time_var[display] += (float)sys.video.elapsed_time[display] * sys.video.elapsed_time_var_ratio[display];
+    sys.video.value_anim[display] = fast_sin(fast_cos(fast_sin(sys.video.frame_time_inc[display]) * fast_sin(sys.video.elapsed_time_var[display] * 0.1) * 0.1) * fast_cos(sys.video.elapsed_time_var[display] * 0.015) * 0.1 ) * 0.05 + 0.001;
+    sys.video.frames[display]++;
+
+}
+
+void deinit_display(void) {
+    ShowCursor();
+	CloseWindow();
+}
+
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
 
 // ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
 // ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
@@ -4362,6 +4386,14 @@ int16_t init_system(void) {
     debug_console_out("//////// init_system", 0);
     uint32_t status = 0;
 
+    int16_t temporal_status = init_temporal();
+    if (temporal_status) add_service(CTRL_TEMPORAL_INITIALIZED);
+    debug_console_out("---------- TEMPORAL_INITIALISATION", temporal_status);
+
+    int16_t debug_status = init_debug();
+    if (!debug_status) add_service(CTRL_DEBUG_INITIALIZED); 
+    debug_console_out("---------- DEBUG_INITIALISATION", debug_status);
+    
     int16_t display_status = init_display_properties(true);
     if (!display_status) add_service(CTRL_VIDEO_INITIALIZED); 
     debug_console_out("---------- VIDEO_INITIALISATION", display_status);
@@ -4377,10 +4409,6 @@ int16_t init_system(void) {
     int16_t audio_status = init_audio_properties();
     if (!audio_status) add_service(CTRL_AUDIO_INITIALIZED);
     debug_console_out("---------- AUDIO_INITIALISATION", audio_status);
-
-    int16_t temporal_status = init_temporal();
-    if (temporal_status) add_service(CTRL_TEMPORAL_INITIALIZED);
-    debug_console_out("---------- TEMPORAL_INITIALISATION", temporal_status);
     
     // TODO: init bootstrap script
 
@@ -4412,21 +4440,12 @@ static int16_t deinit_system(void) {
 static int16_t update_system(void) {
     int16_t status = 0;
     
-    if (sys.program.ctrlstate & CTRL_ASSETS_INITIALIZED) {
-        update_assets();
-    }
-    if (sys.program.ctrlstate & CTRL_TERMINAL_INITIALIZED) {
-        update_terminal();
-    }
-    if (sys.program.ctrlstate & CTRL_VIDEO_INITIALIZED) {
-        update_display();
-    }
-    if (sys.program.ctrlstate & CTRL_AUDIO_INITIALIZED) {
-        update_audio();
-    }
-    if (sys.program.ctrlstate & CTRL_TEMPORAL_INITIALIZED) {
-        update_temporal();
-    }
+    if (active_service(CTRL_ASSETS_INITIALIZED))    status += update_assets();
+    if (active_service(CTRL_TERMINAL_INITIALIZED))  status += update_terminal();
+    if (active_service(CTRL_VIDEO_INITIALIZED))     status += update_display();
+    if (active_service(CTRL_AUDIO_INITIALIZED))     status += update_audio();
+    if (active_service(CTRL_TEMPORAL_INITIALIZED))  status += update_temporal();
+
     return status;
 }
 
@@ -4442,14 +4461,14 @@ void manage_program() {
     if (sys.program.ctrlstate & CTRL_OFF_FOCUS)
         game_off_focus_scene();
     else {
-//        uint32_t switchboard_state = service_active(CTRL_SWITCHBOARD_MASK);
-        switch (service_active(CTRL_SWITCHBOARD_MASK)) {   //(switchboard_state) {
+//        uint32_t switchboard_state = active_service(CTRL_SWITCHBOARD_MASK);
+        switch (active_service(CTRL_SWITCHBOARD_MASK)) {   //(switchboard_state) {
             case CTRL_OFF_FOCUS:
                 begin_draw(true);
                 game_off_focus_scene();
                 end_draw();
             case CTRL_INITIALIZE:
-                add_service(CTRL_SHOW_TERMINAL);
+                add_service(CTRL_TERMINAL);
                 init_system();
                 commute_to(CTRL_INIT_TITLE);
                 game_init_assets();
@@ -4509,28 +4528,31 @@ void manage_program() {
 ////////////// ENTRY POINT FROM RUNTIME //////////////
 // Once runtime heads here --> stuck till CTRL_END
 int16_t process_system(uint32_t ctrlstate, uint32_t pmsnstate, const char* name) {
-    if (name > NULL) strcpy(sys.program.name, name); else strcpy(sys.program.name, "_o/");
-    set_permission(pmsnstate);
     add_service(ctrlstate);
-
     debug_console_out(">>>~~~>>> P R O C E S S   S Y S T E M <<<~~~<<<", 0);
+    set_permission(pmsnstate);
+    if (active_service(CTRL_BOOTSTRAP_TRACE))
+        flip_debugging(DEBUG_TRACE);
+
+    if (name > NULL) strcpy(sys.program.name, name); else strcpy(sys.program.name, "_o/");
+
 
     commute_to(CTRL_INITIALIZE);
     add_service(CTRL_RUNNING);
-    while (service_active(CTRL_RUNNING)) {
+    while (active_service(CTRL_RUNNING)) {
         //debug_console_out("MAIN LOOP_______BEGIN", 0);
 
         manage_program(); // mostly for the game program display and whereabouts, as well as initialize and exit of the aopplication
 
-        if (service_active(CTRL_VIDEO_INITIALIZED)) {
-            if (service_active(CTRL_IN_GAME))  {
+        if (active_service(CTRL_VIDEO_INITIALIZED)) {
+            if (active_service(CTRL_IN_GAME))  {
                 // possibly health information, lives left, score etc... (HUD)
             }
-            if (service_active(CTRL_GAME_PAUSED)) {
+            if (active_service(CTRL_GAME_PAUSED)) {
             // something special happening while game is paused
             // DISPLAY PAUSE MESSAGE
             }
-            if (sys.program.ctrlstate & CTRL_SHOW_TERMINAL) {
+            if (sys.program.ctrlstate & CTRL_TERMINAL) {
                 render_terminal(); // this freezes the current video and does nothing else ******************* ISSUE
             }
             update_system();
