@@ -686,22 +686,22 @@ typedef struct EX_asset {
 #define MAXORDERS       50
 
 typedef struct EX_track {
-    bool        is_playing;
-    uint32_t    state;
-    uint16_t    asset;
-    uint16_t    virtual_display;
-    float       volume;
-    float       dest_volume; // TO DO
-    float       slide_speed; // TO DO
-    uint16_t    order_playing;
-    uint16_t    total_orders;
-    uint16_t    order[MAXORDERS];
+    bool        is_playing;                 // 
+    uint32_t    state;                      // 
+    uint16_t    asset;                      // 
+    uint16_t    virtual_display;            // 
+    float       volume;                     // 
+    float       dest_volume;                // TO DO
+    float       slide_speed;                // TO DO
+    uint16_t    order_playing;              // 
+    uint16_t    total_orders;               // 
+    uint16_t    order[MAXORDERS];           // 
 } EX_track;
 
 typedef struct  EX_audio {
-    uint16_t    total_tracks;
-    float       global_volume;
-    EX_track    track[MAXAUDIOTRACKS];
+    uint16_t    total_tracks;               // 
+    float       global_volume;              // 
+    EX_track    track[MAXAUDIOTRACKS];      // 
 } EX_audio;
 
 // **************************************************************************************** V I D E O   S T R U C T U R E S
@@ -713,34 +713,37 @@ typedef struct  EX_audio {
 #define UNFOCUSEDDISPLAY    3
 #define TERMINALDISPLAY     4
 
+typedef struct EX_screenspace {
+    uint32_t    state;                          // virtual display state
+    Vector2     offset;                         // Windows Display Resolution (x, y)
+    uint32_t    refresh_rate;                   // screen refresh rate
+    uint32_t    fps;                            // frames per second
+    uint32_t    frames;                         // number of game frame elasped since initialisation
+    double      prev_time;                      // keep track of time to grab delta
+    double      elapsed_time_nofocus;           // elapsed time since nofocus
+    double      elapsed_time;                   // elapsed time in milliseconds since last frame refresh
+    float       elapsed_time_var;               // elapsed time in milliseconds since last frame refresh (with ratio)
+    float       elapsed_time_var_ratio;         // multiplication factor
+    float       value_anim;                     // space for animated controls (to be elaborated)
+    float       frame_time;                     // 
+    float       frame_time_inc;                 // 
+    Vector2     size;                           // framebuffer resolution (x, y)
+    uint16_t    asset_id;                       // framebuffer asset number
+} EX_screenspace;
+
 typedef struct EX_video {
-    //uint32_t state;
-    uint32_t    state[MAXDISPLAYS];                     // virtual display state
-    Vector2     screen[MAXDISPLAYS];                    // Windows Display Resolution (x, y)
-    uint32_t    screen_rate[MAXDISPLAYS];               // screen refresh rate
-    uint32_t    fps[MAXDISPLAYS];                       // frames per second
-    uint32_t    frames[MAXDISPLAYS];                    // number of game frame elasped since initialisation
-    double      prev_time[MAXDISPLAYS];                 // keep track of time to grab delta
-    double      elapsed_time_nofocus[MAXDISPLAYS];      // elapsed time since nofocus
-    double      elapsed_time[MAXDISPLAYS];              // elapsed time in milliseconds since last frame refresh
-    float       elapsed_time_var[MAXDISPLAYS];          // elapsed time in milliseconds since last frame refresh (with ratio)
-    float       elapsed_time_var_ratio[MAXDISPLAYS];    // multiplication factor
-    float       value_anim[MAXDISPLAYS];                // space for animated controls (to be elaborated)
-    float       frame_time[MAXDISPLAYS];
-    float       frame_time_inc[MAXDISPLAYS];
-    Vector2     virtual_res[MAXDISPLAYS];               // framebuffer resolution (x, y)
-    uint16_t    virtual_asset[MAXDISPLAYS];             // framebuffer asset number
+    uint32_t    state;                          // 
+    Vector2     screen;                         // Windows Display Resolution (x, y)
+    uint32_t    windowstate_normal;             // screen window state in normal mode
+    uint32_t    windowstate_paused;             // screen window state when game is paused
+    uint16_t    display_id;                     // screen currently used
+    bool        screen_refresh;                 // 
+    bool        window_focus;                   // last state of window focus (true = in applicatioo, false = outside of application)
 
-    EX_canvasgroup canvasgroup[MAXDISPLAYS];            // canvasgroup data
-
-    uint32_t    windowstate_normal;                     // screen window state in normal mode
-    uint32_t    windowstate_paused;                     // screen window state when game is paused
-    uint16_t    display_id;                             // screen currently used
-    bool        screen_refresh;
-    uint16_t    current_virtual;                        // virtual display currently used
-    uint16_t    previous_virtual;                       // virtual display previously used
-
-    bool        window_focus;                           // last state of window focus (true = in applicatioo, false = outside of application)
+    uint16_t    current_virtual;                // virtual display currently used
+    uint16_t    previous_virtual;               // virtual display previously used
+    EX_screenspace vscreen[MAXDISPLAYS];        // 
+    EX_canvasgroup canvasgroup[MAXDISPLAYS];    // canvasgroup data
 } EX_video;
 
 
@@ -753,41 +756,51 @@ typedef struct EX_video {
 #define MAXTOKENS           1024
 
 typedef struct EX_page {
-    uint32_t    state;
-    Vector2     cursor_home_position, cursor_previous_position, cursor_position;
-    uint16_t    default_font, previous_font, current_font;
-    uint16_t    default_palette, previous_palette, current_palette;
-    uint16_t    default_colorfg, default_colorbg, colorfg, colorbg;
-    uint16_t    text_blink_rate;
-    uint16_t    margin_left, margin_right, margin_top, margin_bottom;
-    Vector2     page_split;                             // Horizontal and vertical page split position (usually center)
+    uint32_t    state;                              // terminal page state
+    Vector2     cursor_home_position;               // position when cursor home
+    Vector2     cursor_previous_position;           // previous cursor position
+    Vector2     cursor_position;                    // current cursor position
+    uint16_t    default_font;                       // default font selection (not asset_id)
+    uint16_t    previous_font;                      // previous font selection (not asset_id)
+    uint16_t    default_palette;                    // default palette selection (not asset_id)
+    uint16_t    previous_palette;                   // previous palette selection (not asset_id)
+    uint16_t    default_colorfg_id;                 // 
+    uint16_t    default_colorbg_id;                 // 
+    uint16_t    previous_colorbg_id;                // 
+    uint16_t    previous_colorfg_id;                // 
+    uint16_t    colorbg_id, colorfg_id;             // 
+    uint16_t    text_blink_rate;                    // 
+    uint16_t    margin_left, margin_right, margin_top, margin_bottom; // page margin values for all sides
+    Vector2     page_split;                         // Horizontal and vertical page split position (usually center)
+    EX_cell     cell;                               // active cell template for the page
 } EX_page;
 
 typedef struct EX_token {
-    uint16_t    position;
-    uint16_t    len;
+    uint16_t    position;                           // 
+    uint16_t    len;                                // 
 } EX_token;
 
 typedef struct EX_terminal {
-    uint32_t    state;                                  // to be elaborated
-    uint16_t    asset_id;
-    uint16_t    canvasgroup_id;                         // Where all terminal canvases reside
-    uint16_t    previous_page_id, current_page_id;
-    uint16_t    font_id[TERM_MAXFONTS];
-    uint16_t    fonts;
-    uint16_t    palette_id[TERM_MAXPALETTES];
-    uint16_t    palettes;
+    uint32_t    state;                              // 
+    uint16_t    asset_id;                           // 
+    Vector2     offset;                             // 
+    uint16_t    canvasgroup_id;                     // Where all terminal canvases reside
+    uint16_t    previous_page_id, current_page_id;  // 
+    uint16_t    font_id[TERM_MAXFONTS];             // font to font_id cross reference
+    uint16_t    fonts;                              // number of fonts loaded
+    uint16_t    palette_id[TERM_MAXPALETTES];       // palette to palette_id cross reference
+    uint16_t    palettes;                           // number of palettes loaded
 
-    EX_page     page[TERM_MAXPAGES];                    // space for all terminal pages
-    uint32_t    screensaver_delay;                      // time in seconds before scerensaver kicks in
-    uint32_t    screensaver_count;                      // countdown before screensaver takes effect
+    EX_page     page[TERM_MAXPAGES];                // space for all terminal pages
+    uint32_t    screensaver_delay;                  // time in seconds before scerensaver kicks in
+    uint32_t    screensaver_count;                  // countdown before screensaver takes effect
 
-    uint8_t     input_buffer[IOBUFFERSIZE];
-    uint8_t     output_buffer[IOBUFFERSIZE];
-    uint32_t    input_buffer_pos;
-    uint32_t    output_buffer_pos;
-    EX_token    token[MAXTOKENS];
-
+    uint8_t     input_buffer[IOBUFFERSIZE];         // 
+    uint8_t     output_buffer[IOBUFFERSIZE];        // 
+    uint32_t    input_buffer_position;              // 
+    uint32_t    output_buffer_position;             // 
+    EX_token    token[MAXTOKENS];                   // 
+    uint16_t    token_count;                        // 
 } EX_terminal;
 
 
@@ -799,12 +812,12 @@ typedef struct EX_terminal {
 #define TEMPORAL_ARRAY_SIZE 64
 
 typedef struct EX_temporal {
-    char        datetime[20];
-    double      period_table[TEMPORAL_ARRAY_SIZE];      // time slice period per oscillator
-    uint64_t    prev_osc;                               // previous oscillator bits
-    uint64_t    osc;                                    // all oscillator bits
-    uint64_t    osc_count[TEMPORAL_ARRAY_SIZE];         // number of cycles since start of program (counts are on full cycles)
-    double      osc_next_frame[TEMPORAL_ARRAY_SIZE];    // trigger for oscillator state update (calculated following frame)
+    char        datetime[20];                       // 
+    double      period_table[TEMPORAL_ARRAY_SIZE];  // time slice period per oscillator
+    uint64_t    prev_osc;                           // previous oscillator bits
+    uint64_t    osc;                                // all oscillator bits
+    uint64_t    osc_count[TEMPORAL_ARRAY_SIZE];     // number of cycles since start of program (counts are on full cycles)
+    double      osc_next_frame[TEMPORAL_ARRAY_SIZE];// trigger for oscillator state update (calculated following frame)
 } EX_temporal;
 
 typedef struct EX_player {
@@ -1025,7 +1038,7 @@ Color get_palette_color_pro(uint16_t palette_id, uint16_t id, uint8_t alpha, flo
 }
 
 Vector2 get_current_virtual_size(void) {
-    return sys.video.virtual_res[sys.video.current_virtual];
+    return sys.video.vscreen[sys.video.current_virtual].size;
 }
 
 Vector2 get_tile_size(Vector2 tiles, Vector2 tileset_size) {
@@ -1173,7 +1186,7 @@ int16_t update_assets(void) {
                 break;
 
                 case ASSET_FRAMEBUFFER :
-                //sys.asset.framebuffer[id] = LoadRenderTexture( sys.video.virtual_res[sys.video.current_virtual].x, sys.video.virtual_res[sys.video.current_virtual].y );
+                //sys.asset.framebuffer[id] = LoadRenderTexture( sys.video.vscreen[sys.video.current_virtual].size.x, sys.video.vscreen[sys.video.current_virtual].size.y );
                 //LoadTextureFromImage(sys.asset.tileset[id].texture, sys.asset.img[id].data);
                 BITS_OFF(sys.asset.state[id], ASSET_UPDATE);
                 BITS_ON(sys.asset.state[id], ASSET_UPDATED);
@@ -1270,7 +1283,7 @@ uint16_t load_asset (uint32_t assettype, const char* fileName, const char* fileT
             BITS_ON(sys.asset.state[id], ASSET_LOADED);
             SetTextureFilter(sys.asset.framebuffer[id].texture, FILTER_POINT);
             sys.asset.data_size[id] = dataSize; // ??????????? WRONG !! There is no dataSize passed... so that is a NULL
-            sys.video.virtual_asset[sys.video.current_virtual] = id;
+            sys.video.vscreen[sys.video.current_virtual].asset_id = id;
             sys.asset.asset_type[id] = assettype;  
             break;
 
@@ -1956,7 +1969,7 @@ void set_cell_offset(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targ
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
-            linear_offset = lsx * y + x;
+            linear_offset = (lsx * y + x);
             target_cell[linear_offset].offset = offset;
         }
     }
@@ -1974,7 +1987,7 @@ void set_cell_angle(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targe
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
-            linear_offset = lsx * y + x;
+            linear_offset = (lsx * y + x);
             target_cell[linear_offset].angle = angle;
         }
     }
@@ -1992,7 +2005,7 @@ void set_cell_scale(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targe
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
-            linear_offset = lsx * y + x;
+            linear_offset = (lsx * y + x);
             target_cell[linear_offset].scale = scale;
         }
     }
@@ -2005,7 +2018,7 @@ uint16_t get_cell_colorfg(uint16_t canvas_id, Vector2 target) {
     if (target.x >= lsx || target.y >= lsy || target.x < 0 || target.y < 0) return;
 
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
-    uint16_t linear_offset = lsx * target.y + target.x;
+    uint16_t linear_offset = (lsx * target.y + target.x);
     return target_cell[linear_offset].colorfg_id;
 }
 
@@ -2016,7 +2029,7 @@ uint16_t get_cell_colorbg(uint16_t canvas_id, Vector2 target) {
     if (target.x >= lsx || target.y >= lsy || target.x < 0 || target.y < 0) return;
 
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
-    uint16_t linear_offset = lsx * target.y + target.x;
+    uint16_t linear_offset = (lsx * target.y + target.x);
     return target_cell[linear_offset].colorbg_id;
 }
 
@@ -2124,26 +2137,26 @@ void shift_cell_field_rectangle(uint16_t canvasgroup_id, uint16_t canvas_id, Rec
     for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
         for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
             target_offset = lsx * y + x;
-                        if (state & CFLD_STATE)             {target_cell[target_offset].state               += shift;} // 0xffffffff
-                        if (state & CFLD_VALUE)             {target_cell[target_offset].value               += shift;} // determined by texture # tiles
-                        if (state & CFLD_LINES)             {target_cell[target_offset].lines               += shift;} // 0...255
-                        if (state & CFLD_CYCLE)             {target_cell[target_offset].cycle_id            += shift;} // determined by texture # tiles
-                        if (state & CFLD_FG_COLOR)          {target_cell[target_offset].colorfg_id          += shift;} // 0...255 (or palette size)
-                        if (state & CFLD_FG_COLOR_CYCLE)    {target_cell[target_offset].colorfg_cycle_id    += shift;} // 0...255 (or palette size)
-                        if (state & CFLD_BG_COLOR)          {target_cell[target_offset].colorbg_id          += shift;} // 0...255 (or palette size)
-                        if (state & CFLD_BG_COLOR_CYCLE)    {target_cell[target_offset].colorbg_cycle_id    += shift;} // 0...255 (or palette size)
-                        if (state & CFLD_LINES_COLOR)       {target_cell[target_offset].colorln_id          += shift;} // 0...255 (or palette size)
-                        if (state & CFLD_LINES_COLOR_CYCLE) {target_cell[target_offset].colorln_cycle_id    += shift;} // 0...255 (or palette size)
-                        //if (state & CFLD_OFFSET)            {target_cell[target_offset].offset                += shift;} // Vector2 x,y
-                        //if (state & CFLD_SKEW)              {target_cell[target_offset].skew                  += shift;} // Vector2 x,y
-                        //if (state & CFLD_SCALE)             {target_cell[target_offset].scale                 += shift;} // Vector2 x,y
-                        //if (state & CFLD_SCALE_SPEED)       {target_cell[target_offset].scale_speed           += shift;} // 
-                        //if (state & CFLD_SCROLL_SPEED)      {target_cell[target_offset].scroll_speed          += shift;} // 
-                        if (state & CFLD_ANGLE)             {target_cell[target_offset].angle               += shift;} // 0...360
-                        if (state & CFLD_FG_BRIGHTNESS)     {target_cell[target_offset].fg_brightness       += shift;} // 0...255
-                        if (state & CFLD_BG_BRIGHTNESS)     {target_cell[target_offset].bg_brightness       += shift;} // 0...255
-                        //if (state & CFLD_COLOR_MASK)        {target_cell[target_offset].color_mask            += shift;} // Color
-                        //if (state & CFLD_SHADOW_MASK)       {target_cell[target_offset].shadow_mask           += shift;} // Color
+            if (state & CFLD_STATE)             {target_cell[target_offset].state               += shift;} // 0xffffffff
+            if (state & CFLD_VALUE)             {target_cell[target_offset].value               += shift;} // determined by texture # tiles
+            if (state & CFLD_LINES)             {target_cell[target_offset].lines               += shift;} // 0...255
+            if (state & CFLD_CYCLE)             {target_cell[target_offset].cycle_id            += shift;} // determined by texture # tiles
+            if (state & CFLD_FG_COLOR)          {target_cell[target_offset].colorfg_id          += shift;} // 0...255 (or palette size)
+            if (state & CFLD_FG_COLOR_CYCLE)    {target_cell[target_offset].colorfg_cycle_id    += shift;} // 0...255 (or palette size)
+            if (state & CFLD_BG_COLOR)          {target_cell[target_offset].colorbg_id          += shift;} // 0...255 (or palette size)
+            if (state & CFLD_BG_COLOR_CYCLE)    {target_cell[target_offset].colorbg_cycle_id    += shift;} // 0...255 (or palette size)
+            if (state & CFLD_LINES_COLOR)       {target_cell[target_offset].colorln_id          += shift;} // 0...255 (or palette size)
+            if (state & CFLD_LINES_COLOR_CYCLE) {target_cell[target_offset].colorln_cycle_id    += shift;} // 0...255 (or palette size)
+            //if (state & CFLD_OFFSET)            {target_cell[target_offset].offset                += shift;} // Vector2 x,y
+            //if (state & CFLD_SKEW)              {target_cell[target_offset].skew                  += shift;} // Vector2 x,y
+            //if (state & CFLD_SCALE)             {target_cell[target_offset].scale                 += shift;} // Vector2 x,y
+            //if (state & CFLD_SCALE_SPEED)       {target_cell[target_offset].scale_speed           += shift;} // 
+            //if (state & CFLD_SCROLL_SPEED)      {target_cell[target_offset].scroll_speed          += shift;} // 
+            if (state & CFLD_ANGLE)             {target_cell[target_offset].angle               += shift;} // 0...360
+            if (state & CFLD_FG_BRIGHTNESS)     {target_cell[target_offset].fg_brightness       += shift;} // 0...255
+            if (state & CFLD_BG_BRIGHTNESS)     {target_cell[target_offset].bg_brightness       += shift;} // 0...255
+            //if (state & CFLD_COLOR_MASK)        {target_cell[target_offset].color_mask            += shift;} // Color
+            //if (state & CFLD_SHADOW_MASK)       {target_cell[target_offset].shadow_mask           += shift;} // Color
         }
     }
 }
@@ -2319,7 +2332,7 @@ void render_canvas(uint16_t canvas_id, Vector2 rendersize) {
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
     for (uint16_t x = 0; x < lsx; x++) {
         for (uint16_t y = 0; y < lsy; y++) {
-            cell_offset = lsx * y + x;
+            cell_offset = (lsx * y + x);
             EX_cell *c = &cell[cell_offset];
             uint64_t state = c->state;
 
@@ -2441,7 +2454,7 @@ void render_canvasgroup(void) {
     begin_draw(true);
     for (uint16_t i = 0; i < sys.video.canvasgroup[canvasgroup_id].canvas_count; i++) {
         // get_current_virtual_size()
-        render_canvas(i, sys.video.virtual_res[sys.video.current_virtual]);
+        render_canvas(i, sys.video.vscreen[sys.video.current_virtual].size);
     }
     return 0;
     end_draw();
@@ -2528,7 +2541,7 @@ particle init_particle(Texture texture, Vector2 r1, Vector2 speed) {
 	particle p;
 	p.texture = texture;
 	p.position = r1;
-	//p.size = sys.video.virtual_res[sys.video.current_virtual];
+	//p.size = sys.video.vscreen[sys.video.current_virtual].size;
 	
 	for(uint16_t i = 0; i < MAXPARTICLES; i++) {
 		p.unit[i].x = GetRandomValue(p.position.x ,res.x + 32);
@@ -2543,8 +2556,8 @@ particle init_particle(Texture texture, Vector2 r1, Vector2 speed) {
 
 int16_t update_particle(particle *particle, Vector2 velocity) {
 	Vector2 res = get_current_virtual_size();
-    velocity.x *= sys.video.frame_time[sys.video.current_virtual];
-    velocity.y *= sys.video.frame_time[sys.video.current_virtual];
+    velocity.x *= sys.video.vscreen[sys.video.current_virtual].frame_time;
+    velocity.y *= sys.video.vscreen[sys.video.current_virtual].frame_time;
 	for(uint16_t i = 0; i < MAXPARTICLES; i++) {
 		particle->unit[i].x += particle->unit[i].speedX * velocity.x;
 		particle->unit[i].y += particle->unit[i].speedY * velocity.y;
@@ -2591,7 +2604,7 @@ static void copper_animation(int16_t direction, uint16_t asset, uint16_t segment
     for(uint16_t y = 0; y < coppers; y++) {
         copper = y % 16;
         for(uint16_t x = 0; x < segments; x++) {
-            y_start = amp + fast_sin((sys.video.frame_time_inc[sys.video.current_virtual]*ratio.x)-rastoffset*((float)y*ratio.y)-((float)x * sys.video.value_anim[sys.video.current_virtual]*ratio.z)) * amp + offset.y;
+            y_start = amp + fast_sin((sys.video.vscreen[sys.video.current_virtual].frame_time_inc * ratio.x) - rastoffset*((float)y*ratio.y)-((float)x * sys.video.vscreen[sys.video.current_virtual].value_anim * ratio.z)) * amp + offset.y;
             do_it = true;
             if (direction > 0) {
                 if (y_start >= ex_copper[display].prev_y[y][x]) do_it = false;
@@ -2620,8 +2633,8 @@ EX_marquee ex_marquee[MAXDISPLAYS];
 static int16_t update_marquee_animation(uint16_t asset_id, uint16_t palette_id, Vector2 logosize, float transparency, Vector2 offset, float speed, float shadow_transparency) {
     uint16_t display = sys.video.current_virtual;
     Vector2 vres = get_current_virtual_size();
-    if (ex_marquee[display].palptr_next_frame_time < sys.video.frame_time_inc[display]) {
-        ex_marquee[display].palptr_next_frame_time = sys.video.frame_time_inc[display] + 1/absf(speed);
+    if (ex_marquee[display].palptr_next_frame_time < sys.video.vscreen[display].frame_time_inc) {
+        ex_marquee[display].palptr_next_frame_time = sys.video.vscreen[display].frame_time_inc + 1/absf(speed);
         if (speed > 0.0f)  ex_marquee[display].palptr += 1;  else  ex_marquee[display].palptr -= 1;
         if (ex_marquee[display].palptr > 255) {ex_marquee[display].palptr -= 256;} else if (ex_marquee[display].palptr < 0) {ex_marquee[display].palptr += 256;};
     };
@@ -2639,13 +2652,13 @@ static int16_t update_marquee_animation(uint16_t asset_id, uint16_t palette_id, 
             if (shadow_alpha > 0) {
                 DrawTexturePro( sys.asset.tex[asset_id],
                 (Rectangle) { 0, i, logosize.x, 1 }, 
-                (Rectangle) {final_offset.x + fast_sin(sys.video.frame_time_inc[sys.video.current_virtual] + sys.video.value_anim[sys.video.current_virtual] * (float) i * 2.0) * 32.0 + 2, final_offset.y+i + 4, logosize.x * scale.x, 1 }, 
+                (Rectangle) {final_offset.x + fast_sin(sys.video.vscreen[sys.video.current_virtual].frame_time_inc + sys.video.vscreen[sys.video.current_virtual].value_anim * (float) i * 2.0) * 32.0 + 2, final_offset.y+i + 4, logosize.x * scale.x, 1 }, 
                 (Vector2) { 0, 0 }, 0, (Color){0, 0, 0, shadow_alpha} );
             }
 
             DrawTexturePro( sys.asset.tex[asset_id],
             (Rectangle) { 0, i, logosize.x, 1 }, 
-            (Rectangle) {final_offset.x + fast_sin(sys.video.frame_time_inc[sys.video.current_virtual] + sys.video.value_anim[sys.video.current_virtual] * (float) i * 2.0) * 32.0, final_offset.y+i, logosize.x * scale.x, 1 }, 
+            (Rectangle) {final_offset.x + fast_sin(sys.video.vscreen[sys.video.current_virtual].frame_time_inc + sys.video.vscreen[sys.video.current_virtual].value_anim * (float) i * 2.0) * 32.0, final_offset.y+i, logosize.x * scale.x, 1 }, 
             (Vector2) { 0, 0 }, 0, (Color){rgba.r, rgba.g, rgba.b, transparency} );
 
             palptr_loop -= 1;
@@ -2751,15 +2764,15 @@ static int16_t update_canopy(uint16_t asset_id) {
                     (Vector2) {0.f, 0.f}, (Vector2) {0.f, 0.f},0.f,
                     vertex_colors);
                 }
-                ex_canopy.sin_value.y += (ex_canopy.adjustment.y + fast_sin(sys.video.frame_time_inc[sys.video.current_virtual]) * 0.005f);
+                ex_canopy.sin_value.y += (ex_canopy.adjustment.y + fast_sin(sys.video.vscreen[sys.video.current_virtual].frame_time_inc) * 0.005f);
             }
 
             ex_canopy.sin_value.y += (ex_canopy.cells_y/ex_canopy.cells_x)*1.0665f;  // this is the depth of the waves
             ex_canopy.sin_value.x = ex_canopy.sin_value_old.x;
         }
-        ex_canopy.sin_value.y = ex_canopy.sin_value_old.y + 0.05f * sys.video.frame_time[sys.video.current_virtual];  // this is the vertical wave movement per frame
+        ex_canopy.sin_value.y = ex_canopy.sin_value_old.y + 0.05f * sys.video.vscreen[sys.video.current_virtual].frame_time;  // this is the vertical wave movement per frame
     }
-    ex_canopy.transparency +=ex_canopy.transparency_mod * sys.video.frame_time[sys.video.current_virtual];
+    ex_canopy.transparency +=ex_canopy.transparency_mod * sys.video.vscreen[sys.video.current_virtual].frame_time;
     if (ex_canopy.transparency > 255.0f) {ex_canopy.transparency = 255.0f;} else if (ex_canopy.transparency < 0.0f) {ex_canopy.transparency = 0.0f;};
 };
 
@@ -2876,13 +2889,13 @@ static int16_t update_scrolltext(uint16_t s, float text_scale) {
     Vector2 vres = get_current_virtual_size();
     
     if (ex_scrolltext[s].text_pause <= 0.0) {
-        ex_scrolltext[s].position.x -= (sys.video.frame_time[sys.video.current_virtual] * ex_scrolltext[s].text_scroll_speed) / text_scale;
+        ex_scrolltext[s].position.x -= (sys.video.vscreen[sys.video.current_virtual].frame_time * ex_scrolltext[s].text_scroll_speed) / text_scale;
     } else {
-        ex_scrolltext[s].text_pause -= sys.video.frame_time[sys.video.current_virtual];
+        ex_scrolltext[s].text_pause -= sys.video.vscreen[sys.video.current_virtual].frame_time;
     };
 
     uint16_t id;
-    float et_var = sys.video.elapsed_time_var[sys.video.current_virtual];
+    float et_var = sys.video.vscreen[sys.video.current_virtual].elapsed_time_var;
     Vector2 displacement;
     int16_t i_x = 0;
 
@@ -2956,7 +2969,7 @@ static int16_t update_scrolltext(uint16_t s, float text_scale) {
                     if (ex_scrolltext[s].pause_found != (i - 1)) {
                         ex_scrolltext[s].pause_found = i - 1;
                         if (ex_scrolltext[s].text_pause <= 0.0) {
-                            ex_scrolltext[s].text_pause = sys.video.screen_rate[sys.video.display_id] * (float)(sys.asset.data[ex_scrolltext[s].asset_id][i] - 96); // set pause for x secs (a-z=1-26)
+                            ex_scrolltext[s].text_pause = sys.video.vscreen[sys.video.display_id].refresh_rate * (float)(sys.asset.data[ex_scrolltext[s].asset_id][i] - 96); // set pause for x secs (a-z=1-26)
                         };
                     }
                 } else if (ch == SCROLL_TEXTSPEED) { // set the speed of the scrolling text (a-z = slow to very fast)
@@ -3351,10 +3364,10 @@ typedef enum {
     TCAPS_PAGE3             = 0b00000100000000000000000000000000, // enable page 3
     TCAPS_PAGE2             = 0b00000010000000000000000000000000, // enable page 2
     TCAPS_PAGE1             = 0b00000001000000000000000000000000, // enable page 1
-    TCAPS_R24               = 0b00000000100000000000000000000000, // 
-    TCAPS_R23               = 0b00000000010000000000000000000000, // 
-    TCAPS_R22               = 0b00000000001000000000000000000000, // 
-    TCAPS_R21               = 0b00000000000100000000000000000000, // 
+    TCAPS_OFFSET_TOP        = 0b00000000100000000000000000000000, // 
+    TCAPS_OFFSET_BOTTOM     = 0b00000000010000000000000000000000, // 
+    TCAPS_OFFSET_LEFT       = 0b00000000001000000000000000000000, // 
+    TCAPS_OFFSET_RIGHT      = 0b00000000000100000000000000000000, // 
     TCAPS_R20               = 0b00000000000010000000000000000000, // 
     TCAPS_R19               = 0b00000000000001000000000000000000, // 
     TCAPS_R18               = 0b00000000000000100000000000000000, // 
@@ -3423,28 +3436,96 @@ static void flip_terminal_state(uint32_t state) { BITS_FLIP(sys.terminal.state, 
 static void set_page_state(uint32_t state) { BITS_ON(sys.terminal.page[sys.terminal.current_page_id].state, state); }
 static void clear_page_state(uint32_t state) { BITS_OFF(sys.terminal.page[sys.terminal.current_page_id].state, state); }
 
+static uint16_t get_terminal_font(uint16_t font_id) {
+    for (uint16_t font = 0; font < TERM_MAXFONTS; ++font) {
+        if (sys.terminal.font_id[font] = font_id) return font;
+    }
+    return 0;
+}
+
+static uint16_t get_terminal_palette(uint16_t palette_id) {
+    for (uint16_t palette = 0; palette < TERM_MAXPALETTES; ++palette) {
+        if (sys.terminal.palette_id[palette] = palette_id) return palette;
+    }
+    return 0;
+}
+
 static bool enable_page(uint16_t page_id) {
     EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
     // return error is page not PCAPS_INITIALIZED
 }
 
-static uint16_t get_page_font_id(void) {
-    uint16_t font = sys.terminal.page[sys.terminal.current_page_id].current_font;
-    return sys.terminal.font_id[font];
-}
+static uint16_t get_writing_font(void)              {return sys.terminal.page[sys.terminal.current_page_id].cell.asset_id; }
+static uint16_t get_writing_palette(void)           {return sys.terminal.page[sys.terminal.current_page_id].cell.palette_id; }
+static uint16_t get_writing_foreground_color(void)  {return sys.terminal.page[sys.terminal.current_page_id].cell.colorfg_id;}
+static uint16_t get_writing_background_color(void)  {return sys.terminal.page[sys.terminal.current_page_id].cell.colorbg_id;}
 
-static uint16_t get_page_palette_id(void) {
-    uint16_t palette = sys.terminal.page[sys.terminal.current_page_id].current_palette;
-    return sys.terminal.palette_id[palette];
-}
-
-static bool set_page_font(uint16_t font) {
+static bool set_writing_font(uint16_t font) {
     EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
-    if (font >= TERM_MAXFONTS) return true;
-    page->previous_font = page->current_font;
-    page->current_font = font;
+    if (font >= sys.terminal.fonts) return true;
+    page->previous_font = get_terminal_font(page->cell.asset_id);
+    page->cell.asset_id = get_writing_font();
     return false;
 }
+
+static bool set_writing_palette(uint16_t palette) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    if (palette >= sys.terminal.palettes) return true;
+    page->previous_palette = get_terminal_palette(page->cell.asset_id);
+    page->cell.palette_id = get_writing_palette();
+    return false;
+}
+
+static bool set_writing_blinking_rate(uint16_t rate) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    // establish blinking rates / temporal
+    page->text_blink_rate = rate;
+}
+
+static bool set_writing_foreground_color(uint16_t color_id) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    uint16_t colors = get_palette_color_count(get_writing_palette());
+    if (color_id < 0 || color_id >= colors) return true;
+    page->previous_colorfg_id = page->cell.colorfg_id;
+    page->colorfg_id = color_id;
+    page->cell.colorfg_id = color_id;
+    return false;
+}
+
+static bool set_writing_background_color(uint16_t color_id) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    uint16_t colors = get_palette_color_count(get_writing_palette());
+    if (color_id < 0 || color_id >= colors) return true;
+    page->previous_colorbg_id = page->cell.colorbg_id;
+    page->colorbg_id = color_id;
+    page->cell.colorbg_id = color_id;
+    return false;
+}
+
+static void set_writing_colors_reverse(void)        {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    set_page_state(PCAPS_RVIDEO);
+    page->cell.colorfg_id = page->colorbg_id;
+    page->cell.colorbg_id = page->colorfg_id;
+}
+
+static void set_writing_colors_normal(void) {
+    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    clear_page_state(PCAPS_COL_NORMAL_MASK);
+    page->cell.colorfg_id = page->colorfg_id;
+    page->cell.colorbg_id = page->colorbg_id;
+}
+
+static void set_writing_colors_bold(void)           {set_page_state(PCAPS_BOLD);}     // unclear yet how to handle colors for this
+static void set_writing_colors_faint(void)          {set_page_state(PCAPS_FAINT);}    // unclear yet how to handle colors for this
+static void set_writing_typeface_subscript(void)    {set_page_state(PCAPS_SUBSCRIPT);}
+static void set_writing_typeface_superscript(void)  {set_page_state(PCAPS_SUPERSCRIPT);}
+static void set_writing_typeface_italic(void)       {set_page_state(PCAPS_ITALIC);}
+static void set_writing_typeface_overlined(void)    {set_page_state(PCAPS_OVERLINED);}
+static void set_writing_typeface_underlined(void)   {set_page_state(PCAPS_UNDERLINED);}
+static void set_writing_typeface_normal(void)       {clear_page_state(PCAPS_TF_NORMAL_MASK);}
+static void set_writing_cursor_rtol(void)           {set_page_state(PCAPS_CURSOR_RTOL);}
+static void set_writing_cursor_ltor(void)           {clear_page_state(PCAPS_CURSOR_RTOL);}
 
 static bool set_page_default_font(uint16_t font) {
     EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
@@ -3453,16 +3534,9 @@ static bool set_page_default_font(uint16_t font) {
     return false;
 }
 
-static bool set_page_palette(uint16_t palette) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
-    if (palette >= TERM_MAXPALETTES) return true;
-    page->previous_palette = page->current_palette;
-    page->current_palette = palette;
-    return false;
-}
-
 static bool set_page_margins(uint16_t top, uint16_t bottom, uint16_t left, uint16_t right) {
     EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    if (left > right || top > bottom) return;
 // need to verify if exceeds canvas
     page->margin_left       = left;
     page->margin_right      = right;
@@ -3473,23 +3547,28 @@ static bool set_page_margins(uint16_t top, uint16_t bottom, uint16_t left, uint1
 
 static bool set_page_default_foreground_color(uint16_t color_id) {
     EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
-    uint16_t colors = get_palette_color_count(get_page_palette_id());
+    uint16_t colors = get_palette_color_count(get_writing_palette());
     if (color_id < 0 || color_id >= colors) return true;
-    page->default_colorfg = color_id;
+    page->default_colorfg_id = color_id;
     return false;
 }
 
 static bool set_page_default_background_color(uint16_t color_id) {
     EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
-    uint16_t colors = get_palette_color_count(get_page_palette_id());
+    uint16_t colors = get_palette_color_count(get_writing_palette());
     if (color_id < 0 || color_id >= colors) return true;
-    page->default_colorbg = color_id;
+    page->default_colorbg_id = color_id;
     return false;
 }
 
-static void set_page_split_horizontal(void) {} // configure page to be horizontally split
-static void set_page_split_vertical(void) {} // configure page to be vertically split
-static void unset_page_split(void) {} // remove page split configuration
+static void set_page_split_horizontal(void) {
+} // configure page to be horizontally split
+
+static void set_page_split_vertical(void) {
+} // configure page to be vertically split
+
+static void unset_page_split(void) {
+} // remove page split configuration
 
 
 static void move_keyboard_cursor_position(Vector2 value) {
@@ -3526,60 +3605,33 @@ static bool move_cursor_home(void) {
     return set_keyboard_cursor_position(page->cursor_home_position);
 }
 
-static bool set_writing_blinking_rate(uint16_t rate) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
-    // establish blinking rates / temporal
-    page->text_blink_rate = rate;
-}
-
-static bool set_writing_foreground_color(uint16_t color_id) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
-    uint16_t colors = get_palette_color_count(get_page_palette_id());
-    if (color_id < 0 || color_id >= colors) return true;
-    page->colorbg = color_id;
-    return false;
-}
-
-static bool set_writing_background_color(uint16_t color_id) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
-    uint16_t colors = get_palette_color_count(get_page_palette_id());
-    if (color_id < 0 || color_id >= colors) return true;
-    page->colorbg = color_id;
-    return false;
-}
-
-static uint16_t get_writing_foreground_color(void) {return sys.terminal.page[sys.terminal.current_page_id].colorfg;}
-static uint16_t get_writing_background_color(void) {return sys.terminal.page[sys.terminal.current_page_id].colorbg;}
-
-static void set_writing_colors_reverse(void)        {set_page_state(PCAPS_RVIDEO);}
-static void set_writing_colors_bold(void)           {set_page_state(PCAPS_BOLD);}     // unclear yet how to handle colors for this
-static void set_writing_colors_faint(void)          {set_page_state(PCAPS_FAINT);}    // unclear yet how to handle colors for this
-static void set_writing_colors_normal(void)         {clear_page_state(PCAPS_COL_NORMAL_MASK);}
-static void set_writing_typeface_subscript(void)    {set_page_state(PCAPS_SUBSCRIPT);}
-static void set_writing_typeface_superscript(void)  {set_page_state(PCAPS_SUPERSCRIPT);}
-static void set_writing_typeface_italic(void)       {set_page_state(PCAPS_ITALIC);}
-static void set_writing_typeface_overlined(void)    {set_page_state(PCAPS_OVERLINED);}
-static void set_writing_typeface_underlined(void)   {set_page_state(PCAPS_UNDERLINED);}
-static void set_writing_typeface_normal(void)       {clear_page_state(PCAPS_TF_NORMAL_MASK);}
-static void set_writing_cursor_rtol(void)           {set_page_state(PCAPS_CURSOR_RTOL);}
-static void set_writing_cursor_ltor(void)           {clear_page_state(PCAPS_CURSOR_RTOL);}
 
 static uint16_t init_page(uint16_t page_id, Vector2 size) {
     uint16_t status = 0;
     set_page_state(PCAPS_DEFAULT_MASK);
     status += set_page_default_font(0);
-    status += set_page_font(0);
+    status += set_writing_font(0);
     status += set_page_default_foreground_color(7);
     status += set_page_default_background_color(0);
     status += set_writing_foreground_color(7);
     status += set_writing_background_color(0);
-    status += set_page_palette(0);
+    status += set_writing_palette(0);
     status += set_writing_blinking_rate(0);
     status += set_page_margins(0, size.y - 1, 0, size.x - 1);
     EX_page *page = &sys.terminal.page[page_id];
     status += set_cursor_home_position((Vector2){page->margin_left, page->margin_top});
     status += move_cursor_home();
     page->page_split        = (Vector2){0,0};
+
+    EX_cell *cell = &sys.terminal.page[page_id].cell;
+    cell->state = CVFE_DEFAULT4;
+    cell->asset_id = get_writing_font();
+    cell->value = 32;
+    cell->palette_id = get_writing_palette();
+    cell->colorfg_id = get_writing_foreground_color();
+    cell->colorbg_id = get_writing_background_color();
+    // call to initialize canvas of page using cell template
+
     return status;
 }
 
@@ -3600,22 +3652,17 @@ static bool write_to_cell(uint8_t value) {
     EX_page *page = &sys.terminal.page[page_id];
     //    sys.terminal.canvasgroup_id
     // pass on all graphics rendition to the cell template
-    EX_cell cell;
-    cell.state = CVFE_DEFAULT4;
-    cell.asset_id = get_page_font_id();
-    cell.value = value;
-    cell.palette_id = get_page_palette_id();
-    cell.colorfg_id = get_writing_foreground_color();
-    cell.colorbg_id = get_writing_background_color();
+    EX_cell *cell = &sys.terminal.page[page_id].cell;
+    cell->value = value;
 //    state |= 0; // assign corresponding lines based on some states (underline, strikeout, box, ...)
 
-    if (page->state & PCAPS_OVERLINED) cell.state |= CVFE_LINE_TOP;
-    if (page->state & PCAPS_UNDERLINED) cell.state |= CVFE_LINE_BOT;
-    if (page->state & PCAPS_STRIKEOUT) cell.state |= CVFE_LINE_HOR;
-    if (page->state & PCAPS_FRAMED) cell.state |= (CVFE_LINE_BOT | CVFE_LINE_TOP | CVFE_LINE_LEF | CVFE_LINE_RIG);
+    if (page->state & PCAPS_OVERLINED) cell->state |= CVFE_LINE_TOP;
+    if (page->state & PCAPS_UNDERLINED) cell->state |= CVFE_LINE_BOT;
+    if (page->state & PCAPS_STRIKEOUT) cell->state |= CVFE_LINE_HOR;
+    if (page->state & PCAPS_FRAMED) cell->state |= (CVFE_LINE_BOT | CVFE_LINE_TOP | CVFE_LINE_LEF | CVFE_LINE_RIG);
 
-    if (page->state & PCAPS_ITALIC) cell.skew = (Vector2) {0.25,0}; else  cell.skew = (Vector2) {0,0};
-    cell.offset = (Vector2){0,0};    // set offset for superscript or subscript
+    if (page->state & PCAPS_ITALIC) cell->skew = (Vector2) {0.25,0}; else  cell->skew = (Vector2) {0,0};
+    cell->offset = (Vector2){0,0};    // set offset for superscript or subscript
     plot_cell(TERMINALDISPLAY, page_id, &cell, page->cursor_position);
     return true; // mostly if writing to the cell worked
 }
@@ -3641,21 +3688,18 @@ static void write_string_to_page(uint8_t* s, uint16_t length) {
 }
 
 static void set_terminal_assets(void) {
-    uint16_t tfont = 0, tpalette = 0;
     sys.terminal.fonts = 0;
     sys.terminal.palettes = 0;
-    for (uint16_t i = 0; i < MAXASSETS; ++i) {
-        if (sys.asset.state[i] & ASSET_FONT) {
-            if (tfont > TERM_MAXFONTS) {
-                sys.terminal.font_id[tfont] = i;
+    for (uint16_t asset_id = 0; asset_id < MAXASSETS; ++asset_id) {
+        if (sys.asset.state[asset_id] & ASSET_FONT) {
+            if (sys.terminal.fonts > TERM_MAXFONTS) {
+                sys.terminal.font_id[sys.terminal.fonts] = asset_id;
                 ++sys.terminal.fonts;
-                ++tfont;
             }
-        } else if (sys.asset.state[i] & ASSET_PALETTE) {
-            if (tfont > TERM_MAXPALETTES) {
-                sys.terminal.font_id[tpalette] = i;
+        } else if (sys.asset.state[asset_id] & ASSET_PALETTE) {
+            if (sys.terminal.palettes > TERM_MAXPALETTES) {
+                sys.terminal.palette_id[sys.terminal.palettes] = asset_id;
                 ++sys.terminal.palettes;
-                ++tpalette;
             }
         }
     }    
@@ -3759,6 +3803,7 @@ typedef enum {
 } debug_flags;
 
 void debug_console_out(const char* message, uint32_t status) {
+    // also provide option to TRACELOG to -> TERMINAL or to FILE
     if (active_debugging(DEBUG_TRACE)) {
         TRACELOG(LOG_INFO, "%s | %s | DEBUG = 0x%000000008X | CTRL = 0x%000000008X | PMSN = 0x%000000008X | status = 0x%000000008X <<<<< %s",
         SOFTWARE,
@@ -3816,7 +3861,7 @@ void display_all_res(void) {
         uint32_t bits = modes[i].redBits + modes[i].greenBits + modes[i].blueBits;
         DrawText( TextFormat("%ix%i - %ibit - %ifps - %i:%i", (uint16_t)modes[i].width, (uint16_t)modes[i].height, bits, (uint16_t)modes[i].refreshRate, (uint16_t)ratio.x, (uint16_t)ratio.y ),
         x, y, size, DARKGRAY);
-        y += size; if (y > (sys.video.screen[sys.video.display_id].y - size)) {x+=768; y=0; };
+        y += size; if (y > (sys.video.vscreen[sys.video.display_id].size.y - size)) {x+=768; y=0; };
     };
 }
 
@@ -3837,20 +3882,20 @@ int16_t handle_data_menu(uint16_t size) {
     sys.video.screen_refresh = true;
     uint16_t x = 0, y = 0;
     DrawText(TextFormat("%s", sys.temporal.datetime), 1400, 0, 40, DARKGRAY);
-    DrawText(TextFormat("FRAMES=%i", (uint32_t)sys.video.frames[sys.video.display_id]), 0, 0, 20, DARKGRAY);
-    DrawText(TextFormat("prev_time = %f", (float)sys.video.prev_time[sys.video.display_id]), 0, 0, 40, DARKGRAY);
+    DrawText(TextFormat("FRAMES=%i", (uint32_t)sys.video.vscreen[sys.video.display_id].frames), 0, 0, 20, DARKGRAY);
+    DrawText(TextFormat("prev_time = %f", (float)sys.video.vscreen[sys.video.display_id].prev_time), 0, 0, 40, DARKGRAY);
     DrawText(TextFormat("monitors = %i, current = %i, %s", (uint16_t)GetMonitorCount(), (uint16_t)sys.video.display_id, GetMonitorName(sys.video.display_id)), 0, 60, 20, DARKGRAY);
-    DrawText(TextFormat("screen is %ix%i at %i fps", (uint16_t)sys.video.screen[sys.video.display_id].x, (uint16_t)sys.video.screen[sys.video.display_id].y, (uint16_t)sys.video.screen_rate[sys.video.display_id]), 0, 100, 20, DARKGRAY);
+    DrawText(TextFormat("screen is %ix%i at %i fps", (uint16_t)sys.video.screen.x, (uint16_t)sys.video.screen.y, (uint16_t)sys.video.vscreen[sys.video.display_id].refresh_rate), 0, 100, 20, DARKGRAY);
     DrawText(TextFormat("screen is %ix%i mm", (uint16_t)GetMonitorPhysicalWidth(sys.video.display_id), (uint16_t)GetMonitorPhysicalHeight(sys.video.display_id)), 0, 120, 20, DARKGRAY);
     DrawText(TextFormat("ex_canopy.adjustment.y = %f", (float)ex_canopy.adjustment.y), 0, 140, 20, DARKGRAY);
-    DrawText(TextFormat("ftime = %f and sys.video.frame_time_inc = %f",  (float)sys.video.elapsed_time[sys.video.display_id], (float)sys.video.frame_time_inc[sys.video.display_id]), 0, 160, 20, DARKGRAY);
+    DrawText(TextFormat("ftime = %f and sys.video.frame_time_inc = %f",  (float)sys.video.vscreen[sys.video.display_id].elapsed_time, (float)sys.video.vscreen[sys.video.display_id].frame_time_inc), 0, 160, 20, DARKGRAY);
 //    DrawText(TextFormat("text_pause = %i, text_color_flag = %i, text_wave_flag = %i", (int)text_pause, (int)text_color_flag, (int)text_wave_flag), 0, 180, 20, DARKGRAY);
-    DrawText(TextFormat("value_anim %i", (float)sys.video.value_anim[sys.video.display_id]), 0, 200, 20, DARKGRAY);
-    DrawText(TextFormat("fast_sin = %f", fast_sin(sys.video.frame_time_inc[sys.video.display_id])), 0, 220, 20, DARKGRAY);
-    DrawText(TextFormat("     sin = %f", sin(sys.video.frame_time_inc[sys.video.display_id])), 0, 240, 20, DARKGRAY);
-    DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 260, 20, DARKGRAY);
-    DrawText(TextFormat("     cos = %f", cos(sys.video.frame_time_inc[sys.video.display_id])), 0, 280, 20, DARKGRAY);
-    show_state_bits(sys.temporal.osc, TEMPORAL_ARRAY_SIZE, 30, (Vector2) {0.f, sys.video.screen[sys.video.display_id].y - 30});
+    DrawText(TextFormat("value_anim %i", (float)sys.video.vscreen[sys.video.display_id].value_anim), 0, 200, 20, DARKGRAY);
+    DrawText(TextFormat("fast_sin = %f", fast_sin(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 220, 20, DARKGRAY);
+    DrawText(TextFormat("     sin = %f", sin(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 240, 20, DARKGRAY);
+    DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 260, 20, DARKGRAY);
+    DrawText(TextFormat("     cos = %f", cos(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 280, 20, DARKGRAY);
+    show_state_bits(sys.temporal.osc, TEMPORAL_ARRAY_SIZE, 30, (Vector2) {0.f, sys.video.vscreen[sys.video.display_id].size.y - 30});
 
     if (IsKeyPressed(KEY_KP_1)) {ex_canopy.adjustment.y -= 0.002;};
     if (IsKeyPressed(KEY_KP_2)) {ex_canopy.adjustment.y += 0.002;};
@@ -3909,8 +3954,8 @@ int16_t handle_video_menu(uint16_t size) {
 int16_t handle_debug_menu(uint16_t size) {
     debug_console_out("handle_debug_menu", size);
     sys.video.screen_refresh = true;
-    uint16_t x = (sys.video.screen[sys.video.display_id].x - 12 * size) * 0.5;
-    uint16_t y = (sys.video.screen[sys.video.display_id].y - 6 * size) * 0.5;
+    uint16_t x = (sys.video.vscreen[sys.video.display_id].size.x - 12 * size) * 0.5;
+    uint16_t y = (sys.video.vscreen[sys.video.display_id].size.y - 6 * size) * 0.5;
     if (valid_permission(PMSN_DEBUG_AUDIO) && active_debugging(DEBUG_SHOW_OPTION_AUDIO))         { y += size; display_debug_option(!active_debugging(DEBUG_AUDIO), x, y, size, "F1 -> AUDIO");}
     if (valid_permission(PMSN_DEBUG_VIDEO) && active_debugging(DEBUG_SHOW_OPTION_VIDEO))         { y += size; display_debug_option(!active_debugging(DEBUG_VIDEO), x, y, size, "F2 -> VIDEO");}
     if (valid_permission(PMSN_DEBUG_DATA) && active_debugging(DEBUG_SHOW_OPTION_DATA))           { y += size; display_debug_option(!active_debugging(DEBUG_DATA), x, y, size, "F3 -> DATA");}
@@ -3937,7 +3982,7 @@ int16_t update_debug(void) {
     if (active_debugging(DEBUG_VIDEO))      handle_video_menu(size);
     if (active_debugging(DEBUG_DATA))       handle_data_menu(size);
     if (active_debugging(DEBUG_CONTROLS))   display_keybed();
-    if (active_debugging(DEBUG_FPS))        DrawFPS(sys.video.screen[sys.video.display_id].x - 100, 0);
+    if (active_debugging(DEBUG_FPS))        DrawFPS(sys.video.screen.x - 100, 0);
     if (IsKeyDown(KEY_LEFT_CONTROL))        handle_debug_menu(size);
 }
 
@@ -4073,7 +4118,7 @@ static void change_global_volume(float amount) {
 
 typedef enum {
     VIDEO_RESERVED       = 0b10000000000000000000000000000000, // 
-    VIDEO_ON_TOP         = 0b00001000000000000000000000000000, // Terminal display is above all other virtual displays
+    VIDEO_ON_TOP         = 0b00001000000000000000000000000000, // 
     VIDEO_MOVE_X         = 0b00000000000000000100000000000000, // 
     VIDEO_MOVE_Y         = 0b00000000000000000010000000000000, // 
     VIDEO_HIDDEN         = 0b00000000000000000000000010000000, // 
@@ -4084,7 +4129,7 @@ typedef enum {
 };
 
 void begin_draw(bool clear) {
-    BeginTextureMode(sys.asset.framebuffer[sys.video.virtual_asset[sys.video.current_virtual]]);
+    BeginTextureMode(sys.asset.framebuffer[sys.video.vscreen[sys.video.current_virtual].asset_id]);
     if (clear) ClearBackground(BLACK);
     rlDisableDepthMask();            // Disable depth writes
     rlDisableDepthTest();            // Disable depth test for speed
@@ -4105,16 +4150,16 @@ void flip_frame_buffer(uint16_t display, bool clear) {
 static void draw_frame_buffer(RenderTexture renderer, Vector2 position) {
 	DrawTexturePro (renderer.texture,
     (Rectangle) {0.0, 0.0, (float)renderer.texture.width, (float)-renderer.texture.height},
-    (Rectangle) {position.x, position.y, sys.video.screen[sys.video.display_id].x, sys.video.screen[sys.video.display_id].y},
+    (Rectangle) {position.x, position.y, sys.video.screen.x, sys.video.screen.y},
     (Vector2)   {0.0, 0.0}, 0.0f, WHITE);
 }
 
 static uint16_t init_frame_buffer(uint16_t display, Vector2 resolution) {
     flip_frame_buffer(display, true);
-    sys.video.virtual_res[sys.video.current_virtual] = resolution;
-    sys.video.frames[sys.video.current_virtual] = 0;
-    sys.video.elapsed_time_var_ratio[sys.video.current_virtual] = 5.f;
-    sys.video.frame_time_inc[sys.video.current_virtual] = 0;
+    sys.video.vscreen[sys.video.current_virtual].size = resolution;
+    sys.video.vscreen[sys.video.current_virtual].frames = 0;
+    sys.video.vscreen[sys.video.current_virtual].elapsed_time_var_ratio = 5.f;
+    sys.video.vscreen[sys.video.current_virtual].frame_time_inc = 0;
 	uint16_t asset_id = load_asset(ASSET_FRAMEBUFFER, NULL, NULL, NULL, NULL, 0);
     flip_frame_buffer(sys.video.previous_virtual, true);
     return asset_id;
@@ -4141,9 +4186,9 @@ int16_t init_display_properties(bool hide_mouse) {
     InitWindow(0, 0, sys.program.name);
     sys.video.display_id = GetCurrentMonitor();
     if (hide_mouse) HideCursor();
-    sys.video.screen[sys.video.display_id] = (Vector2) {GetScreenWidth(), GetScreenHeight()};
-    sys.video.screen_rate[sys.video.display_id] = GetMonitorRefreshRate(sys.video.display_id);
-    SetWindowSize(sys.video.screen[sys.video.display_id].x, sys.video.screen[sys.video.display_id].y);
+    sys.video.screen = (Vector2){GetScreenWidth(), GetScreenHeight()};
+    sys.video.vscreen[sys.video.display_id].refresh_rate = GetMonitorRefreshRate(sys.video.display_id);
+    SetWindowSize(sys.video.screen.x, sys.video.screen.y);
 
     if (IsWindowReady()) return status; else return 1;
 }
@@ -4179,10 +4224,10 @@ int16_t update_display(void) {
             sys.video.screen_refresh = false;
         };
         // game app video
-        draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[display]], (Vector2) {0,0});
+        draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[display].asset_id], (Vector2) {0,0});
 
         if (active_service(CTRL_TERMINAL | CTRL_TERMINAL_INITIALIZED)) {
-            draw_frame_buffer(sys.asset.framebuffer[sys.video.virtual_asset[TERMINALDISPLAY]], (Vector2) {0,0});
+            //draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[TERMINALDISPLAY].asset_id], sys.terminal.offset);
         }
 
         if (active_service(CTRL_DEBUG | CTRL_DEBUG_INITIALIZED)) {
@@ -4194,15 +4239,15 @@ int16_t update_display(void) {
 
     sys.video.window_focus = IsWindowFocused();
 
-    double next_frame = sys.video.prev_time[display] + (double)(1 / sys.video.screen_rate[sys.video.display_id]);
+    double next_frame = sys.video.vscreen[display].prev_time + (double)(1 / sys.video.vscreen[sys.video.display_id].refresh_rate);
     float wait = (next_frame - GetTime());
     if (wait < 0) wait = 0;
     WaitTime(wait * 1000.f);
 
     double current_time = GetTime();
 
-    sys.video.elapsed_time[display] = current_time - sys.video.prev_time[display];
-    sys.video.prev_time[display] = current_time;
+    sys.video.vscreen[display].elapsed_time = current_time - sys.video.vscreen[display].prev_time;
+    sys.video.vscreen[display].prev_time = current_time;
 
    if (sys.video.window_focus) {        // ************** GO TO APP MODE
         if (sys.program.ctrlstate & CTRL_OFF_FOCUS) {
@@ -4211,7 +4256,7 @@ int16_t update_display(void) {
                 flip_frame_buffer(PRIMARYDISPLAY, true);
                 ClearWindowState(sys.video.windowstate_normal ^ sys.video.windowstate_paused);
                 SetWindowState(sys.video.windowstate_normal);
-                sys.video.prev_time[sys.video.current_virtual] = current_time;
+                sys.video.vscreen[sys.video.current_virtual].prev_time = current_time;
             }
         }
     } else {        // ************* GO TO PAUSE MODE
@@ -4222,16 +4267,14 @@ int16_t update_display(void) {
             ClearWindowState(sys.video.windowstate_paused ^ sys.video.windowstate_normal);
             SetWindowState(sys.video.windowstate_paused);
             hint_restart_track(true);
-            sys.video.prev_time[sys.video.current_virtual] = current_time;
+            sys.video.vscreen[sys.video.current_virtual].prev_time = current_time;
         };
     };
-
-    sys.video.frame_time[display] = (float)sys.video.elapsed_time[display] * (float)sys.video.screen_rate[sys.video.display_id];
-    sys.video.frame_time_inc[display] += (float)sys.video.elapsed_time[display];
-    sys.video.elapsed_time_var[display] += (float)sys.video.elapsed_time[display] * sys.video.elapsed_time_var_ratio[display];
-    sys.video.value_anim[display] = fast_sin(fast_cos(fast_sin(sys.video.frame_time_inc[display]) * fast_sin(sys.video.elapsed_time_var[display] * 0.1) * 0.1) * fast_cos(sys.video.elapsed_time_var[display] * 0.015) * 0.1 ) * 0.05 + 0.001;
-    sys.video.frames[display]++;
-
+    sys.video.vscreen[display].frame_time = (float)sys.video.vscreen[display].elapsed_time * (float)sys.video.vscreen[sys.video.display_id].refresh_rate;
+    sys.video.vscreen[display].frame_time_inc += (float)sys.video.vscreen[display].elapsed_time;
+    sys.video.vscreen[display].elapsed_time_var += (float)sys.video.vscreen[display].elapsed_time * sys.video.vscreen[display].elapsed_time_var_ratio;
+    sys.video.vscreen[display].value_anim = fast_sin(fast_cos(fast_sin(sys.video.vscreen[display].frame_time_inc) * fast_sin(sys.video.vscreen[display].elapsed_time_var * 0.1) * 0.1) * fast_cos(sys.video.vscreen[display].elapsed_time_var * 0.015) * 0.1 ) * 0.05 + 0.001;
+    sys.video.vscreen[display].frames++;
 }
 
 void deinit_display(void) {
@@ -4306,8 +4349,8 @@ void game_init_title(void) {
     play_track(1, 11, true);
     play_track(2, 6, true);
 
-	sys.video.frame_time_inc[UNFOCUSEDDISPLAY] = 17.0;
-	sys.video.frame_time_inc[PRIMARYDISPLAY] = 102.0;
+	sys.video.vscreen[UNFOCUSEDDISPLAY].frame_time_inc = 17.0;
+	sys.video.vscreen[PRIMARYDISPLAY].frame_time_inc = 102.0;
 
 }
 
