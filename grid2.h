@@ -636,13 +636,13 @@ typedef enum {
 typedef struct EX_canvasgroup {
     char        name[NAMELENGTH_MAX + 1];
     uint32_t    state;
-    uint16_t    canvas_count;               // total number of canvases
     uint16_t    default_asset_id;
     uint16_t    default_palette_id;         // color palette used for whole canvas
     uint16_t    default_colorfg_id;         // palette index color for cell
     uint16_t    default_colorbg_id;         // palette index color for cell background
     uint16_t    default_colorln_id;         // palette index color for cell lines
-    EX_canvas* canvas;                      // could be NULL (if not initialized)
+    uint16_t    canvas_count;               // total number of canvases
+    EX_canvas*  canvas;                     // could be NULL (if not initialized)    
 } EX_canvasgroup;
 
 // **************************************************************************************** A S S E T   S T R U C T U R E S
@@ -715,6 +715,7 @@ typedef struct  EX_audio {
 
 typedef struct EX_screenspace {
     uint32_t    state;                          // virtual display state
+    Vector2     size;                           // framebuffer resolution (x, y)
     Vector2     offset;                         // Windows Display Resolution (x, y)
     uint32_t    refresh_rate;                   // screen refresh rate
     uint32_t    fps;                            // frames per second
@@ -727,7 +728,6 @@ typedef struct EX_screenspace {
     float       value_anim;                     // space for animated controls (to be elaborated)
     float       frame_time;                     // 
     float       frame_time_inc;                 // 
-    Vector2     size;                           // framebuffer resolution (x, y)
     uint16_t    asset_id;                       // framebuffer asset number
 } EX_screenspace;
 
@@ -801,6 +801,7 @@ typedef struct EX_terminal {
     uint32_t    output_buffer_position;             // 
     EX_token    token[MAXTOKENS];                   // 
     uint16_t    token_count;                        // 
+    EX_canvas   canvas;                             // active canvas template for the terminal
 } EX_terminal;
 
 
@@ -917,7 +918,7 @@ typedef enum {
     PMSN_END_GAME           = 0b00000000100000000000000000000000, // 
     PMSN_BENCHMARK          = 0b00000000000001000000000000000000, // 
     PMSN_ATTRACT            = 0b00000000000000100000000000000000, // 
-    PMSN_R17                = 0b00000000000000010000000000000000, // 
+    PMSN_DEBUG_TERMINAL     = 0b00000000000000010000000000000000, // 
     PMSN_DEBUG_TRACE        = 0b00000000000000001000000000000000, // 
     PMSN_DEBUG_AUDIO        = 0b00000000000000000100000000000000, // 
     PMSN_DEBUG_FPS          = 0b00000000000000000010000000000000, // 
@@ -935,8 +936,8 @@ typedef enum {
     PMSN_R2                 = 0b00000000000000000000000000000010, // 
     PMSN_DEBUG              = 0b00000000000000000000000000000001, // 
     PMSN_OFF                = 0b00000000000000000000000000000000, // 
-    PMSN_GAME_MASK          = 0b11111111111111110000000000000000, // 
-    PMSN_DEBUG_OPTIONS      = 0b00000000000000001111111000111101, // 
+    PMSN_GAME_MASK          = 0b11111111111111100000000000000000, // 
+    PMSN_DEBUG_OPTIONS      = 0b00000000000000011111111000111101, // 
     PMSN_GODMODE_MASK       = 0b11111111111111111111111111111111  // 
 } permission_state;
 
@@ -953,6 +954,7 @@ const char* permission_state_literal(uint32_t state) {
     case PMSN_END_GAME:         return "PMSN_END_GAME";
     case PMSN_BENCHMARK:        return "PMSN_BENCHMARK";
     case PMSN_ATTRACT:          return "PMSN_ATTRACT";
+    case PMSN_DEBUG_TERMINAL:   return "PMSN_DEBUG_TERMINAL";
     case PMSN_DEBUG_TRACE:      return "PMSN_DEBUG_TRACE";
     case PMSN_DEBUG_AUDIO:      return "PMSN_DEBUG_AUDIO";
     case PMSN_DEBUG_FPS:        return "PMSN_DEBUG_FPS";
@@ -1054,7 +1056,6 @@ Vector2 get_canvas_size(uint16_t tileset_id) {
     return (Vector2){size.x / sys.asset.tileset[tileset_id].tilesize.x, size.y / sys.asset.tileset[tileset_id].tilesize.y};
 }
 
-
 #define GRIDILON            1.182940076
 #define GRIDEDGECYCLE       60
 
@@ -1086,7 +1087,6 @@ uint16_t init_temporal() {
 }
 
 int16_t update_temporal(void) {
-
     datetime_literal(&sys.temporal.datetime);
 
     sys.temporal.prev_osc = sys.temporal.osc;
@@ -1715,11 +1715,11 @@ void set_canvas_default_asset(uint16_t canvasgroup_id, uint16_t canvas_id, uint1
     canvas->default_asset_id = asset_id;
 }
 
-uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 tiles, uint64_t canvas_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
+uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 size, uint64_t canvas_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
     EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint32_t cell_count = (uint16_t)tiles.x * (uint16_t)tiles.y;
-    canvas->size = tiles;
+    uint32_t cell_count = (uint16_t)size.x * (uint16_t)size.y;
+    canvas->size = size;
     canvas->state = canvas_state;
     set_canvas_default_palette(canvasgroup_id, canvas_id, palette_id);
     set_canvas_default_asset(canvasgroup_id, canvas_id, asset_id);
@@ -1728,7 +1728,7 @@ uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 tiles,
     canvas->offset = (Vector2) {0,0};
     canvas->scale = (Vector2) {1,1};
     canvas->angle = 0;
-    canvas->default_tilesize = get_tile_size(tiles, get_asset_pixelsize(asset_id));
+    canvas->default_tilesize = get_tile_size(size, get_asset_pixelsize(asset_id));
     canvas->fg_brightness = 1.f;
     canvas->bg_brightness = 1.f;
     canvas->alpha = 255;
@@ -1736,6 +1736,21 @@ uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 tiles,
     EX_cell *cell = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint32_t i = 0; i < cell_count; i++) {
         init_cell_linear(&cell[i], cell_state, 0, 0); // this process is temporary, as the faster alternative is to mass copy a template cell
+    }
+    return 1;
+}
+
+uint16_t init_canvas_templated(uint16_t canvasgroup_id, uint16_t canvas_id, EX_canvas *canvas_t, EX_cell *cell_t) {
+    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    memcpy(canvas, canvas_t, sizeof(EX_canvas));//    canvas = (EX_canvas)canvas_t;
+    canvas->cell_count = canvas->size.x * canvas->size.y;
+    canvas->cell = calloc(canvas->cell_count, sizeof(EX_cell));
+
+    EX_cell *cell_array = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
+    for (uint32_t i = 0; i < canvas->cell_count; i++) {
+        EX_cell *cell = &cell_array[i];
+        memcpy(cell, cell_t, sizeof(EX_cell));//        cell[i] = (EX_cell)cell_t;
     }
     return 1;
 }
@@ -1750,17 +1765,18 @@ void set_canvasgroup_default_asset(uint16_t canvasgroup_id, uint16_t asset_id) {
     canvasgroup->default_asset_id = asset_id;
 }
 
-uint16_t init_canvasgroup(uint32_t canvasgroup_id, Vector2 size, uint16_t canvas_count, uint32_t canvasgroup_state, uint64_t canvas_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
-    uint16_t canvases = 0;
+uint16_t init_canvasgroup(uint32_t canvasgroup_id, uint32_t canvasgroup_state, uint16_t canvas_count) {
+//    uint16_t canvases = 0;
     sys.video.canvasgroup[canvasgroup_id].state = canvasgroup_state;
     sys.video.canvasgroup[canvasgroup_id].canvas_count = canvas_count;
-    set_canvasgroup_default_palette(canvasgroup_id, palette_id);
-    set_canvasgroup_default_asset(canvasgroup_id, asset_id);
-    sys.video.canvasgroup[canvasgroup_id].canvas = calloc(sys.video.canvasgroup[canvasgroup_id].canvas_count, sizeof(EX_canvas));
-    for (uint16_t canvas_id = 0; canvas_id < canvas_count; canvas_id++) {
+//    set_canvasgroup_default_palette(canvasgroup_id, palette_id);
+//    set_canvasgroup_default_asset(canvasgroup_id, asset_id);
+    sys.video.canvasgroup[canvasgroup_id].canvas = calloc(canvas_count, sizeof(EX_canvas));
+/*    for (uint16_t canvas_id = 0; canvas_id < canvas_count; canvas_id++) {
         canvases += init_canvas(canvasgroup_id, canvas_id, size, canvas_state, cell_state, asset_id, palette_id);
     }
     return canvases;
+*/
 }
 
 // *************** REFERENCING SHORTCUTS TO USE *****************
@@ -2319,6 +2335,7 @@ void copy_cell_to_canvas(uint16_t source_canvasgroup_id, uint16_t source_canvas_
 
 void copy_canvas() {
     // copy canvas routine, mostly used for backup restore of canvas content from / to a copy buffer
+    // potentially use memcpy(dest, src, len);
 }
 
 void render_canvas(uint16_t canvas_id, Vector2 rendersize) {
@@ -2364,8 +2381,8 @@ void render_canvas(uint16_t canvas_id, Vector2 rendersize) {
     CVFE_FLIPH               // flip cell(s) horizontally
     CVFE_FLIPV               // flip cell(s) vertically
 */
-                uint16_t palette_id = c->palette_id;
-                if (!palette_id)    palette_id = canvas->default_palette_id;
+                uint16_t palette_id = c->palette_id;   if (!palette_id) palette_id = canvas->default_palette_id;
+
                 // for now only canvas alpha supported, per cell alpha will force to use float to combine canvas and cell alpha (potentially), or set the texture alpha as the canvas alpha
                 Color colorfg = get_palette_color_pro(palette_id, c->colorfg_id, canvas->alpha, c->fg_brightness * canvas->fg_brightness);
                 Color colorbg = get_palette_color_pro(palette_id, c->colorbg_id, canvas->alpha, c->bg_brightness * canvas->bg_brightness);
@@ -2396,14 +2413,16 @@ void render_canvas(uint16_t canvas_id, Vector2 rendersize) {
                 if (state & CVFE_FOREGROUND) {
                     uint16_t value = c->value;
                     if (state & CVFE_SHADOW) {
-                        vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
-                        vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
-                        vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
-                        vertex_colors[3] = (Color) {0.f, 0.f, 0.f, 48.f};
-                        DrawTexturePro2(sys.asset.tex[asset_id],
-                            get_tilezone_from_code(asset_id, value),
-                            (Rectangle) { cellpos.x + shadow.x, cellpos.y + shadow.y, tscaled.x, tscaled.y },
-                            (Vector2) {0,0}, skew, angle, vertex_colors);
+                        if (shadow.x != 0 || shadow.y != 0) {
+                            vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
+                            vertex_colors[1] = (Color) {0.f, 0.f, 0.f, 48.f};
+                            vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
+                            vertex_colors[3] = (Color) {0.f, 0.f, 0.f, 48.f};
+                            DrawTexturePro2(sys.asset.tex[asset_id],
+                                get_tilezone_from_code(asset_id, value),
+                                (Rectangle) { cellpos.x + shadow.x, cellpos.y + shadow.y, tscaled.x, tscaled.y },
+                                (Vector2) {0,0}, skew, angle, vertex_colors);
+                        }
                     };
                     // we have the cell data we can use it to draw our background, foreground and shadow
                     // reading color from palette get_palette_color(palette,id);
@@ -3432,9 +3451,12 @@ typedef enum {
 static void set_terminal_state(uint32_t state) { BITS_ON(sys.terminal.state, state); }
 static void clear_terminal_state(uint32_t state) { BITS_OFF(sys.terminal.state, state); }
 static void flip_terminal_state(uint32_t state) { BITS_FLIP(sys.terminal.state, state); }
+uint32_t active_terminal(uint32_t state)     {return BITS_TEST(sys.terminal.state, state);}
 
 static void set_page_state(uint32_t state) { BITS_ON(sys.terminal.page[sys.terminal.current_page_id].state, state); }
 static void clear_page_state(uint32_t state) { BITS_OFF(sys.terminal.page[sys.terminal.current_page_id].state, state); }
+static void flip_page_state(uint32_t state) { BITS_FLIP(sys.terminal.page[sys.terminal.current_page_id].state, state); }
+uint32_t page_status(uint16_t page_id, uint32_t state)     {return BITS_TEST(sys.terminal.page[page_id].state, state);}
 
 static uint16_t get_terminal_font(uint16_t font_id) {
     for (uint16_t font = 0; font < TERM_MAXFONTS; ++font) {
@@ -3605,36 +3627,6 @@ static bool move_cursor_home(void) {
     return set_keyboard_cursor_position(page->cursor_home_position);
 }
 
-
-static uint16_t init_page(uint16_t page_id, Vector2 size) {
-    uint16_t status = 0;
-    set_page_state(PCAPS_DEFAULT_MASK);
-    status += set_page_default_font(0);
-    status += set_writing_font(0);
-    status += set_page_default_foreground_color(7);
-    status += set_page_default_background_color(0);
-    status += set_writing_foreground_color(7);
-    status += set_writing_background_color(0);
-    status += set_writing_palette(0);
-    status += set_writing_blinking_rate(0);
-    status += set_page_margins(0, size.y - 1, 0, size.x - 1);
-    EX_page *page = &sys.terminal.page[page_id];
-    status += set_cursor_home_position((Vector2){page->margin_left, page->margin_top});
-    status += move_cursor_home();
-    page->page_split        = (Vector2){0,0};
-
-    EX_cell *cell = &sys.terminal.page[page_id].cell;
-    cell->state = CVFE_DEFAULT4;
-    cell->asset_id = get_writing_font();
-    cell->value = 32;
-    cell->palette_id = get_writing_palette();
-    cell->colorfg_id = get_writing_foreground_color();
-    cell->colorbg_id = get_writing_background_color();
-    // call to initialize canvas of page using cell template
-
-    return status;
-}
-
 static void page_scroll_up(void) {
 // copy within margins 1 up on canvas
 }
@@ -3680,11 +3672,45 @@ static void write_char_to_page(uint8_t value) {
     // page_clear_line(page->margin_bottom);
 }
 
-static void write_string_to_page(uint8_t* s, uint16_t length) {
+static void write_string_to_page(uint8_t* s) {
+    uint16_t length = strlen(s);
     for (uint16_t i=0; i < length; ++i) {
         uint8_t value = s[i];
         write_char_to_page(value);
     }
+}
+
+static uint16_t init_page(uint16_t page_id) {
+    uint16_t status = 0;
+    if (page_status(page_id, TCAPS_INITIALIZED)) return 1;
+    set_page_state(PCAPS_DEFAULT_MASK);
+    EX_canvas *canvas = &sys.terminal.canvas;
+    status += set_page_default_font(0);
+    status += set_writing_font(0);
+    status += set_writing_palette(0);
+    status += set_page_default_foreground_color(canvas->default_colorfg_id);
+    status += set_page_default_background_color(canvas->default_colorbg_id);
+    status += set_writing_foreground_color(canvas->default_colorfg_id);
+    status += set_writing_background_color(canvas->default_colorbg_id);
+    status += set_writing_blinking_rate(0);
+    status += set_page_margins(0, canvas->size.y - 1, 0, canvas->size.x - 1);
+    EX_page *page = &sys.terminal.page[page_id];
+    status += set_cursor_home_position((Vector2){page->margin_left, page->margin_top});
+    status += move_cursor_home();
+    page->page_split = (Vector2){0,0};
+
+    EX_cell *cell = &sys.terminal.page[page_id].cell;
+    cell->state = CVFE_DEFAULT4;
+    cell->asset_id = get_writing_font();
+    cell->value = 65;
+    cell->palette_id = get_writing_palette();
+    cell->colorfg_id = get_writing_foreground_color();
+    cell->colorbg_id = get_writing_background_color();
+    // call to initialize canvas of page using cell template
+    init_canvas_templated(sys.terminal.canvasgroup_id, page_id, &canvas, &cell);
+
+    enable_page(page_id);
+    return status;
 }
 
 static void set_terminal_assets(void) {
@@ -3708,6 +3734,29 @@ static void set_terminal_assets(void) {
 static void show_terminal(void) {remove_service(CTRL_TERMINAL);}
 static void hide_terminal(void) {add_service(CTRL_TERMINAL);}
 
+static void reset_terminal_canvas_template(void) {
+    EX_canvas *canvas = &sys.terminal.canvas;
+    canvas->name[0] = "TERMINAL";
+    canvas->size = (Vector2){64,28};
+    canvas->default_palette_id = get_terminal_palette(0);
+    canvas->default_asset_id = get_terminal_font(0);
+    canvas->asset_id[0] = canvas->default_asset_id;
+    canvas->scale = (Vector2){1,1};
+    canvas->angle = 0.f;
+    canvas->default_tilesize = (Vector2){8, 8};
+    canvas->default_colorfg_id = 7;
+    canvas->default_colorbg_id = 14;
+    canvas->default_colorln_id = 7;
+    canvas->fg_brightness = 1.f;
+    canvas->bg_brightness = 1.f;
+    canvas->shadow = (Vector2){0,0};
+    canvas->alpha = 255;
+    canvas->offset = (Vector2){0,0};
+    EX_cell *keycursor = &sys.terminal.canvas.keycursor;
+    EX_cell *mousecursor = &sys.terminal.canvas.mousecursor;
+    
+}
+
 static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     int16_t status;
     flip_frame_buffer(TERMINALDISPLAY, false);
@@ -3720,11 +3769,11 @@ static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     uint64_t cell_state = CVFE_DEFAULT4;
     sys.terminal.canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
 
-    Vector2 size = {64,28};
+    init_canvasgroup(sys.terminal.canvasgroup_id, canvasgroup_state, TERM_MAXPAGES);
+    reset_terminal_canvas_template();
     for (uint16_t page_id = 0; page_id < TERM_MAXPAGES; ++page_id) {
-        init_page(page_id, size);
+        init_page(page_id);
     }
-    status = init_canvasgroup(sys.terminal.canvasgroup_id, size, TERM_MAXPAGES, canvasgroup_state, canvas_state, cell_state, tileset_id, palette_id);
     sys.terminal.current_page_id = 0;
     flip_frame_buffer(sys.video.previous_virtual, false);
     return status;
@@ -3788,18 +3837,20 @@ typedef enum {
     DEBUG_SHOW_OPTION_VIDEO     = 0b00000000000000000010000000000000, // 
     DEBUG_SHOW_OPTION_CONTROLS  = 0b00000000000000000001000000000000, // 
     DEBUG_SHOW_OPTION_DATA      = 0b00000000000000000000100000000000, // 
-    DEBUG_SHOW_OPTION_TRACE     = 0b00000000000000000000010000000000, // 
-    DEBUG_SHOW_OPTION_EXIT      = 0b00000000000000000000001000000000, // 
-    DEBUG_TRACE                 = 0b00000000000000000000000001000000, // 
-    DEBUG_AUDIO                 = 0b00000000000000000000000000100000, // 
-    DEBUG_FPS                   = 0b00000000000000000000000000010000, // 
-    DEBUG_VIDEO                 = 0b00000000000000000000000000001000, // 
-    DEBUG_CONTROLS              = 0b00000000000000000000000000000100, // 
-    DEBUG_DATA                  = 0b00000000000000000000000000000010, // 
+    DEBUG_SHOW_OPTION_TERMINAL  = 0b00000000000000000000010000000000, // 
+    DEBUG_SHOW_OPTION_TRACE     = 0b00000000000000000000001000000000, // 
+    DEBUG_SHOW_OPTION_EXIT      = 0b00000000000000000000000100000000, // 
+    DEBUG_AUDIO                 = 0b00000000000000000000000010000000, // 
+    DEBUG_FPS                   = 0b00000000000000000000000001000000, // 
+    DEBUG_VIDEO                 = 0b00000000000000000000000000100000, // 
+    DEBUG_CONTROLS              = 0b00000000000000000000000000010000, // 
+    DEBUG_DATA                  = 0b00000000000000000000000000001000, // 
+    DEBUG_TERMINAL              = 0b00000000000000000000000000000100, // 
+    DEBUG_TRACE                 = 0b00000000000000000000000000000010, // 
     DEBUG_EXIT                  = 0b00000000000000000000000000000001, // 
-    DEBUG_SHOW_OPTIONS_MASK     = 0b00000000000000001111111000000000, // 
+    DEBUG_SHOW_OPTIONS_MASK     = 0b00000000000000001111111100000000, // 
     DEBUG_OPTIONS_MASK          = 0b00000000000000000000000001111111, //
-    DEBUG_INITIALIZE_MASK       = 0b00000000000000001111111000000000  // 
+    DEBUG_INITIALIZE_MASK       = 0b00000000000000001111111100000000  // 
 } debug_flags;
 
 void debug_console_out(const char* message, uint32_t status) {
@@ -3814,6 +3865,19 @@ void debug_console_out(const char* message, uint32_t status) {
         status,
         message
         );
+    }
+}
+
+void show_state_bits(uint64_t state, uint16_t length, Vector2 size, Vector2 position) {
+    uint16_t y = position.y - size.y;
+    uint16_t x = position.x + (length - 1) * size.x;
+    uint64_t bit_tested = 1;
+    Color col;
+    for (uint64_t i = 0; i < length; i++) {
+        uint64_t bit = state & bit_tested;
+        if (bit) col = GREEN; else col = ORANGE;
+        DrawRectangle(x - (i * size.x), y, size.x - 2, size.y - 2, col);
+        bit_tested = bit_tested << 1;
     }
 }
 
@@ -3861,21 +3925,8 @@ void display_all_res(void) {
         uint32_t bits = modes[i].redBits + modes[i].greenBits + modes[i].blueBits;
         DrawText( TextFormat("%ix%i - %ibit - %ifps - %i:%i", (uint16_t)modes[i].width, (uint16_t)modes[i].height, bits, (uint16_t)modes[i].refreshRate, (uint16_t)ratio.x, (uint16_t)ratio.y ),
         x, y, size, DARKGRAY);
-        y += size; if (y > (sys.video.vscreen[sys.video.display_id].size.y - size)) {x+=768; y=0; };
+        y += size; if (y > (sys.video.screen.y - size)) {x+=768; y=0; };
     };
-}
-
-void show_state_bits(uint64_t state, uint16_t length, uint16_t size, Vector2 position) {
-    uint16_t y = position.y - size;
-    uint16_t x = position.x + length * size;
-    uint64_t bit_tested = 1;
-    Color col;
-    for (uint64_t i = 0; i < length; i++) {
-        uint64_t bit = sys.temporal.osc & bit_tested;
-        if (bit) col = GREEN; else col = ORANGE;
-        DrawRectangle(x - (i * size), y, size, size, col);
-        bit_tested = bit_tested << 1;
-    }
 }
 
 int16_t handle_data_menu(uint16_t size) {
@@ -3895,7 +3946,7 @@ int16_t handle_data_menu(uint16_t size) {
     DrawText(TextFormat("     sin = %f", sin(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 240, 20, DARKGRAY);
     DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 260, 20, DARKGRAY);
     DrawText(TextFormat("     cos = %f", cos(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 280, 20, DARKGRAY);
-    show_state_bits(sys.temporal.osc, TEMPORAL_ARRAY_SIZE, 30, (Vector2) {0.f, sys.video.vscreen[sys.video.display_id].size.y - 30});
+    show_state_bits(sys.temporal.osc, TEMPORAL_ARRAY_SIZE, (Vector2){16, 32}, (Vector2) {sys.video.screen.y * 0.5, sys.video.screen.y - 32});
 
     if (IsKeyPressed(KEY_KP_1)) {ex_canopy.adjustment.y -= 0.002;};
     if (IsKeyPressed(KEY_KP_2)) {ex_canopy.adjustment.y += 0.002;};
@@ -3944,6 +3995,31 @@ int16_t handle_audio_menu(uint16_t size) {
 //    jar_xm_debug(sys.asset.music[sys.audio.asset_playing].ctxData);
 }
 
+int16_t handle_terminal_menu(void) {
+//    debug_console_out("handle_terminal_menu", size});
+
+    sys.video.screen_refresh = true;
+
+    flip_frame_buffer(TERMINALDISPLAY, false);
+//    Vector2 size = get_current_virtual_size();
+    
+    uint16_t canvasgroup_id = TERMINALDISPLAY;
+    uint16_t canvas_id = sys.terminal.current_page_id;
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    Vector2 size = canvas->size;
+
+    DrawText(TextFormat("current = %i, size is %ix%i", (uint16_t)canvas_id, (uint16_t)size.x, (uint16_t)size.y), 0, 60, 20, DARKGRAY);
+    
+    
+    for (uint16_t i = 0; i < TERM_MAXPAGES; ++i) {
+        show_state_bits(sys.terminal.page[i].state, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, (i +1) * 32});
+    }
+/*    for (uint16_t i = 0; i < ; ++i) {
+    }
+*/    flip_frame_buffer(sys.video.previous_virtual, false);
+
+}
+
 int16_t handle_video_menu(uint16_t size) {
     sys.video.screen_refresh = true;
     if (IsKeyDown(KEY_F9))      display_all_res();
@@ -3954,19 +4030,21 @@ int16_t handle_video_menu(uint16_t size) {
 int16_t handle_debug_menu(uint16_t size) {
     debug_console_out("handle_debug_menu", size);
     sys.video.screen_refresh = true;
-    uint16_t x = (sys.video.vscreen[sys.video.display_id].size.x - 12 * size) * 0.5;
-    uint16_t y = (sys.video.vscreen[sys.video.display_id].size.y - 6 * size) * 0.5;
+    uint16_t x = (sys.video.screen.x - 12 * size) * 0.5;
+    uint16_t y = (sys.video.screen.y - 6 * size) * 0.5;
     if (valid_permission(PMSN_DEBUG_AUDIO) && active_debugging(DEBUG_SHOW_OPTION_AUDIO))         { y += size; display_debug_option(!active_debugging(DEBUG_AUDIO), x, y, size, "F1 -> AUDIO");}
     if (valid_permission(PMSN_DEBUG_VIDEO) && active_debugging(DEBUG_SHOW_OPTION_VIDEO))         { y += size; display_debug_option(!active_debugging(DEBUG_VIDEO), x, y, size, "F2 -> VIDEO");}
     if (valid_permission(PMSN_DEBUG_DATA) && active_debugging(DEBUG_SHOW_OPTION_DATA))           { y += size; display_debug_option(!active_debugging(DEBUG_DATA), x, y, size, "F3 -> DATA");}
     if (valid_permission(PMSN_DEBUG_CONTROLS) && active_debugging(DEBUG_SHOW_OPTION_CONTROLS))   { y += size; display_debug_option(!active_debugging(DEBUG_CONTROLS), x, y, size, "F4 -> CONTROLS");}
-    if (valid_permission(PMSN_DEBUG_TRACE) && active_debugging(DEBUG_SHOW_OPTION_TRACE))         { y += size; display_debug_option(!active_debugging(DEBUG_TRACE), x, y, size, "F5 -> TRACE");}
+    if (valid_permission(PMSN_DEBUG_TERMINAL) && active_debugging(DEBUG_SHOW_OPTION_TERMINAL))   { y += size; display_debug_option(!active_debugging(DEBUG_TERMINAL), x, y, size, "F5 -> TERMINAL");}
+    if (valid_permission(PMSN_DEBUG_TRACE) && active_debugging(DEBUG_SHOW_OPTION_TRACE))         { y += size; display_debug_option(!active_debugging(DEBUG_TRACE), x, y, size, "F6 -> TRACE");}
     if (valid_permission(PMSN_DEBUG_EXIT) && active_debugging(DEBUG_SHOW_OPTION_EXIT))           { y += size; display_debug_option(0, x, y, size, "F8 -> EXIT");}
     if (valid_permission(PMSN_DEBUG_AUDIO) && IsKeyPressed(KEY_F1))       flip_debugging(DEBUG_AUDIO);
     if (valid_permission(PMSN_DEBUG_VIDEO) && IsKeyPressed(KEY_F2))       flip_debugging(DEBUG_VIDEO);
     if (valid_permission(PMSN_DEBUG_DATA) && IsKeyPressed(KEY_F3))        flip_debugging(DEBUG_DATA);
     if (valid_permission(PMSN_DEBUG_CONTROLS) && IsKeyPressed(KEY_F4))    flip_debugging(DEBUG_CONTROLS);
-    if (valid_permission(PMSN_DEBUG_TRACE) && IsKeyPressed(KEY_F5))       flip_debugging(DEBUG_TRACE);
+    if (valid_permission(PMSN_DEBUG_TERMINAL) && IsKeyPressed(KEY_F5))    flip_debugging(DEBUG_TERMINAL);
+    if (valid_permission(PMSN_DEBUG_TRACE) && IsKeyPressed(KEY_F6))       flip_debugging(DEBUG_TRACE);
     if (valid_permission(PMSN_DEBUG_EXIT) && IsKeyPressed(KEY_F8))        commute_to(CTRL_DEINIT);
 }
 
@@ -3983,6 +4061,7 @@ int16_t update_debug(void) {
     if (active_debugging(DEBUG_DATA))       handle_data_menu(size);
     if (active_debugging(DEBUG_CONTROLS))   display_keybed();
     if (active_debugging(DEBUG_FPS))        DrawFPS(sys.video.screen.x - 100, 0);
+    if (active_debugging(DEBUG_TERMINAL))   handle_terminal_menu();
     if (IsKeyDown(KEY_LEFT_CONTROL))        handle_debug_menu(size);
 }
 
@@ -4224,15 +4303,13 @@ int16_t update_display(void) {
             sys.video.screen_refresh = false;
         };
         // game app video
-        draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[display].asset_id], (Vector2) {0,0});
+        draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[display].asset_id], sys.video.vscreen[display].offset);
 
         if (active_service(CTRL_TERMINAL | CTRL_TERMINAL_INITIALIZED)) {
-            //draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[TERMINALDISPLAY].asset_id], sys.terminal.offset);
+            draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[TERMINALDISPLAY].asset_id], sys.video.vscreen[TERMINALDISPLAY].offset);
         }
 
         if (active_service(CTRL_DEBUG | CTRL_DEBUG_INITIALIZED)) {
-            // if debug functionalities activated
-            // DISPLAY MANAGE DEBUG INFORMATION
             status = update_debug();
         }
 	EndDrawing();
