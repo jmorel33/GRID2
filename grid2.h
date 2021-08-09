@@ -53,7 +53,8 @@ extern "C" {
 #define BITS_OFF(a,b)   (a &= ~(b))
 #define BITS_INIT(a, b) (a = (b))
 #define BITS_FLIP(a, b) (a ^= (b))
-#define BITS_TEST(a, b) (a & (b))
+#define BITS_TEST(a, b) (((a & (b)) == (b)) ? 1 : 0)
+#define BITS_FILTER(a, b) (a & (b))
 
 #define BIT_LITERAL_ON_OFF(s) ((s) > 0 ? ("ON") : ("OFF"))
 #define BIT_LITERAL_TRUE_FALSE(s) ((s) > 0 ? ("TRUE") : ("FALSE"))
@@ -600,7 +601,7 @@ typedef struct EX_canvas {
     uint16_t    asset_id[CANVAS_MAX_ASSETS];// tilset used for this canvas
     uint16_t    default_asset_id;
     Vector2     size;                       // total cells x and y
-    Vector2     default_tilesize;
+    Vector2     default_tilesize;           
     uint16_t    palette_id[CANVAS_MAX_PALETTES];     // color palette used for whole canvas
     uint16_t    default_palette_id;         // color palette used for whole canvas
     uint16_t    default_colorfg_id;         // palette index color for cell
@@ -752,7 +753,7 @@ typedef struct EX_video {
 #define TERM_MAXPAGES       8
 #define TERM_MAXFONTS       8
 #define TERM_MAXPALETTES    8
-#define IOBUFFERSIZE        8192
+#define IOBUFFERSIZE        65536
 #define MAXTOKENS           1024
 
 typedef struct EX_page {
@@ -782,10 +783,9 @@ typedef struct EX_token {
 
 typedef struct EX_terminal {
     uint32_t    state;                              // 
-    uint16_t    asset_id;                           // 
-    Vector2     offset;                             // 
     uint16_t    canvasgroup_id;                     // Where all terminal canvases reside
-    uint16_t    previous_page_id, current_page_id;  // 
+    uint16_t    previous_page_id;
+    uint16_t    page_id;                            // 
     uint16_t    font_id[TERM_MAXFONTS];             // font to font_id cross reference
     uint16_t    fonts;                              // number of fonts loaded
     uint16_t    palette_id[TERM_MAXPALETTES];       // palette to palette_id cross reference
@@ -795,10 +795,9 @@ typedef struct EX_terminal {
     uint32_t    screensaver_delay;                  // time in seconds before scerensaver kicks in
     uint32_t    screensaver_count;                  // countdown before screensaver takes effect
 
-    uint8_t     input_buffer[IOBUFFERSIZE];         // 
-    uint8_t     output_buffer[IOBUFFERSIZE];        // 
-    uint32_t    input_buffer_position;              // 
-    uint32_t    output_buffer_position;             // 
+    uint8_t     iobuffer[IOBUFFERSIZE];             // 
+    uint32_t    read_position;                      // 
+    uint32_t    write_position;                     // 
     EX_token    token[MAXTOKENS];                   // 
     uint16_t    token_count;                        // 
     EX_canvas   canvas;                             // active canvas template for the terminal
@@ -865,6 +864,8 @@ typedef enum {
     CTRL_DEBUG_INITIALIZED      = 0b00000000000000000000000000000001, // 
     CTRL_SWITCHBOARD_MASK       = 0b11111111111111111110000000000000, // to filter out base states
     CTRL_SERVICES_MASK          = 0b00000000000000000001111111111111, // to filter out switchboard states
+    CTRL_TERMINAL_SERVICE_MASK  = 0b00000000000000000000001000001000, // 
+    CTRL_DEBUG_SERVICE_MASK     = 0b00000000000000000000010000000001, // 
     CTRL_NULL                   = 0b00000000000000000000000000000000  // in case that happens... (should never)
 } control_state;
 
@@ -987,13 +988,13 @@ typedef struct EX_debug {
 // **************************************************************************************** S Y S T E M   S T R U C T U R E S
 
 typedef struct EX_system {
+    EX_program      program;
+    EX_debug        debug;
     EX_temporal     temporal;
     EX_terminal     terminal;
     EX_asset        asset;
     EX_audio        audio;
     EX_video        video;
-    EX_program      program;
-    EX_debug        debug;
 } EX_system;
                 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 EX_system sys;  /* / / > > > > >   G l o b a l   W o r k i n g   S t o r a g e   < < < < < / / */
@@ -1013,6 +1014,7 @@ void add_service(uint32_t state)            {BITS_ON(sys.program.ctrlstate, stat
 void remove_service(uint32_t state)         {BITS_OFF(sys.program.ctrlstate, state);}
 void flip_service(uint32_t state)           {BITS_FLIP(sys.program.ctrlstate, state);}
 uint32_t active_service(uint32_t state)     {return BITS_TEST(sys.program.ctrlstate, state);}
+uint32_t only_service(uint32_t state)       {return BITS_FILTER(sys.program.ctrlstate, state);}
 
 void commute_to(uint32_t state) {
     BITS_OFF(sys.program.ctrlstate_prev, CTRL_SWITCHBOARD_MASK);
@@ -1045,6 +1047,10 @@ Vector2 get_current_virtual_size(void) {
 
 Vector2 get_tile_size(Vector2 tiles, Vector2 tileset_size) {
     return (Vector2){tileset_size.x/tiles.x, tileset_size.y/tiles.y};
+}
+
+Vector2 get_tile_size_from_asset(uint16_t asset_id) {
+    return sys.asset.tileset[asset_id].tilesize;
 }
 
 Vector2 get_asset_pixelsize(asset_id) {
@@ -1271,6 +1277,7 @@ uint16_t load_asset (uint32_t assettype, const char* fileName, const char* fileT
             BITS_ON(sys.asset.state[id], ASSET_LOADED);
             sys.asset.tex[id] = LoadTextureFromImage(sys.asset.img[id]);
             BITS_ON(sys.asset.state[id], ASSET_TEXTURE);
+            BITS_ON(sys.asset.state[id], ASSET_FONT);
             sys.asset.tileset[id].tex = sys.asset.tex[id];
             sys.asset.data[id] = fileData;
             BITS_ON(sys.asset.state[id], ASSET_DATA);
@@ -1366,10 +1373,10 @@ uint16_t load_palette(Vector2 count, const char* fileName, const char* fileType,
     float height = (float)sys.asset.img[asset_id].height;
 
     sys.asset.tileset[asset_id].ascii_start = 0;
-    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
-    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
-    sys.asset.tileset[asset_id].count.x = count.x;
-    sys.asset.tileset[asset_id].count.y = count.y;
+    sys.asset.tileset[asset_id].tilesize = get_tile_size((Vector2) count, (Vector2) {width, height});
+//    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
+//    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
+    sys.asset.tileset[asset_id].count = count;
     sys.asset.tileset[asset_id].total = count.x * count.y;
 
     //debug_console_out(sprintf("load_palette ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
@@ -1379,16 +1386,15 @@ uint16_t load_palette(Vector2 count, const char* fileName, const char* fileType,
 uint16_t get_palette_color_count(asset_id) { sys.asset.tileset[asset_id].total; }
 
 uint16_t load_tileset(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t ascii_start) {
-
     uint16_t asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
     float width = (float)sys.asset.img[asset_id].width;
     float height = (float)sys.asset.img[asset_id].height;
 
     sys.asset.tileset[asset_id].ascii_start = ascii_start;
-    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
-    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
-    sys.asset.tileset[asset_id].count.x = count.x;
-    sys.asset.tileset[asset_id].count.y = count.y;
+    sys.asset.tileset[asset_id].tilesize = get_tile_size((Vector2) count, (Vector2) {width, height});
+//    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
+//    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
+    sys.asset.tileset[asset_id].count = count;
     sys.asset.tileset[asset_id].total = count.x * count.y;
 
     //debug_console_out(sprintf("load_tileset ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
@@ -2338,13 +2344,14 @@ void copy_canvas() {
     // potentially use memcpy(dest, src, len);
 }
 
-void render_canvas(uint16_t canvas_id, Vector2 rendersize) {
+void render_canvas(uint16_t canvas_id) {
     static Color vertex_colors[4];
     uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
 
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     EX_cell  *cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     uint32_t cell_offset;
+    Vector2 rendersize = get_current_virtual_size();
     Vector2 shadow = canvas->shadow;
     uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
     for (uint16_t x = 0; x < lsx; x++) {
@@ -2473,7 +2480,7 @@ void render_canvasgroup(void) {
     begin_draw(true);
     for (uint16_t i = 0; i < sys.video.canvasgroup[canvasgroup_id].canvas_count; i++) {
         // get_current_virtual_size()
-        render_canvas(i, sys.video.vscreen[sys.video.current_virtual].size);
+        render_canvas(i);
     }
     return 0;
     end_draw();
@@ -3453,37 +3460,58 @@ static void clear_terminal_state(uint32_t state) { BITS_OFF(sys.terminal.state, 
 static void flip_terminal_state(uint32_t state) { BITS_FLIP(sys.terminal.state, state); }
 uint32_t active_terminal(uint32_t state)     {return BITS_TEST(sys.terminal.state, state);}
 
-static void set_page_state(uint32_t state) { BITS_ON(sys.terminal.page[sys.terminal.current_page_id].state, state); }
-static void clear_page_state(uint32_t state) { BITS_OFF(sys.terminal.page[sys.terminal.current_page_id].state, state); }
-static void flip_page_state(uint32_t state) { BITS_FLIP(sys.terminal.page[sys.terminal.current_page_id].state, state); }
+static void set_page_state(uint32_t state) { BITS_ON(sys.terminal.page[sys.terminal.page_id].state, state); }
+static void clear_page_state(uint32_t state) { BITS_OFF(sys.terminal.page[sys.terminal.page_id].state, state); }
+static void flip_page_state(uint32_t state) { BITS_FLIP(sys.terminal.page[sys.terminal.page_id].state, state); }
 uint32_t page_status(uint16_t page_id, uint32_t state)     {return BITS_TEST(sys.terminal.page[page_id].state, state);}
+
+static uint16_t set_current_page(uint16_t page_id) {
+    if (page_id >= TERM_MAXPAGES) return 1;
+    sys.terminal.previous_page_id = sys.terminal.page_id;
+    sys.terminal.page_id = page_id;
+    return 0;
+}
+
+static void goto_previous_page(void) {
+    sys.terminal.page_id = sys.terminal.previous_page_id;
+}
+
+static void move_to_next_page(void) {
+    sys.terminal.page_id += 1;
+    if  (sys.terminal.page_id >= TERM_MAXPAGES) sys.terminal.page_id -= TERM_MAXPAGES;    
+}
+
+static void move_to_previous_page(void) {
+    sys.terminal.page_id -= 1;
+    if  (sys.terminal.page_id < 0) sys.terminal.page_id += TERM_MAXPAGES;        
+}
 
 static uint16_t get_terminal_font(uint16_t font_id) {
     for (uint16_t font = 0; font < TERM_MAXFONTS; ++font) {
-        if (sys.terminal.font_id[font] = font_id) return font;
+        if (sys.terminal.font_id[font] == font_id) return font;
     }
     return 0;
 }
 
 static uint16_t get_terminal_palette(uint16_t palette_id) {
     for (uint16_t palette = 0; palette < TERM_MAXPALETTES; ++palette) {
-        if (sys.terminal.palette_id[palette] = palette_id) return palette;
+        if (sys.terminal.palette_id[palette] == palette_id) return palette;
     }
     return 0;
 }
 
 static bool enable_page(uint16_t page_id) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     // return error is page not PCAPS_INITIALIZED
 }
 
-static uint16_t get_writing_font(void)              {return sys.terminal.page[sys.terminal.current_page_id].cell.asset_id; }
-static uint16_t get_writing_palette(void)           {return sys.terminal.page[sys.terminal.current_page_id].cell.palette_id; }
-static uint16_t get_writing_foreground_color(void)  {return sys.terminal.page[sys.terminal.current_page_id].cell.colorfg_id;}
-static uint16_t get_writing_background_color(void)  {return sys.terminal.page[sys.terminal.current_page_id].cell.colorbg_id;}
+static uint16_t get_writing_font(void)              {return sys.terminal.page[sys.terminal.page_id].cell.asset_id; }
+static uint16_t get_writing_palette(void)           {return sys.terminal.page[sys.terminal.page_id].cell.palette_id; }
+static uint16_t get_writing_foreground_color(void)  {return sys.terminal.page[sys.terminal.page_id].cell.colorfg_id;}
+static uint16_t get_writing_background_color(void)  {return sys.terminal.page[sys.terminal.page_id].cell.colorbg_id;}
 
 static bool set_writing_font(uint16_t font) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (font >= sys.terminal.fonts) return true;
     page->previous_font = get_terminal_font(page->cell.asset_id);
     page->cell.asset_id = get_writing_font();
@@ -3491,7 +3519,7 @@ static bool set_writing_font(uint16_t font) {
 }
 
 static bool set_writing_palette(uint16_t palette) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (palette >= sys.terminal.palettes) return true;
     page->previous_palette = get_terminal_palette(page->cell.asset_id);
     page->cell.palette_id = get_writing_palette();
@@ -3499,13 +3527,13 @@ static bool set_writing_palette(uint16_t palette) {
 }
 
 static bool set_writing_blinking_rate(uint16_t rate) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     // establish blinking rates / temporal
     page->text_blink_rate = rate;
 }
 
 static bool set_writing_foreground_color(uint16_t color_id) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     uint16_t colors = get_palette_color_count(get_writing_palette());
     if (color_id < 0 || color_id >= colors) return true;
     page->previous_colorfg_id = page->cell.colorfg_id;
@@ -3515,7 +3543,7 @@ static bool set_writing_foreground_color(uint16_t color_id) {
 }
 
 static bool set_writing_background_color(uint16_t color_id) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     uint16_t colors = get_palette_color_count(get_writing_palette());
     if (color_id < 0 || color_id >= colors) return true;
     page->previous_colorbg_id = page->cell.colorbg_id;
@@ -3525,14 +3553,14 @@ static bool set_writing_background_color(uint16_t color_id) {
 }
 
 static void set_writing_colors_reverse(void)        {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     set_page_state(PCAPS_RVIDEO);
     page->cell.colorfg_id = page->colorbg_id;
     page->cell.colorbg_id = page->colorfg_id;
 }
 
 static void set_writing_colors_normal(void) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     clear_page_state(PCAPS_COL_NORMAL_MASK);
     page->cell.colorfg_id = page->colorfg_id;
     page->cell.colorbg_id = page->colorbg_id;
@@ -3550,14 +3578,14 @@ static void set_writing_cursor_rtol(void)           {set_page_state(PCAPS_CURSOR
 static void set_writing_cursor_ltor(void)           {clear_page_state(PCAPS_CURSOR_RTOL);}
 
 static bool set_page_default_font(uint16_t font) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (font >= TERM_MAXFONTS) return true;
     page->default_font = font;
     return false;
 }
 
 static bool set_page_margins(uint16_t top, uint16_t bottom, uint16_t left, uint16_t right) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (left > right || top > bottom) return;
 // need to verify if exceeds canvas
     page->margin_left       = left;
@@ -3568,7 +3596,7 @@ static bool set_page_margins(uint16_t top, uint16_t bottom, uint16_t left, uint1
 }
 
 static bool set_page_default_foreground_color(uint16_t color_id) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     uint16_t colors = get_palette_color_count(get_writing_palette());
     if (color_id < 0 || color_id >= colors) return true;
     page->default_colorfg_id = color_id;
@@ -3576,7 +3604,7 @@ static bool set_page_default_foreground_color(uint16_t color_id) {
 }
 
 static bool set_page_default_background_color(uint16_t color_id) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     uint16_t colors = get_palette_color_count(get_writing_palette());
     if (color_id < 0 || color_id >= colors) return true;
     page->default_colorbg_id = color_id;
@@ -3594,7 +3622,7 @@ static void unset_page_split(void) {
 
 
 static void move_keyboard_cursor_position(Vector2 value) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     Vector2 position = {page->cursor_position.x + value.x, page->cursor_position.y + value.y};
     if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
     page->cursor_previous_position = page->cursor_position;
@@ -3603,7 +3631,7 @@ static void move_keyboard_cursor_position(Vector2 value) {
 }
 
 static bool set_keyboard_cursor_position(Vector2 position) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
     page->cursor_previous_position = page->cursor_position;
     page->cursor_position = position;
@@ -3611,19 +3639,19 @@ static bool set_keyboard_cursor_position(Vector2 position) {
 }
 
 static Vector2 get_keyboard_cursor_position(void) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     return page->cursor_position;
 }
 
 static bool set_cursor_home_position(Vector2 position) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
     page->cursor_home_position = position;
     return false;
 }
 
 static bool move_cursor_home(void) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     return set_keyboard_cursor_position(page->cursor_home_position);
 }
 
@@ -3632,7 +3660,7 @@ static void page_scroll_up(void) {
 }
 
 static bool page_clear_line(uint16_t line) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (line >= page->margin_top || line <= page->margin_bottom) {
     // ok to clear row on canvas
     }
@@ -3640,7 +3668,7 @@ static bool page_clear_line(uint16_t line) {
 }
 
 static bool write_to_cell(uint8_t value) {
-    uint16_t page_id = sys.terminal.current_page_id;
+    uint16_t page_id = sys.terminal.page_id;
     EX_page *page = &sys.terminal.page[page_id];
     //    sys.terminal.canvasgroup_id
     // pass on all graphics rendition to the cell template
@@ -3660,7 +3688,7 @@ static bool write_to_cell(uint8_t value) {
 }
 
 static void write_char_to_page(uint8_t value) {
-    EX_page *page = &sys.terminal.page[sys.terminal.current_page_id];
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     uint64_t state;
     Vector2 position = page->cursor_position;
     bool status = write_to_cell(value);
@@ -3682,7 +3710,9 @@ static void write_string_to_page(uint8_t* s) {
 
 static uint16_t init_page(uint16_t page_id) {
     uint16_t status = 0;
-    if (page_status(page_id, TCAPS_INITIALIZED)) return 1;
+    if (page_id >= TERM_MAXPAGES) return 1;
+    if (page_status(page_id, TCAPS_INITIALIZED)) return 9;
+    set_current_page(page_id);
     set_page_state(PCAPS_DEFAULT_MASK);
     EX_canvas *canvas = &sys.terminal.canvas;
     status += set_page_default_font(0);
@@ -3702,7 +3732,7 @@ static uint16_t init_page(uint16_t page_id) {
     EX_cell *cell = &sys.terminal.page[page_id].cell;
     cell->state = CVFE_DEFAULT4;
     cell->asset_id = get_writing_font();
-    cell->value = 65;
+    cell->value = 65; // temporary testing measure
     cell->palette_id = get_writing_palette();
     cell->colorfg_id = get_writing_foreground_color();
     cell->colorbg_id = get_writing_background_color();
@@ -3710,6 +3740,7 @@ static uint16_t init_page(uint16_t page_id) {
     init_canvas_templated(sys.terminal.canvasgroup_id, page_id, &canvas, &cell);
 
     enable_page(page_id);
+    goto_previous_page();
     return status;
 }
 
@@ -3717,33 +3748,33 @@ static void set_terminal_assets(void) {
     sys.terminal.fonts = 0;
     sys.terminal.palettes = 0;
     for (uint16_t asset_id = 0; asset_id < MAXASSETS; ++asset_id) {
-        if (sys.asset.state[asset_id] & ASSET_FONT) {
-            if (sys.terminal.fonts > TERM_MAXFONTS) {
-                sys.terminal.font_id[sys.terminal.fonts] = asset_id;
-                ++sys.terminal.fonts;
-            }
-        } else if (sys.asset.state[asset_id] & ASSET_PALETTE) {
-            if (sys.terminal.palettes > TERM_MAXPALETTES) {
+        if (sys.asset.state[asset_id] & ASSET_PALETTE) {
+            if (sys.terminal.palettes < TERM_MAXPALETTES) {
                 sys.terminal.palette_id[sys.terminal.palettes] = asset_id;
                 ++sys.terminal.palettes;
+            }
+        } else if (sys.asset.state[asset_id] & ASSET_FONT) {
+            if (sys.terminal.fonts < TERM_MAXFONTS) {
+                sys.terminal.font_id[sys.terminal.fonts] = asset_id;
+                ++sys.terminal.fonts;
             }
         }
     }    
 }
 
-static void show_terminal(void) {remove_service(CTRL_TERMINAL);}
-static void hide_terminal(void) {add_service(CTRL_TERMINAL);}
+static void hide_terminal(void) {remove_service(CTRL_TERMINAL);}
+static void show_terminal(void) {add_service(CTRL_TERMINAL);}
 
 static void reset_terminal_canvas_template(void) {
     EX_canvas *canvas = &sys.terminal.canvas;
-    canvas->name[0] = "TERMINAL";
-    canvas->size = (Vector2){64,28};
+    strcpy_s(canvas->name, sizeof(canvas->name), "TERMINAL");
     canvas->default_palette_id = get_terminal_palette(0);
     canvas->default_asset_id = get_terminal_font(0);
     canvas->asset_id[0] = canvas->default_asset_id;
+    canvas->size = get_canvas_size(canvas->default_asset_id);
+    canvas->default_tilesize = get_tile_size_from_asset(canvas->default_asset_id);
     canvas->scale = (Vector2){1,1};
     canvas->angle = 0.f;
-    canvas->default_tilesize = (Vector2){8, 8};
     canvas->default_colorfg_id = 7;
     canvas->default_colorbg_id = 14;
     canvas->default_colorln_id = 7;
@@ -3757,8 +3788,8 @@ static void reset_terminal_canvas_template(void) {
     
 }
 
-static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
-    int16_t status;
+static int16_t init_terminal(void) {
+    int16_t status = 0;
     flip_frame_buffer(TERMINALDISPLAY, false);
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
     uint16_t display = sys.video.current_virtual;
@@ -3767,14 +3798,14 @@ static int16_t init_terminal(uint16_t tileset_id, uint16_t palette_id) {
     uint32_t canvasgroup_state = 0;
     uint64_t canvas_state = CVFE_DEFAULT4;
     uint64_t cell_state = CVFE_DEFAULT4;
-    sys.terminal.canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
+    sys.terminal.canvasgroup_id = display;
 
     init_canvasgroup(sys.terminal.canvasgroup_id, canvasgroup_state, TERM_MAXPAGES);
     reset_terminal_canvas_template();
     for (uint16_t page_id = 0; page_id < TERM_MAXPAGES; ++page_id) {
         init_page(page_id);
     }
-    sys.terminal.current_page_id = 0;
+    sys.terminal.page_id = 0;
     flip_frame_buffer(sys.video.previous_virtual, false);
     return status;
 }
@@ -3813,7 +3844,7 @@ void render_terminal(void) {
     flip_frame_buffer(TERMINALDISPLAY, false);
 
     begin_draw(true);
-    render_canvas(sys.terminal.current_page_id, get_current_virtual_size());
+    render_canvas(sys.terminal.page_id);
     end_draw();
     flip_frame_buffer(sys.video.previous_virtual, false);
 }
@@ -3948,6 +3979,10 @@ int16_t handle_data_menu(uint16_t size) {
     DrawText(TextFormat("     cos = %f", cos(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 280, 20, DARKGRAY);
     show_state_bits(sys.temporal.osc, TEMPORAL_ARRAY_SIZE, (Vector2){16, 32}, (Vector2) {sys.video.screen.y * 0.5, sys.video.screen.y - 32});
 
+    show_state_bits(sys.program.ctrlstate, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, 96});
+    show_state_bits(sys.program.pmsnstate, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, 128});
+    DrawText(TextFormat("%s, ctrlstate & pmsnstate", sys.program.name), sys.video.screen.x - 512, 32, 20, DARKGRAY);
+
     if (IsKeyPressed(KEY_KP_1)) {ex_canopy.adjustment.y -= 0.002;};
     if (IsKeyPressed(KEY_KP_2)) {ex_canopy.adjustment.y += 0.002;};
     if (IsKeyPressed(KEY_KP_3)) {ex_canopy.pal_idx_cells -= 16; if(ex_canopy.pal_idx_cells < 0) {ex_canopy.pal_idx_cells +=256;};};
@@ -4004,16 +4039,60 @@ int16_t handle_terminal_menu(void) {
 //    Vector2 size = get_current_virtual_size();
     
     uint16_t canvasgroup_id = TERMINALDISPLAY;
-    uint16_t canvas_id = sys.terminal.current_page_id;
-    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t canvas_id = sys.terminal.page_id;
+//    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    EX_canvas *canvas = &sys.terminal.canvas;
     Vector2 size = canvas->size;
 
-    DrawText(TextFormat("current = %i, size is %ix%i", (uint16_t)canvas_id, (uint16_t)size.x, (uint16_t)size.y), 0, 60, 20, DARKGRAY);
+    DrawText(TextFormat("canvasgroup_id=%i", (uint32_t)sys.terminal.canvasgroup_id), 0, 80, 20, GRAY);
+    DrawText(TextFormat("previous_page_id=%i", (uint32_t)sys.terminal.previous_page_id), 0, 100, 20, GRAY);
+    DrawText(TextFormat("page_id=%i", (uint32_t)sys.terminal.page_id), 0, 120, 20, GRAY);
+    DrawText(TextFormat("font_id[0...7]=%i %i %i %i %i %i %i %i", (uint16_t)sys.terminal.font_id[0], (uint16_t)sys.terminal.font_id[1], (uint16_t)sys.terminal.font_id[2], (uint16_t)sys.terminal.font_id[3], (uint16_t)sys.terminal.font_id[4], (uint16_t)sys.terminal.font_id[5], (uint16_t)sys.terminal.font_id[6], (uint16_t)sys.terminal.font_id[7]), 0, 140, 20, GRAY);
+    DrawText(TextFormat("fonts=%i", (uint32_t)sys.terminal.fonts), 0, 160, 20, GRAY);
+    DrawText(TextFormat("palette_id[0...7]=%i %i %i %i %i %i %i %i", (uint16_t)sys.terminal.palette_id[0], (uint16_t)sys.terminal.palette_id[1], (uint16_t)sys.terminal.palette_id[2], (uint16_t)sys.terminal.palette_id[3], (uint16_t)sys.terminal.palette_id[4], (uint16_t)sys.terminal.palette_id[5], (uint16_t)sys.terminal.palette_id[6], (uint16_t)sys.terminal.palette_id[7]), 0, 180, 20, GRAY);
+    DrawText(TextFormat("palettes=%i", (uint32_t)sys.terminal.palettes), 0, 200, 20, GRAY);
+    DrawText(TextFormat("read_position=%i", (uint32_t)sys.terminal.read_position), 0, 240, 20, GRAY);
+    DrawText(TextFormat("write_position=%i", (uint32_t)sys.terminal.write_position), 0, 260, 20, GRAY);
     
-    
+//    EX_canvas *canvas = &sys.terminal.canvas;
+    DrawText(TextFormat("name = %s", canvas->name), 0, 300, 20, GRAY);
+    DrawText(TextFormat("state = %i", (uint32_t)canvas->state), 0, 320, 20, GRAY);
+//    uint16_t    asset_id[CANVAS_MAX_ASSETS];// tilset used for this canvas
+    DrawText(TextFormat("default_asset_id = %i", (uint32_t)canvas->default_asset_id), 0, 360, 20, GRAY);
+    DrawText(TextFormat("size = %ix%i", (uint32_t)canvas->size.x, (uint32_t)canvas->size.y), 0, 380, 20, GRAY);
+    DrawText(TextFormat("default_tilesize = %ix%i", (uint32_t)canvas->default_tilesize.x,  (uint32_t)canvas->default_tilesize.y), 0, 400, 20, GRAY);           
+//    uint16_t    palette_id[CANVAS_MAX_PALETTES];     // color palette used for whole canvas
+    DrawText(TextFormat("default_palette_id = %i", (uint32_t)canvas->default_palette_id), 0, 440, 20, GRAY);
+    DrawText(TextFormat("default_colorfg_id = %i", (uint32_t)canvas->default_colorfg_id), 0, 460, 20, GRAY);
+    DrawText(TextFormat("default_colorbg_id = %i", (uint32_t)canvas->default_colorbg_id), 0, 480, 20, GRAY);
+    DrawText(TextFormat("default_colorln_id = %i", (uint32_t)canvas->default_colorln_id), 0, 500, 20, GRAY);
+    DrawText(TextFormat("offset = %ix%i", (uint32_t)canvas->offset.x, (uint32_t)canvas->offset.y), 0, 520, 20, GRAY);
+//    Vector2     displace[4];                // cell corner displacement (x,y)
+    DrawText(TextFormat("scale = %ix%i", (uint32_t)canvas->scale.x, (uint32_t)canvas->scale.y), 0, 560, 20, GRAY);
+//    Vector2     scale_speed;                // (x,y) cell scale speed
+//    Vector2     scroll_speed;               // canvas scroll speed (x,y)
+    DrawText(TextFormat("angle = %i", (uint32_t)canvas->angle), 0, 620, 20, GRAY);
+//    float       fg_brightness;              // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
+//    float       bg_brightness;              // background brightness (values 0...1 divides, values 1 to 255 multiply)
+//    uint8_t     alpha;                      // transparency
+//    Vector2     shadow;                     // shadow corner displacement (x,y)
+//    Vector2     shadow_displace[4];         // shadow corners displacement (x,y)
+//    Color       color_mask;                 // RGBA color mask of canvas
+//    Color       shadow_mask;                // shadow RGBA mask
+//    EX_cell     mousecursor;                // mouse cursor
+//    EX_cell     keycursor;                  // key cursor
+//    EX_cell     mask;                       // used for when replicating
+//    uint32_t    cell_count;
+//    EX_cell*    cell;                       // could be NULL
+
+    show_state_bits(sys.terminal.state, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, 0});
+    DrawText(TextFormat("curr %i, size %ix%i", (uint16_t)canvas_id, (uint16_t)size.x, (uint16_t)size.y), sys.video.screen.x - 700, 00, 20, GRAY);
     for (uint16_t i = 0; i < TERM_MAXPAGES; ++i) {
-        show_state_bits(sys.terminal.page[i].state, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, (i +1) * 32});
+        EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[i];
+        show_state_bits(sys.terminal.page[i].state, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, (i +3) * 32});
+        DrawText(TextFormat("page %i, size %ix%i", (uint16_t)i, (uint16_t)canvas->size.x, (uint16_t)canvas->size.y), sys.video.screen.x - 700, (i +2) * 32, 20, GRAY);
     }
+
 /*    for (uint16_t i = 0; i < ; ++i) {
     }
 */    flip_frame_buffer(sys.video.previous_virtual, false);
@@ -4046,6 +4125,8 @@ int16_t handle_debug_menu(uint16_t size) {
     if (valid_permission(PMSN_DEBUG_TERMINAL) && IsKeyPressed(KEY_F5))    flip_debugging(DEBUG_TERMINAL);
     if (valid_permission(PMSN_DEBUG_TRACE) && IsKeyPressed(KEY_F6))       flip_debugging(DEBUG_TRACE);
     if (valid_permission(PMSN_DEBUG_EXIT) && IsKeyPressed(KEY_F8))        commute_to(CTRL_DEINIT);
+
+    if (IsKeyPressed(KEY_F9))        flip_service(CTRL_TERMINAL);
 }
 
 int16_t init_debug(void) {
@@ -4060,8 +4141,8 @@ int16_t update_debug(void) {
     if (active_debugging(DEBUG_VIDEO))      handle_video_menu(size);
     if (active_debugging(DEBUG_DATA))       handle_data_menu(size);
     if (active_debugging(DEBUG_CONTROLS))   display_keybed();
-    if (active_debugging(DEBUG_FPS))        DrawFPS(sys.video.screen.x - 100, 0);
     if (active_debugging(DEBUG_TERMINAL))   handle_terminal_menu();
+    if (active_debugging(DEBUG_FPS))        DrawFPS(sys.video.screen.x - 50, 0);
     if (IsKeyDown(KEY_LEFT_CONTROL))        handle_debug_menu(size);
 }
 
@@ -4302,14 +4383,13 @@ int16_t update_display(void) {
             ClearBackground(BLACK);
             sys.video.screen_refresh = false;
         };
-        // game app video
         draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[display].asset_id], sys.video.vscreen[display].offset);
 
-        if (active_service(CTRL_TERMINAL | CTRL_TERMINAL_INITIALIZED)) {
+        if (active_service(CTRL_TERMINAL_SERVICE_MASK)) {
             draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[TERMINALDISPLAY].asset_id], sys.video.vscreen[TERMINALDISPLAY].offset);
         }
 
-        if (active_service(CTRL_DEBUG | CTRL_DEBUG_INITIALIZED)) {
+        if (active_service(CTRL_DEBUG_SERVICE_MASK)) {
             status = update_debug();
         }
 	EndDrawing();
@@ -4511,7 +4591,7 @@ int16_t init_system(void) {
     debug_console_out("---------- TEMPORAL_INITIALISATION", temporal_status);
 
     int16_t debug_status = init_debug();
-    if (!debug_status) add_service(CTRL_DEBUG_INITIALIZED); 
+    if (!debug_status) add_service(CTRL_DEBUG_SERVICE_MASK); 
     debug_console_out("---------- DEBUG_INITIALISATION", debug_status);
     
     int16_t display_status = init_display_properties(true);
@@ -4522,8 +4602,8 @@ int16_t init_system(void) {
     if (assets_status) add_service(CTRL_ASSETS_INITIALIZED);
     debug_console_out("---------- ASSETS_INITIALISATION", assets_status);
     
-    int16_t terminal_status = init_terminal(8, 5);
-    if (!terminal_status) add_service(CTRL_TERMINAL_INITIALIZED);
+    int16_t terminal_status = init_terminal();
+    if (!terminal_status) add_service(CTRL_TERMINAL_SERVICE_MASK);
     debug_console_out("---------- TERMINAL_INITIALISATION", terminal_status);
     
     int16_t audio_status = init_audio_properties();
@@ -4571,18 +4651,16 @@ static int16_t update_system(void) {
 
 void display_initialize_splash(void) {
 //    if (sys.program.ctrlstate & CTRL_INITIALIZE) display_initialize_splash();
-
     update_system();
 }
 
 void manage_program() {
     debug_console_out( control_state_literal(sys.program.ctrlstate & CTRL_SWITCHBOARD_MASK), 0);
 
-    if (sys.program.ctrlstate & CTRL_OFF_FOCUS)
+    if (active_service(CTRL_OFF_FOCUS))
         game_off_focus_scene();
     else {
-//        uint32_t switchboard_state = active_service(CTRL_SWITCHBOARD_MASK);
-        switch (active_service(CTRL_SWITCHBOARD_MASK)) {   //(switchboard_state) {
+        switch (only_service(CTRL_SWITCHBOARD_MASK)) {
             case CTRL_OFF_FOCUS:
                 begin_draw(true);
                 game_off_focus_scene();
@@ -4654,8 +4732,7 @@ int16_t process_system(uint32_t ctrlstate, uint32_t pmsnstate, const char* name)
     if (active_service(CTRL_BOOTSTRAP_TRACE))
         flip_debugging(DEBUG_TRACE);
 
-    if (name > NULL) strcpy(sys.program.name, name); else strcpy(sys.program.name, "_o/");
-
+    if (name > NULL) strcpy_s(sys.program.name, sizeof(sys.program.name), name); else strcpy_s(sys.program.name, sizeof(sys.program.name), "_o/");
 
     commute_to(CTRL_INITIALIZE);
     add_service(CTRL_RUNNING);
@@ -4672,8 +4749,8 @@ int16_t process_system(uint32_t ctrlstate, uint32_t pmsnstate, const char* name)
             // something special happening while game is paused
             // DISPLAY PAUSE MESSAGE
             }
-            if (sys.program.ctrlstate & CTRL_TERMINAL) {
-                render_terminal(); // this freezes the current video and does nothing else ******************* ISSUE
+            if (active_service(CTRL_TERMINAL)) {
+                render_terminal();
             }
             update_system();
         }
