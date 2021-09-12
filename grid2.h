@@ -12,6 +12,7 @@
 
 //#include <windows.h> 
 #include <stdlib.h>         // header of the general purpose standard library
+#include <xmmintrin.h>      // x86 cpu architecture dependency
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
@@ -23,18 +24,6 @@
 //#include <errno.h>        // A value (the error number) is stored in errno by certain library functions when they detect errors
 //#include <unistd.h>       // provides access to the POSIX operating system API
 //#include <fcntl.h>        // system-wide table of files opened by all processes, called the file table
-
-// **************************************************************************************** B A S E   A S S E T S
-#include <VGACOLORS.h>
-#include <A8COLORS.h>
-#include <icon.h>
-#include <A8COPPER.h>
-#include <font_JJ.h>
-#include <font_vga.h>
-#include <font_atascii.h>
-#include <font_atascii_big.h>
-#include <font_OSD.h>
-#include <lines.h>
 
 #ifdef __cplusplus // Calling C code from C++
 extern "C" { 
@@ -48,6 +37,8 @@ extern "C" {
 #include <GLFW/glfw3.h>
 
 // **************************************************************************************** U T I L I T Y   M A C R O S   &   F U N C T I O N S
+
+#define __forceinline __attribute__((always_inline))    // non microsoft forced inline
 
 #define BITS_ON(a,b)    (a |= (b))
 #define BITS_OFF(a,b)   (a &= ~(b))
@@ -175,9 +166,9 @@ uint8_t fifo_getc() {
 #define SQRT3       1.73205080756887729352744634150587236f
 #define SQRT5       2.23606797749978969640917366873127623f
 
-static inline float Rand(float a) {	return (float)rand()/(float)(RAND_MAX/a);}
+__forceinline float Rand(float a) {	return (float)rand()/(float)(RAND_MAX/a);}
 
-static inline float fast_sin(double x) {
+__forceinline float fast_sin(double x) {
     x *= DIVIDEH_PI;
     x -= (int32_t) x;
     if (x <= 0.5) {
@@ -189,11 +180,11 @@ static inline float fast_sin(double x) {
     }
 }
 
-static inline float fast_cos(double x) {
+__forceinline float fast_cos(double x) {
     return fast_sin(x + HALF_PI);
 }
 
-static inline double dfast_sin(double x) {
+__forceinline double dfast_sin(double x) {
     x *= DIVIDEH_PI;
     x -= (int32_t) x;
     if (x <= 0.5) {
@@ -205,25 +196,31 @@ static inline double dfast_sin(double x) {
     }
 }
 
-static inline double dfast_cos(double x) {
+__forceinline double dfast_cos(double x) {
     return fast_sin(x + HALF_PI);
 }
 
-float ffast_rsqrt(float value) {  /* PULLED FROM QUAKE SOURCE */
+__forceinline float ffast_fisr(float value) {  /* FISR - PULLED FROM QUAKE SOURCE - DEPRECATED */
 	union { int32_t i; float f; } t;
 	float half = value * 0.5f;
 	t.f = value;
 	t.i = 0x5f375a86 - (t.i >> 1);
 	t.f = t.f * (1.5f - (half * t.f * t.f)); /* 1st iteration */
-	t.f = t.f * (1.5f - (half * t.f * t.f)); /* 2nd iteration, adds more precision */
+//	t.f = t.f * (1.5f - (half * t.f * t.f)); /* 2nd iteration, adds more precision */
 	return t.f;
 }
 
-static inline float ffast_ceil(float x)  { return (float)((x < 0) ? (int32_t)x : ((int32_t)x)+1); }
-static inline float ffast_floor(float x) { return (float)((x >= 0.0f) ? (int32_t)x : (int32_t)(x-0.9999999999999999f)); }
-static inline float ffast_round(float x) { return (float)((x >= 0.0f) ? ffast_floor(x + 0.5f) : ffast_ceil(x - 0.5f)); }
-static inline float ffast_remainder(float x, float y) {	return x - (ffast_round(x/y)*y);}
-static inline float ffast_copysign(float x, float y) {
+__forceinline float ffast_rsqrt(const float f) {
+    __m128 temp = _mm_set_ss(f);
+    temp = _mm_rsqrt_ss(temp);
+    return _mm_cvtss_f32(temp);
+}
+
+__forceinline float ffast_ceil(float x)  { return (float)((x < 0) ? (int32_t)x : ((int32_t)x)+1); }
+__forceinline float ffast_floor(float x) { return (float)((x >= 0.0f) ? (int32_t)x : (int32_t)(x-0.9999999999999999f)); }
+__forceinline float ffast_round(float x) { return (float)((x >= 0.0f) ? ffast_floor(x + 0.5f) : ffast_ceil(x - 0.5f)); }
+__forceinline float ffast_remainder(float x, float y) {	return x - (ffast_round(x/y)*y);}
+__forceinline float ffast_copysign(float x, float y) {
 	int32_t ix, iy;
 	ix = *(int32_t *)&x;
 	iy = *(int32_t *)&y;
@@ -232,15 +229,26 @@ static inline float ffast_copysign(float x, float y) {
 	return *(float *)&ix;
 }
 
-static inline float ffast_mod(float x, float y) {
+// use type punning instead of pointer arithmatics, to require proper alignment
+__forceinline float ffast_abs(float f) {
+    if (sizeof(float) == sizeof(uint32_t)) {     // optimizer will optimize away the `if` statement and the library call
+        union { float f; uint32_t i; } u;
+        u.f = f;
+        u.i &= 0x7fffffff;
+        return u.f;
+    }
+    return ABS(f);
+}
+
+__forceinline float ffast_mod(float x, float y) {
 	float result;
-	y = ABS(y);
-	result = ffast_remainder(gb_abs(x), y);
+	y = ffast_abs(y);
+	result = ffast_remainder(ffast_abs(x), y);
 	if (SIGN(result)) result += y;
 	return ffast_copysign(result, x);
 }
 
-static inline float ffast_tan(float radians) {
+__forceinline float ffast_tan(float radians) {
     float rr = radians * radians;
     float a;
     a = 9.5168091e-03f;     a *= rr;
@@ -254,7 +262,7 @@ static inline float ffast_tan(float radians) {
     return a;
 }
 
-static inline float ffast_atan(float a)	{
+__forceinline float ffast_atan(float a)	{
     float u  = a*a;
     float u2 = u*u;
     float u3 = u2*u;
@@ -263,24 +271,12 @@ static inline float ffast_atan(float a)	{
     return a/f;
 }
 
-// use type punning instead of pointer arithmatics, to require proper alignment
-static inline float absf(float f) {
-    // optimizer will optimize away the `if` statement and the library call
-    if (sizeof(float) == sizeof(uint32_t)) {
-        union { float f; uint32_t i; } u;
-        u.f = f;
-        u.i &= 0x7fffffff;
-        return u.f;
-    }
-    return fabsf(f);
-}
-
-static int32_t gcdl(int32_t a, int32_t b) {
+__forceinline int32_t gcdl(int32_t a, int32_t b) {
     if (a == 0) return b; else if (b == 0) return a;
-    if (a < b) return gcd_l(a, b % a); else return gcd_l(b, a % b);
+    if (a < b) return gcdl(a, b % a); else return gcdl(b, a % b);
 }
 
-static int32_t gcdi(int32_t a, int32_t b) {
+__forceinline int32_t gcdi(int32_t a, int32_t b) {
     int32_t res = a%b;
     while (res > 0) { a = b; b = res; res = a % b; }
     return b;
@@ -412,15 +408,6 @@ static Vector2 ratio_info(float x, float y) {
 
 // **************************************************************************************** R A Y L I B   E X T E N S I O N S
 
-void DrawTextImage(Texture texture, uint8_t* txt, Vector2 position) {
-    // remove hardcoded values ************************************** (ie. -32, and sizes)
-    // expand concept
-	DrawTexturePro(texture,
-    (Rectangle) { (txt[0] - 32) * 24, 0, 24, 24 } ,
-    (Rectangle) { position.x , position.y, 64, 64 },
-    (Vector2) {0},0,WHITE);
-}
-
 // draw Textured Quad
 void DrawQuadSprite ( Texture texture , Vector2 position, Vector2 scale, Color color) {
     // expand concept, think about particles, player character, etc... color blending opotions, priority system... Use DrawTexturePro2 for skew, etc...
@@ -430,7 +417,6 @@ void DrawQuadSprite ( Texture texture , Vector2 position, Vector2 scale, Color c
     (Vector2) { 0,0 } , 0 , color );
 }
 
-// Draw a color-filled rectangle with pro parameters
 void DrawRectanglePro2(Rectangle rec, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
     rlCheckRenderBatchLimit(4);
 
@@ -486,7 +472,6 @@ void DrawRectanglePro2(Rectangle rec, Vector2 origin, Vector2 skew, float rotati
     rlEnd();
 }
 
-// Draw a part of a texture (defined by a rectangle) with 'pro' parameters
 // NOTE: origin is relative to destination rectangle size
 void DrawTexturePro2 (Texture texture, Rectangle source, Rectangle dest, Vector2 origin, Vector2 skew, float rotation, Color color[4]) {
     if (texture.id > 0) {
@@ -569,7 +554,7 @@ Color get_pixel_color(Image *image, Vector2 position) {
 #define CANVAS_MAX_ASSETS       8
 
 
-typedef struct EX_cell {
+typedef struct cell_s {
     uint64_t    state;                      // all flags for cell
     uint16_t    value;                      // value of cell
     uint8_t     lines;                      // lines feature
@@ -595,11 +580,11 @@ typedef struct EX_cell {
     Color       shadow_mask;                // shadow RGBA mask
 } EX_cell;
 
-typedef struct EX_canvas {
+typedef struct canvas_s {
     char        name[NAMELENGTH_MAX + 1];
     uint64_t    state;                      // all flags for grid
     uint16_t    asset_id[CANVAS_MAX_ASSETS];// tilset used for this canvas
-    uint16_t    default_asset_id;
+    uint16_t    default_asset_id;           // tilset used for this canvas
     Vector2     size;                       // total cells x and y
     Vector2     default_tilesize;           
     uint16_t    palette_id[CANVAS_MAX_PALETTES];     // color palette used for whole canvas
@@ -620,8 +605,6 @@ typedef struct EX_canvas {
     Vector2     shadow_displace[4];         // shadow corners displacement (x,y)
     Color       color_mask;                 // RGBA color mask of canvas
     Color       shadow_mask;                // shadow RGBA mask
-    EX_cell     mousecursor;                // mouse cursor
-    EX_cell     keycursor;                  // key cursor
     EX_cell     mask;                       // used for when replicating
     uint32_t    cell_count;
     EX_cell*    cell;                       // could be NULL
@@ -634,7 +617,7 @@ typedef enum {
 // to be determined
 } canvasgroup_states;
 
-typedef struct EX_canvasgroup {
+typedef struct canvasgroup_s {
     char        name[NAMELENGTH_MAX + 1];
     uint32_t    state;
     uint16_t    default_asset_id;
@@ -650,7 +633,7 @@ typedef struct EX_canvasgroup {
 #define MAXASSETS           1024
 #define MAXPALETTECOLORS    4096
 
-typedef struct EX_tileset {
+typedef struct tileset_s {
     Vector2     tilesize;                   // Tile size
     Vector2     count;                      // number of tiles (x, y)
     Texture     tex;                        // Characters texture atlas
@@ -658,7 +641,7 @@ typedef struct EX_tileset {
     uint16_t    ascii_start;                // if tileset if character font, identifies ascii code first tile
 } EX_tileset;
 
-typedef struct EX_asset {
+typedef struct asset_s {
     char        name[NAMELENGTH_MAX + 1];
     uint32_t    total_assets;
     uint16_t    lines_id;
@@ -686,7 +669,7 @@ typedef struct EX_asset {
 #define MAXAUDIOTRACKS  10
 #define MAXORDERS       50
 
-typedef struct EX_track {
+typedef struct track_s {
     bool        is_playing;                 // 
     uint32_t    state;                      // 
     uint16_t    asset;                      // 
@@ -699,7 +682,7 @@ typedef struct EX_track {
     uint16_t    order[MAXORDERS];           // 
 } EX_track;
 
-typedef struct  EX_audio {
+typedef struct audio_s {
     uint16_t    total_tracks;               // 
     float       global_volume;              // 
     EX_track    track[MAXAUDIOTRACKS];      // 
@@ -714,7 +697,7 @@ typedef struct  EX_audio {
 #define UNFOCUSEDDISPLAY    3
 #define TERMINALDISPLAY     4
 
-typedef struct EX_screenspace {
+typedef struct screenspace_s {
     uint32_t    state;                          // virtual display state
     Vector2     size;                           // framebuffer resolution (x, y)
     Vector2     offset;                         // Windows Display Resolution (x, y)
@@ -732,7 +715,7 @@ typedef struct EX_screenspace {
     uint16_t    asset_id;                       // framebuffer asset number
 } EX_screenspace;
 
-typedef struct EX_video {
+typedef struct video_s {
     uint32_t    state;                          // 
     Vector2     screen;                         // Windows Display Resolution (x, y)
     uint32_t    windowstate_normal;             // screen window state in normal mode
@@ -756,7 +739,7 @@ typedef struct EX_video {
 #define IOBUFFERSIZE        65536
 #define MAXTOKENS           1024
 
-typedef struct EX_page {
+typedef struct page_s {
     uint32_t    state;                              // terminal page state
     Vector2     cursor_home_position;               // position when cursor home
     Vector2     cursor_previous_position;           // previous cursor position
@@ -772,16 +755,19 @@ typedef struct EX_page {
     uint16_t    colorbg_id, colorfg_id;             // 
     uint16_t    text_blink_rate;                    // 
     uint16_t    margin_left, margin_right, margin_top, margin_bottom; // page margin values for all sides
+    Vector2     size;                               // Page size (in character count)
     Vector2     page_split;                         // Horizontal and vertical page split position (usually center)
     EX_cell     cell;                               // active cell template for the page
+    EX_cell     mousecursor;                        // mouse cursor
+    EX_cell     keycursor;                          // key cursor
 } EX_page;
 
-typedef struct EX_token {
+typedef struct token_s {
     uint16_t    position;                           // 
     uint16_t    len;                                // 
 } EX_token;
 
-typedef struct EX_terminal {
+typedef struct terminal_s {
     uint32_t    state;                              // 
     uint16_t    canvasgroup_id;                     // Where all terminal canvases reside
     uint16_t    previous_page_id;
@@ -800,7 +786,7 @@ typedef struct EX_terminal {
     uint32_t    write_position;                     // 
     EX_token    token[MAXTOKENS];                   // 
     uint16_t    token_count;                        // 
-    EX_canvas   canvas;                             // active canvas template for the terminal
+    EX_canvas   canvas_template;                    // active canvas template for the terminal
 } EX_terminal;
 
 
@@ -811,7 +797,7 @@ typedef struct EX_terminal {
 // With this a function to poll oscillator states
 #define TEMPORAL_ARRAY_SIZE 64
 
-typedef struct EX_temporal {
+typedef struct temportal_s {
     char        datetime[20];                       // 
     double      period_table[TEMPORAL_ARRAY_SIZE];  // time slice period per oscillator
     uint64_t    prev_osc;                           // previous oscillator bits
@@ -972,7 +958,7 @@ const char* permission_state_literal(uint32_t state) {
     }
 }
 
-typedef struct EX_program {
+typedef struct program_s {
         uint32_t    ctrlstate;
         uint32_t    ctrlstate_prev;
         uint32_t    pmsnstate;
@@ -980,15 +966,24 @@ typedef struct EX_program {
         uint32_t    status;
 } EX_program;
 
-typedef struct EX_debug {
+typedef struct debug_s {
     uint32_t    state;
 } EX_debug;
 
 
+typedef struct io_s {
+    uint16_t    last_key;                           // Last keyboard unicode key input
+} EX_io;
+
+// ********************* Declarations to avoid conflicts
+
+int16_t update_debug(void);         // avoid conflicts
+
 // **************************************************************************************** S Y S T E M   S T R U C T U R E S
 
-typedef struct EX_system {
+typedef struct system_s {
     EX_program      program;
+    EX_io           io;
     EX_debug        debug;
     EX_temporal     temporal;
     EX_terminal     terminal;
@@ -1062,8 +1057,8 @@ Vector2 get_canvas_size(uint16_t tileset_id) {
     return (Vector2){size.x / sys.asset.tileset[tileset_id].tilesize.x, size.y / sys.asset.tileset[tileset_id].tilesize.y};
 }
 
-#define GRIDILON            1.182940076
-#define GRIDEDGECYCLE       60
+#define GRIDEDGECYCLE       60          // determins range from 1/GRIDEDGECYCLEth of s second to GRIDEDGECYCLE seconds
+#define GRIDILON            1.182940076 // For timer intervals (determined by GRIDEDGECYCLE and TEMPORAL_ARRAY_SIZE)
 
 uint16_t init_temporal() {
     uint64_t osc;
@@ -1073,7 +1068,7 @@ uint16_t init_temporal() {
     double range_high = GRIDEDGECYCLE;
     double range_low = 1. / GRIDEDGECYCLE;
 
-    double ratio =  range_low;
+    double ratio = range_low;
     double value = range_low;
 
     double t = GetTime();
@@ -1086,8 +1081,8 @@ uint16_t init_temporal() {
         value += range_low * ratio;
         ratio *= GRIDILON;
     }
-    sys.temporal.prev_osc = 0; //
-    sys.temporal.osc = 0; // oscillator states
+    sys.temporal.prev_osc = 0;  // oscillator states
+    sys.temporal.osc = 0;       // oscillator states
 
     return osc;
 }
@@ -1108,6 +1103,77 @@ int16_t update_temporal(void) {
         }
     }
 }
+
+// ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** B E G I N
+// ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** B E G I N
+// ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** B E G I N
+
+typedef enum {
+    ASCII_NULL                      = 0,
+    ASCII_START_OF_HEADER           = 1,
+    ASCII_START_OF_TEXT             = 2,
+    ASCII_END_OF_TEXT               = 3,
+    ASCII_END_OF_TRANSMISSION       = 4,
+    ASCII_ENQUIRY                   = 5,
+    ASCII_ACKNOWLEDGE               = 6,
+    ASCII_BELL                      = 7,
+    ASCII_BACKSPACE                 = 8,
+    ASCII_HORIZONTAL_TAB            = 9,
+    ASCII_LINE_FEED                 = 10,
+    ASCII_VERTICAL_TAB              = 11,
+    ASCII_FORM_FEED                 = 12,
+    ASCII_CARRIAGE_RETURN           = 13,
+    ASCII_SHIFT_OUT                 = 14,
+    ASCII_SHIFT_IN                  = 15,
+    ASCII_DATA_LINK_ESCAPE          = 16,
+    ASCII_DEVICE_CONTROL_1          = 17,
+    ASCII_DEVICE_CONTROL_2          = 18,
+    ASCII_DEVICE_CONTROL_3          = 19,
+    ASCII_DEVICE_CONTROL_4          = 20,
+    ASCII_NEGATIVE_ACKNOWLEDGE      = 21,
+    ASCII_SYNCHRONOUS_IDLE          = 22,
+    ASCII_END_TRANSMISSION_BLOCK    = 23,
+    ASCII_CANCEL                    = 24,
+    ASCII_END_OF_MEDIUM             = 25,
+    ASCII_SUBSTITUTE                = 26,
+    ASCII_ESCAPE                    = 27,
+    ASCII_FILE_SEPARATOR            = 28,
+    ASCII_GROUP_SEPARATOR           = 29,
+    ASCII_RECORD_SEPARATOR          = 30,
+    ASCII_UNIT_SEPARATOR            = 31,
+    ASCII_SPACE                     = 32,
+    ASCII_DELETE                    = 127
+} ASCII_CONTROL_CODES;
+
+//PollInputEvents();  // Register all input events
+// https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-oemkeyscan
+uint16_t process_keyboard(void) {
+// Establish keyboard management / buffer
+// RLAPI int GetKeyPressed(void);                                // Get key pressed (keycode), call it multiple times for keys queued
+
+    // This is a *temporary* very wonky way of handling keyboard inputs....
+    uint16_t key = GetCharPressed();
+    if (key > 0)                       { sys.io.last_key = key;                      return key;}
+    if (IsKeyPressed(KEY_ENTER))       { sys.io.last_key = ASCII_CARRIAGE_RETURN;    return ASCII_CARRIAGE_RETURN;}
+    if (IsKeyPressed(KEY_KP_ENTER))    { sys.io.last_key = ASCII_CARRIAGE_RETURN;    return ASCII_CARRIAGE_RETURN;}
+    if (IsKeyPressed(KEY_ESCAPE))      { sys.io.last_key = ASCII_ESCAPE;             return ASCII_ESCAPE;}
+    if (IsKeyPressed(KEY_TAB))         { sys.io.last_key = ASCII_HORIZONTAL_TAB;     return ASCII_HORIZONTAL_TAB;}
+    if (IsKeyPressed(KEY_BACKSPACE))   { sys.io.last_key = ASCII_BACKSPACE;          return ASCII_BACKSPACE;}
+    if (IsKeyPressed(KEY_DELETE))      { sys.io.last_key = ASCII_DELETE;             return ASCII_DELETE;}
+    
+}
+
+// Establish mouse management (old x,y / current x,y)
+void process_mouse(void) {
+// RLAPI bool IsMouseButtonPressed(int button);                  // Check if a mouse button has been pressed once
+// RLAPI bool IsMouseButtonDown(int button);                     // Check if a mouse button is being pressed
+// RLAPI bool IsMouseButtonReleased(int button);                 // Check if a mouse button has been released once
+// RLAPI bool IsMouseButtonUp(int button);                       // Check if a mouse button is NOT being pressed
+}
+
+// ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** E N D
+// ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** E N D
+// ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** E N D
 
 // ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
 // ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** B E G I N
@@ -1366,41 +1432,6 @@ uint16_t load_asset (uint32_t assettype, const char* fileName, const char* fileT
     return id;
 }
 
-
-uint16_t load_palette(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
-    uint16_t asset_id = load_asset(ASSET_PALETTE, fileName, fileType, fileData, dataSize, pak);
-    float width = (float)sys.asset.img[asset_id].width;
-    float height = (float)sys.asset.img[asset_id].height;
-
-    sys.asset.tileset[asset_id].ascii_start = 0;
-    sys.asset.tileset[asset_id].tilesize = get_tile_size((Vector2) count, (Vector2) {width, height});
-//    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
-//    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
-    sys.asset.tileset[asset_id].count = count;
-    sys.asset.tileset[asset_id].total = count.x * count.y;
-
-    //debug_console_out(sprintf("load_palette ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
-    return asset_id;
-}
-
-uint16_t get_palette_color_count(asset_id) { sys.asset.tileset[asset_id].total; }
-
-uint16_t load_tileset(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t ascii_start) {
-    uint16_t asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
-    float width = (float)sys.asset.img[asset_id].width;
-    float height = (float)sys.asset.img[asset_id].height;
-
-    sys.asset.tileset[asset_id].ascii_start = ascii_start;
-    sys.asset.tileset[asset_id].tilesize = get_tile_size((Vector2) count, (Vector2) {width, height});
-//    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
-//    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
-    sys.asset.tileset[asset_id].count = count;
-    sys.asset.tileset[asset_id].total = count.x * count.y;
-
-    //debug_console_out(sprintf("load_tileset ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
-    return asset_id;
-}
-
 static int16_t unload_asset(uint32_t id) {
     int16_t status = 0;
     if (BITS_TEST(sys.asset.state[id], ASSET_ACTIVE)) {
@@ -1515,6 +1546,59 @@ uint16_t unload_all_assets(void) {
     return count;
 }
 
+uint16_t get_palette_color_count(asset_id) { sys.asset.tileset[asset_id].total; }
+
+uint16_t load_palette(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak) {
+    uint16_t asset_id = load_asset(ASSET_PALETTE, fileName, fileType, fileData, dataSize, pak);
+    float width = (float)sys.asset.img[asset_id].width;
+    float height = (float)sys.asset.img[asset_id].height;
+
+    sys.asset.tileset[asset_id].ascii_start = 0;
+    sys.asset.tileset[asset_id].tilesize = get_tile_size((Vector2) count, (Vector2) {width, height});
+//    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
+//    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
+    sys.asset.tileset[asset_id].count = count;
+    sys.asset.tileset[asset_id].total = count.x * count.y;
+
+    //debug_console_out(sprintf("load_palette ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
+    return asset_id;
+}
+
+Rectangle get_tilezone_from_position(uint16_t asset_id, Vector2 position) {
+    EX_tileset *tileset = &sys.asset.tileset[asset_id];
+    if ((position.x >= tileset->count.x) || position.x < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.x, tileset->tilesize.y};
+    if ((position.y >= tileset->count.y) || position.y < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.y, tileset->tilesize.y};
+    Vector2 *tilesize = &sys.asset.tileset[asset_id].tilesize;
+    return (Rectangle) {position.x * tilesize->x, position.y * tilesize->y,  tilesize->x, tilesize->y};
+}
+
+Rectangle get_tilezone_from_code(uint16_t asset_id, uint16_t code) {
+    EX_tileset *tileset = &sys.asset.tileset[asset_id];
+
+    code -= sys.asset.tileset[asset_id].ascii_start;
+    if (code > sys.asset.tileset[asset_id].total || code < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.x, tileset->tilesize.y};
+
+    float px = code % (uint32_t)tileset->count.x;
+    float py = (uint32_t)(code / (uint32_t)tileset->count.x);
+    Vector2 *tilesize = &sys.asset.tileset[asset_id].tilesize;
+    return (Rectangle) {px * tilesize->x, py * tilesize->y,  tilesize->x, tilesize->y};
+}
+
+uint16_t load_tileset(Vector2 count, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t ascii_start) {
+    uint16_t asset_id = load_asset(ASSET_TILESET, fileName, fileType, fileData, dataSize, pak);
+    float width = (float)sys.asset.img[asset_id].width;
+    float height = (float)sys.asset.img[asset_id].height;
+
+    sys.asset.tileset[asset_id].ascii_start = ascii_start;
+    sys.asset.tileset[asset_id].tilesize = get_tile_size((Vector2) count, (Vector2) {width, height});
+//    sys.asset.tileset[asset_id].tilesize.x = width / count.x;
+//    sys.asset.tileset[asset_id].tilesize.y = height / count.y;
+    sys.asset.tileset[asset_id].count = count;
+    sys.asset.tileset[asset_id].total = count.x * count.y;
+
+    //debug_console_out(sprintf("load_tileset ---- %s WIDTH=%f, HEIGHT=%f, COUNT (%f, %f), SIZE (%f, %f)", fileName, width, height, count.x, count.y, sys.asset.tileset[asset_id].tilesize.x, sys.asset.tileset[asset_id].tilesize.y), asset_id);
+    return asset_id;
+}
 
 // ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** E N D
 // ********** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** A S S E T   S Y S T E M  ***** E N D
@@ -1596,7 +1680,7 @@ typedef enum {
     CVFE_FGBLINK_MASK       = 0b0000000000000000000000000000000000000011100000000000000000000000,
     CVFE_DEFAULT1           = 0b0000000000000000000000000000000000000000011100000000000011110101, // DEFAULT STATE :HEAVY PROCESSING
     CVFE_DEFAULT2           = 0b0000000000000000000000000000000000000000000000001100000011110111, // DEFAULT STATE :SCROLLTEXT
-    CVFE_DEFAULT3           = 0b0000000000000000000000000000000000000000000000000000000000000000, // DEFAULT STATE :GAME canvas
+    CVFE_DEFAULT3           = 0b0000000000000000000000000000000000000000000011110000000011110001, // DEFAULT STATE :GAME canvas
     CVFE_DEFAULT4           = 0b0000000000000000000000000000000000000000000000000100000011110101  // DEFAULT STATE :TERMINAL DISPLAY
 } canvas_features;
 
@@ -1604,30 +1688,8 @@ typedef enum {
 #define CVFE_LNBLINK_BITS   29
 #define CVFE_BGBLINK_BITS   26
 #define CVFE_FGBLINK_BITS   23
-#define GET_FROM_STATE(state, mask, shift) ((state & mask) >> shift) // shifting greater than 31 is invalid in non 64bit -march...
+#define GET_FROM_STATE(state, mask, shift) ((state & mask) >> shift) // be weary that shifting greater than 31 is invalid in non 64bit -march...
 
-Rectangle get_tilezone_from_position(uint16_t asset_id, Vector2 position) {
-    EX_tileset *tileset = &sys.asset.tileset[asset_id];
-    if ((position.x >= tileset->count.x) || position.x < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.x, tileset->tilesize.y};
-    if ((position.y >= tileset->count.y) || position.y < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.y, tileset->tilesize.y};
-    Vector2 *tilesize = &sys.asset.tileset[asset_id].tilesize;
-    return (Rectangle) {position.x * tilesize->x, position.y * tilesize->y,  tilesize->x, tilesize->y};
-}
-
-Rectangle get_tilezone_from_code(uint16_t asset_id, uint16_t code) {
-    EX_tileset *tileset = &sys.asset.tileset[asset_id];
-
-    code -= sys.asset.tileset[asset_id].ascii_start;
-    if (code > sys.asset.tileset[asset_id].total || code < 0) return (Rectangle) {0.f, 0.f, tileset->tilesize.x, tileset->tilesize.y};
-
-    float px = code % (uint32_t)tileset->count.x;
-    float py = (uint32_t)(code / (uint32_t)tileset->count.x);
-    Vector2 *tilesize = &sys.asset.tileset[asset_id].tilesize;
-    return (Rectangle) {px * tilesize->x, py * tilesize->y,  tilesize->x, tilesize->y};
-}
-
-
-//        plot_character(ex_scrolltext[s].font, ch, position, (Vector2) {text_scale}, (Vector2) {2, 4}, ex_scrolltext[s].text_angle, col, ex_scrolltext[s].colorbg, colorln, state);
 void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, uint64_t state) {
     //add logic for out of bound position
     // get the current render texture's size
@@ -1686,17 +1748,18 @@ void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vecto
     }
 }
 
-static void plot_cell(uint16_t canvasgroup_id, uint16_t canvas_id, EX_cell* cell, Vector2 target) {
+static void plot_cell(uint16_t canvasgroup_id, uint16_t canvas_id, EX_cell *cell_t, Vector2 target) {
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
     if (target.x >= lsx || target.y >= lsy || target.x < 0 || target.y < 0) return;
 
-    EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     uint16_t linear_offset = lsx * target.y + target.x;
-    target_cell[linear_offset] = *cell;
+    EX_cell *cell_array  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
+    EX_cell *cell = &cell_array[linear_offset];
+    memcpy(cell, cell_t, sizeof(EX_cell));
 }
 
-int16_t init_cell_linear(EX_cell *cell, uint64_t cell_state, uint32_t color_id, uint32_t colorbg_id) {
+int16_t init_cell_zone_linear(EX_cell *cell, uint64_t cell_state, uint32_t color_id, uint32_t colorbg_id) {
     cell->state = cell_state;
     cell->value = 0;
     cell->colorfg_id = color_id;
@@ -1707,9 +1770,9 @@ int16_t init_cell_linear(EX_cell *cell, uint64_t cell_state, uint32_t color_id, 
 
     cell->fg_brightness = 1.f;
     cell->bg_brightness = 1.f;
+
     return 0;
 }
-
 
 void set_canvas_default_palette(uint16_t canvasgroup_id, uint16_t canvas_id, uint16_t palette_id) {
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
@@ -1722,7 +1785,7 @@ void set_canvas_default_asset(uint16_t canvasgroup_id, uint16_t canvas_id, uint1
 }
 
 uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 size, uint64_t canvas_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
-    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
+    //EX_canvasgroup *canvasgroup = sys.video.canvasgroup[canvasgroup_id];
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     uint32_t cell_count = (uint16_t)size.x * (uint16_t)size.y;
     canvas->size = size;
@@ -1741,34 +1804,52 @@ uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 size, 
 
     EX_cell *cell = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint32_t i = 0; i < cell_count; i++) {
-        init_cell_linear(&cell[i], cell_state, 0, 0); // this process is temporary, as the faster alternative is to mass copy a template cell
+        init_cell_zone_linear(&cell[i], cell_state, 0, 0); // this process is temporary, as the faster alternative is to mass copy a template cell
+    }
+    return 1;
+}
+
+uint16_t init_canvas_section_templated(uint16_t canvasgroup_id, uint16_t canvas_id, EX_cell *cell_t, Rectangle target) {
+    uint16_t linear_offset;
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+
+    if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
+    if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
+    if ((target.y + target.height) > lsy) target.height = lsy - target.y;
+
+    EX_cell *cell_array = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
+    for (uint16_t x = target.x; x++; x < (target.x + target.width)) {
+        for (uint16_t y = target.y; y++; y < (target.y + target.height)) {
+            linear_offset = lsx * y + x;
+            EX_cell *cell = &cell_array[linear_offset];
+            memcpy(cell, cell_t, sizeof(EX_cell));            
+        }
     }
     return 1;
 }
 
 uint16_t init_canvas_templated(uint16_t canvasgroup_id, uint16_t canvas_id, EX_canvas *canvas_t, EX_cell *cell_t) {
-    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
+    //EX_canvasgroup *canvasgroup = sys.video.canvasgroup[canvasgroup_id];
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     memcpy(canvas, canvas_t, sizeof(EX_canvas));//    canvas = (EX_canvas)canvas_t;
-    canvas->cell_count = canvas->size.x * canvas->size.y;
+    canvas->cell_count = (canvas->size.x * canvas->size.y);
     canvas->cell = calloc(canvas->cell_count, sizeof(EX_cell));
 
     EX_cell *cell_array = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
-    for (uint32_t i = 0; i < canvas->cell_count; i++) {
-        EX_cell *cell = &cell_array[i];
-        memcpy(cell, cell_t, sizeof(EX_cell));//        cell[i] = (EX_cell)cell_t;
+    for (uint32_t linear_offset = 0; linear_offset < canvas->cell_count; linear_offset++) {
+        EX_cell *cell = &cell_array[linear_offset];
+        memcpy(cell, cell_t, sizeof(EX_cell));
     }
     return 1;
 }
 
 void set_canvasgroup_default_palette(uint16_t canvasgroup_id, uint16_t palette_id) {
-    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
-    canvasgroup->default_palette_id = palette_id;
+    sys.video.canvasgroup[canvasgroup_id].default_palette_id = palette_id;
 }
 
 void set_canvasgroup_default_asset(uint16_t canvasgroup_id, uint16_t asset_id) {
-    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
-    canvasgroup->default_asset_id = asset_id;
+    sys.video.canvasgroup[canvasgroup_id].default_asset_id = asset_id;
 }
 
 uint16_t init_canvasgroup(uint32_t canvasgroup_id, uint32_t canvasgroup_state, uint16_t canvas_count) {
@@ -1783,10 +1864,11 @@ uint16_t init_canvasgroup(uint32_t canvasgroup_id, uint32_t canvasgroup_state, u
     }
     return canvases;
 */
+    return canvas_count;
 }
 
-// *************** REFERENCING SHORTCUTS TO USE *****************
-// EX_canvasgroup  *canvasgroup  = &sys.video.canvasgroup[canvasgroup_id];
+// *************** REFERENCE SHORTCUTS TO USE *****************
+// EX_canvasgroup  *canvasgroup  = sys.video.canvasgroup[canvasgroup_id];
 // EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
 // EX_cell  *cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0]; ( cell[50].state )
 // This functionality requires setting a bunch of stuff afterwards;
@@ -1820,8 +1902,7 @@ uint16_t unload_canvas(uint16_t canvasgroup_id, uint16_t canvas_id) {
 
 uint16_t unload_canvasgroup(uint16_t canvasgroup_id) {
     uint16_t canvases = 0;
-    EX_canvasgroup *canvasgroup = &sys.video.canvasgroup[canvasgroup_id];
-    for (uint16_t canvas_id = 0; canvas_id < (canvasgroup->canvas_count); canvas_id++) {
+    for (uint16_t canvas_id = 0; canvas_id < (sys.video.canvasgroup[canvasgroup_id].canvas_count); canvas_id++) {
         canvases += unload_canvas(canvasgroup_id, canvas_id);
     }
     if (canvases) free(sys.video.canvasgroup[canvasgroup_id].canvas);
@@ -1839,24 +1920,24 @@ uint16_t unload_all_canvasgroups() {
 
 void canvas_set_mouse_position(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 target) {
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
-    canvas->mousecursor.offset = target;
+    //canvas->mousecursor->offset = target;
 }
 
 void canvas_set_keyboard_position(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 target) {
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
     if (target.x >= lsx) target.x = lsx - 1; else if (target.x < 0) target.x = 0;
     if (target.y >= lsy) target.y = lsy - 1; else if (target.y < 0) target.y = 0;
-    canvas->keycursor.offset = target;
+    //canvas->keycursor->offset = target;
 }
 
 void set_cell_state(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint64_t state) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1874,7 +1955,7 @@ void set_cell_state(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targe
 void clear_cell_state(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint64_t state) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1892,7 +1973,7 @@ void clear_cell_state(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle tar
 void set_cell_colorfg(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint16_t color_id) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1910,7 +1991,7 @@ void set_cell_colorfg(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle tar
 void set_cell_colorbg(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint16_t color_id) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1928,7 +2009,7 @@ void set_cell_colorbg(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle tar
 void set_cell_colorln(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint16_t color_id) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1946,7 +2027,7 @@ void set_cell_colorln(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle tar
 void set_cell_color_mask(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, Color color) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1964,7 +2045,7 @@ void set_cell_color_mask(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle 
 void set_cell_color_shadow_mask(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, Color color) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -1982,7 +2063,7 @@ void set_cell_color_shadow_mask(uint16_t canvasgroup_id, uint16_t canvas_id, Rec
 void set_cell_offset(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, Vector2 offset) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -2000,7 +2081,7 @@ void set_cell_offset(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targ
 void set_cell_angle(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, float angle) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -2018,7 +2099,7 @@ void set_cell_angle(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targe
 void set_cell_scale(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, Vector2 scale) {
     uint16_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
     if ((target.x + target.width) > lsx) target.width = lsx - target.x; 
@@ -2036,7 +2117,8 @@ void set_cell_scale(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle targe
 uint16_t get_cell_colorfg(uint16_t canvas_id, Vector2 target) {
     uint16_t canvasgroup_id = sys.video.current_virtual;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+
     if (target.x >= lsx || target.y >= lsy || target.x < 0 || target.y < 0) return;
 
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
@@ -2047,7 +2129,8 @@ uint16_t get_cell_colorfg(uint16_t canvas_id, Vector2 target) {
 uint16_t get_cell_colorbg(uint16_t canvas_id, Vector2 target) {
     uint16_t canvasgroup_id = sys.video.current_virtual;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+
     if (target.x >= lsx || target.y >= lsy || target.x < 0 || target.y < 0) return;
 
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
@@ -2098,10 +2181,11 @@ typedef enum {
 } cellfield_features;
 
 // init every cell using a prototype cell and based on a stat system
-void init_cell (uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, EX_cell info_cell, uint64_t state) {
+void init_cell_zone (uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, EX_cell info_cell, uint64_t state) {
     uint32_t target_offset, source_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
@@ -2143,13 +2227,14 @@ void init_cell (uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, E
 
 void clear_cell (uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, uint64_t state) {
     static inline EX_cell blank_cell;
-    init_cell(canvasgroup_id, canvas_id, target, blank_cell, state);
+    init_cell_zone(canvasgroup_id, canvas_id, target, blank_cell, state);
 }
 
 void shift_cell_field_rectangle(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, float shift, uint64_t state) {
     uint16_t target_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
@@ -2186,7 +2271,8 @@ void shift_cell_field_rectangle(uint16_t canvasgroup_id, uint16_t canvas_id, Rec
 void shift_cell_field_circle(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle target, float shift, uint64_t state) {
     uint32_t linear_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+
     EX_cell  *target_cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     if (target.x >= lsx || target.y >= lsy || (target.x + target.width) < 0 || (target.y + target.height) < 0) return;
@@ -2218,7 +2304,8 @@ typedef enum {
 void copy_cell_in_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle source, Vector2 target, uint64_t state) {
     uint32_t source_offset, target_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+
     EX_cell  *cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     
     if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
@@ -2273,7 +2360,7 @@ void copy_cell_in_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle 
 void shift_cell (uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle source, uint8_t shift_method, bool cycle, uint64_t state) {
     uint32_t source_offset, target_offset;
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
     EX_cell  *cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
 
     //if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
@@ -2287,7 +2374,8 @@ void copy_cell_to_canvas(uint16_t source_canvasgroup_id, uint16_t source_canvas_
     uint32_t source_offset, target_offset;
 
     EX_canvas *source_canvas = &sys.video.canvasgroup[source_canvasgroup_id].canvas[source_canvas_id];
-    uint16_t lsx = source_canvas->size.x, lsy = source_canvas->size.y;
+    uint16_t lsx = source_canvas->size.x, lsy = source_canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+
     EX_cell  *source_cell  = &sys.video.canvasgroup[source_canvasgroup_id].canvas[source_canvas_id].cell[0];
 
     EX_canvas *target_canvas = &sys.video.canvasgroup[target_canvasgroup_id].canvas[target_canvas_id];
@@ -2341,7 +2429,7 @@ void copy_cell_to_canvas(uint16_t source_canvasgroup_id, uint16_t source_canvas_
 
 void copy_canvas() {
     // copy canvas routine, mostly used for backup restore of canvas content from / to a copy buffer
-    // potentially use memcpy(dest, src, len);
+    // potentially use calloc.... then ....memcpy(dest, src, len);
 }
 
 void render_canvas(uint16_t canvas_id) {
@@ -2353,7 +2441,10 @@ void render_canvas(uint16_t canvas_id) {
     uint32_t cell_offset;
     Vector2 rendersize = get_current_virtual_size();
     Vector2 shadow = canvas->shadow;
-    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+
+    Vector2 tsize, tscaled, offset, cellpos, skew; // per cell calculated values
+
     for (uint16_t x = 0; x < lsx; x++) {
         for (uint16_t y = 0; y < lsy; y++) {
             cell_offset = (lsx * y + x);
@@ -2361,41 +2452,36 @@ void render_canvas(uint16_t canvas_id) {
             uint64_t state = c->state;
 
             // establish scaling on screen....  For a 512x224 display = 64x28 tiles of 8 x 8 pixels, for that we need a ratio for x and y
-            Vector2 tsize  = canvas->default_tilesize;
-            Vector2 tscaled = {c->scale.x * tsize.x, c->scale.y * tsize.y};
-            Vector2 offset = c->offset;
-            Vector2 cellpos = {canvas->offset.x + offset.x + x * tsize.x, canvas->offset.y + offset.y + y * tsize.y};
-            Vector2 skew; if (!(state & CVFE_SKEW))     skew = (Vector2){0}; else skew = c->skew;
+            tsize  = canvas->default_tilesize;
+            if (state & CVFE_SCALE_X) tscaled.x = c->scale.x * tsize.x; else tscaled.x = tsize.x;
+            if (state & CVFE_SCALE_Y) tscaled.y = c->scale.y * tsize.y; else tscaled.y = tsize.y;
+            offset = c->offset;
+            cellpos = (Vector2){canvas->offset.x + offset.x + x * tsize.x, canvas->offset.y + offset.y + y * tsize.y};
+            if (!(state & CVFE_SKEW))     skew = (Vector2){0}; else skew = c->skew;
 
             // if inbound proceed to draw cell tiles
-            if (((cellpos.x + tscaled.x + skew.x) >= 0) && ((cellpos.y + tscaled.y + skew.y) >= 0) && ((cellpos.x) <= rendersize.x) && ((cellpos.y) <= rendersize.y)) {
+            if (((cellpos.x + tscaled.x + skew.x) >= 0) && ((cellpos.y + tscaled.y + skew.y) >= 0) && (cellpos.x <= rendersize.x) && (cellpos.y <= rendersize.y)) {
 
-/*  All STATES (exhaustive logic)
-    // This is a different beast and not sure yet how to handle sequences
-    CVFE_LINESSEQ            // turn on lines sequencing
-    CVFE_COLORSEQ            // turn on color sequencing
-    CVFE_VALUESEQ            // turn on cell value sequencing
-    // This is a different beast and not sure yet how to handle scrolling of tiles
-    CVFE_AUTOSCRX            // turn on automatic scrolling on x axis
-    CVFE_AUTOSCRY            // turn on automatic scrolling on y axis
-    if (state & CVFE_ROTATION) // then allow using the rotation value else use 0 
-    if (state & CVFE_SKEW)   // then allow using the skew value else use 0
-    if (state & CVFE_CELLDIS)  // then allow corner displacements
-    CVFE_SCALE_X             // turn on cell scaling on x axis
-    CVFE_SCALE_Y             // turn on cell scaling on y axis
-    CVFE_WRAP_X              // turn on wrap around on x axis
-    CVFE_WRAP_Y              // turn on wrap around on y axis
-    CVFE_FLIPH               // flip cell(s) horizontally
-    CVFE_FLIPV               // flip cell(s) vertically
+/*  
+    if (state & CVFE_LINESSEQ)            // turn on lines sequencing
+    if (state & CVFE_COLORSEQ)            // turn on color sequencing
+    if (state & CVFE_VALUESEQ)            // turn on cell value sequencing
+    if (state & CVFE_AUTOSCRX)            // turn on automatic scrolling on x axis
+    if (state & CVFE_AUTOSCRY)            // turn on automatic scrolling on y axis
+    if (state & CVFE_CELLDIS)             // then allow corner displacements
+    if (state & CVFE_WRAP_X)              // turn on wrap around on x axis
+    if (state & CVFE_WRAP_Y)              // turn on wrap around on y axis
+    if (state & CVFE_FLIPH)               // flip cell(s) horizontally
+    if (state & CVFE_FLIPV)               // flip cell(s) vertically
 */
                 uint16_t palette_id = c->palette_id;   if (!palette_id) palette_id = canvas->default_palette_id;
 
                 // for now only canvas alpha supported, per cell alpha will force to use float to combine canvas and cell alpha (potentially), or set the texture alpha as the canvas alpha
-                Color colorfg = get_palette_color_pro(palette_id, c->colorfg_id, canvas->alpha, c->fg_brightness * canvas->fg_brightness);
-                Color colorbg = get_palette_color_pro(palette_id, c->colorbg_id, canvas->alpha, c->bg_brightness * canvas->bg_brightness);
+                Color colorfg = get_palette_color_pro(palette_id, c->colorfg_id, 255, c->fg_brightness * canvas->fg_brightness); // canvas->alpha
+                Color colorbg = get_palette_color_pro(palette_id, c->colorbg_id, 255, c->bg_brightness * canvas->bg_brightness); // canvas->alpha
                 Color colorln = get_palette_color(palette_id, c->colorln_id);
  
-                float angle; if (!(state & CVFE_ROTATION))  angle = 0.f; else  angle = c->angle;
+                float angle = angle = c->angle;     if (!(state & CVFE_ROTATION))  angle = 0.f;
 
                 if (state & CVFE_BACKGROUND) {
                     // background set color of corner to color of next tile 
@@ -2415,10 +2501,8 @@ void render_canvas(uint16_t canvas_id) {
                         (Rectangle) { cellpos.x, cellpos.y, tscaled.x, tscaled.y },
                         (Vector2) {0,0}, (Vector2) {0,0}, angle, vertex_colors);
                 }
-                uint16_t asset_id = c->asset_id;
-                if (!asset_id) asset_id = canvas->default_asset_id;
+                uint16_t asset_id = c->asset_id;     if (!asset_id) asset_id = canvas->default_asset_id;
                 if (state & CVFE_FOREGROUND) {
-                    uint16_t value = c->value;
                     if (state & CVFE_SHADOW) {
                         if (shadow.x != 0 || shadow.y != 0) {
                             vertex_colors[0] = (Color) {0.f, 0.f, 0.f, 48.f};
@@ -2426,7 +2510,7 @@ void render_canvas(uint16_t canvas_id) {
                             vertex_colors[2] = (Color) {0.f, 0.f, 0.f, 48.f};
                             vertex_colors[3] = (Color) {0.f, 0.f, 0.f, 48.f};
                             DrawTexturePro2(sys.asset.tex[asset_id],
-                                get_tilezone_from_code(asset_id, value),
+                                get_tilezone_from_code(asset_id, c->value),
                                 (Rectangle) { cellpos.x + shadow.x, cellpos.y + shadow.y, tscaled.x, tscaled.y },
                                 (Vector2) {0,0}, skew, angle, vertex_colors);
                         }
@@ -2446,7 +2530,7 @@ void render_canvas(uint16_t canvas_id) {
                     vertex_colors[2] = vertex_colors[0];
                     vertex_colors[3] = vertex_colors[0];
                     DrawTexturePro2(sys.asset.tex[asset_id],
-                        get_tilezone_from_code(asset_id, value),
+                        get_tilezone_from_code(asset_id, c->value),
                         (Rectangle) { cellpos.x, cellpos.y , tscaled.x, tscaled.y },
                         (Vector2) {0,0}, skew, angle, vertex_colors);
                 }
@@ -2465,17 +2549,21 @@ void render_canvas(uint16_t canvas_id) {
                         (Rectangle) { cellpos.x, cellpos.y , tscaled.x, tscaled.y },
                         (Vector2) {0,0}, skew, angle, vertex_colors);
                 }
+                //DrawText(TextFormat("%c", (char)c->value), cellpos.x, cellpos.y, 5, WHITE); // DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!
+                //DrawText(TextFormat("%i", asset_id), cellpos.x, cellpos.y, 10, WHITE); // DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!
+                //DrawText(TextFormat("%i", palette_id), cellpos.x, cellpos.y, 10, WHITE); // DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!
             }
         }
     }
+    //DrawText(TextFormat("CANVAS SIZE = %ix%i", lsx, lsy), 0, 0, 10, GREEN); // DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!
 //logic to show mouse cursor
 //IsCursorOnScreen(void)
-//RLAPI Vector2 GetMousePosition(void);                         // Get mouse position XY
+//RLAPI Vector2 GetMousePosition(void);
 }
 
 void render_canvasgroup(void) {
     uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
-    EX_canvasgroup  *canvasgroup  = &sys.video.canvasgroup[canvasgroup_id];
+    //EX_canvasgroup  *canvasgroup  = &sys.video.canvasgroup[canvasgroup_id];
 
     begin_draw(true);
     for (uint16_t i = 0; i < sys.video.canvasgroup[canvasgroup_id].canvas_count; i++) {
@@ -2660,7 +2748,7 @@ static int16_t update_marquee_animation(uint16_t asset_id, uint16_t palette_id, 
     uint16_t display = sys.video.current_virtual;
     Vector2 vres = get_current_virtual_size();
     if (ex_marquee[display].palptr_next_frame_time < sys.video.vscreen[display].frame_time_inc) {
-        ex_marquee[display].palptr_next_frame_time = sys.video.vscreen[display].frame_time_inc + 1/absf(speed);
+        ex_marquee[display].palptr_next_frame_time = sys.video.vscreen[display].frame_time_inc + 1/ffast_abs(speed);
         if (speed > 0.0f)  ex_marquee[display].palptr += 1;  else  ex_marquee[display].palptr -= 1;
         if (ex_marquee[display].palptr > 255) {ex_marquee[display].palptr -= 256;} else if (ex_marquee[display].palptr < 0) {ex_marquee[display].palptr += 256;};
     };
@@ -2701,8 +2789,8 @@ static int16_t update_marquee_animation(uint16_t asset_id, uint16_t palette_id, 
 // ********** C A N O P Y   S Y S T E M  ***** C A N O P Y   S Y S T E M  ***** C A N O P Y   S Y S T E M  ***** B E G I N
 // ********** C A N O P Y   S Y S T E M  ***** C A N O P Y   S Y S T E M  ***** C A N O P Y   S Y S T E M  ***** B E G I N
 
-#define CANOPYMAXX 64
-#define CANOPYMAXY 32
+#define CANOPYMAX_X 64
+#define CANOPYMAX_Y 32
 
 typedef struct EX_canopy {
     Vector2 sin_value;
@@ -2718,7 +2806,7 @@ typedef struct EX_canopy {
     int16_t pal_idx_text;
     uint16_t font_id;
     uint16_t palette_id;
-    Vector2 grid[CANOPYMAXY][CANOPYMAXX]; // set to max capacity
+    Vector2 grid[CANOPYMAX_Y][CANOPYMAX_X]; // set to max capacity
 } EX_canopy;
 
 EX_canopy ex_canopy;
@@ -2747,7 +2835,7 @@ static void init_canopy (uint16_t font_id, uint16_t palette_id, Vector2 cells, V
 
 static int16_t update_canopy(uint16_t asset_id) {
     Vector2 vres = get_current_virtual_size();
-    ex_canopy.offset.x = (vres.x - ((ex_canopy.cells_x + 1) * ex_canopy.cell_size.x)) * 0.5f;
+    ex_canopy.offset.x = (vres.x - ((ex_canopy.cells_x) * ex_canopy.cell_size.x)) * 0.5f;
     ex_canopy.offset.y = 7.0f * ex_canopy.cell_size.x + (255.f - ex_canopy.transparency);
     if ((ex_canopy.transparency > 0.0f) & (ex_canopy.offset.y <= vres.y)) {
             
@@ -2864,6 +2952,7 @@ static void init_scrolltext(uint16_t s, uint16_t asset_id, uint16_t font_id, uin
     ex_scrolltext[s].colorbg = 0;
 }
 
+// picks from the Atari 256 GTIA colors as indexed
 const uint16_t scrolltext_color[] = {
         33,   // BROWN
         41,   // BEIGE
@@ -3026,8 +3115,7 @@ static int16_t update_scrolltext(uint16_t s, float text_scale) {
                         ex_scrolltext[s].text_angle = displacement.y;
                     };
 
-                    uint64_t state = 0;
-                    BITS_ON(state, CVFE_DEFAULT2);
+                    uint64_t state = CVFE_DEFAULT2;
                     if (ex_scrolltext[s].colorbg_flag == 0) BITS_OFF(state, CVFE_BACKGROUND);
                     if (!(ex_scrolltext[s].text_angle))     BITS_OFF(state, CVFE_ROTATION);
                     if (ex_scrolltext[s].text_shadow == 0.0) BITS_OFF(state, CVFE_SHADOW);
@@ -3062,57 +3150,302 @@ static int16_t update_scrolltext(uint16_t s, float text_scale) {
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** E N D
 // ********** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** S C R O L L T E X T   S Y S T E M  ***** E N D
 
-// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** B E G I N
-// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** B E G I N
-// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** B E G I N
-
-// MUSIC SCORING
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
 typedef enum {
-    octave_up           = 192,
-    octave_down         = 193,
-    instrument_up       = 194,
-    instrument_down     = 195,
-    enable_arpeggio     = 196,
-    disable_arpeggio    = 197,
-    perc_bd1            = 224,
-    perc_bd2            = 225,
-    perc_sn1            = 226,
-    perc_sn2            = 227,
-    perc_tom1           = 228,
-    perc_tom2           = 229,
-    perc_tom3           = 230,
-    perc_cymbal         = 231,
-    perc_oph            = 232,
-    perc_clhh           = 233,
-    perc_cbell          = 234,
-    perc_wblk           = 235,
-    perc_clap           = 236,
-    perc_rim            = 237,
-    perc_tamb           = 238,
-    null_function       = 255
-} track_editor;
-
-static const kbmap_piano[] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    TRACK_RESERVED          = 0b10000000000000000000000000000000,
+    TRACK_SWITCH_IMMEDIATE  = 0b00100000000000000000000000000000,
+    TRACK_STOP_UNFOCUSED    = 0b00010000000000000000000000000000,
+    TRACK_RESTART_ON_FOCUS  = 0b00001000000000000000000000000000,
+    TRACK_PAUSE_ON_PAUSE    = 0b00000010000000000000000000000000,
+    TRACK_PAUSE_ON_TERMINAL = 0b00000000100000000000000000000000,
+    TRACK_STOPPED           = 0b00000000000000000000000000100000,
+    TRACK_PAUSED            = 0b00000000000000000000000000010000,
+    TRACK_FINISHED          = 0b00000000000000000000000000001000,
+    TRACK_EXPIRED           = 0b00000000000000000000000000000010,
+    TRACK_ACTIVE            = 0b00000000000000000000000000000001
 };
 
-// Add all level design tools and import / export capability
-// Editor design will benefit from the paging system capabilities for menu options
+// no wav or mp3 support implemented yet (!)
 
-// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E N D
-// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E N D
-// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E N D
+int16_t init_audio_properties(void) {
+    bool status = 0;
+    InitAudioDevice();
+    sys.audio.total_tracks = 0;
+    sys.audio.global_volume = 0.5f;
+    SetMasterVolume(sys.audio.global_volume); 
+    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
+        sys.audio.track[id].is_playing = false;
+        sys.audio.track[id].volume = 1.0f;
+        sys.audio.track[id].order_playing = 0;
+        sys.audio.track[id].total_orders = 0;
+        for (uint16_t j=0; j < MAXORDERS; j++) {
+            sys.audio.track[id].order[j] = 0;
+        }
+    }
+    if  (IsAudioDeviceReady()) return status; else return 1;
+    return status;
+}
+
+int16_t update_audio(void) {
+    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
+        if (sys.audio.track[id].is_playing) {
+            if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
+                UpdateMusicStream(sys.asset.music[sys.audio.track[id].asset]);
+            }
+        }
+    }
+}
+
+static int16_t add_track(uint16_t display, uint32_t state, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t total_orders, uint16_t orderlist[]) {
+    uint16_t track_id = sys.audio.total_tracks;
+    sys.audio.track[track_id].virtual_display = display;
+    sys.audio.track[track_id].state = state;
+    sys.audio.track[track_id].asset = load_asset(ASSET_XM, fileName, fileType, fileData, dataSize, pak);
+    sys.audio.track[track_id].volume = 1.f;
+    //uint16_t asset = sys.audio.track[].asset_playing;
+
+    //uint16_t total_orders = sizeof(orderlist[0]) / sizeof(int);
+    for (uint16_t i = 0; i < total_orders; i++) {
+        sys.audio.track[track_id].order[i] = orderlist[i];
+    }
+    sys.audio.track[track_id].total_orders = total_orders;
+
+    sys.audio.total_tracks += 1;
+    return track_id;
+}
+
+//StopMusicStream(sys.asset.music[asset]);
+void change_music_stream(uint16_t track_id, uint16_t order_id, bool immediate) {
+    uint16_t asset = sys.audio.track[track_id].asset;
+    sys.audio.track[track_id].order_playing = order_id;
+    
+    if (order_id < sys.audio.track[track_id].total_orders) {
+        if (!immediate) { // switches at end of pattern
+            jar_xm_pattern_jump(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id]);
+        } else { // switches immediately
+            jar_xm_pattern_jump_immediate(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id], true);
+        };
+    }
+}
+
+static void hint_restart_track(bool immediate) {
+    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
+        if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
+            if (sys.audio.track[id].state || TRACK_RESTART_ON_FOCUS) {
+                sys.audio.track[id].is_playing = true;
+                uint16_t order = sys.audio.track[id].order_playing;
+                change_music_stream(id, order, immediate);
+            }
+        }
+    }
+}
+
+static void play_track(uint16_t track_id, uint16_t order_id, bool immediate) {
+    sys.audio.track[track_id].is_playing = true;
+    uint16_t asset = sys.audio.track[track_id].asset;
+	PlayMusicStream(sys.asset.music[asset]);
+    change_music_stream(track_id, order_id, immediate);
+}
+
+static void change_track_playing(uint16_t track_id, uint16_t value) {
+    sys.audio.track[track_id].is_playing = true;
+    uint16_t proposed_order = (sys.audio.track[track_id].order_playing + value) % sys.audio.track[track_id].total_orders;
+    change_music_stream(track_id, proposed_order, true);
+}
+
+//    jar_xm_change_all_channel_volumes(sys.asset.music[asset].ctxData, (int) amount); // DO NOT USE, INSTEAD REVAMP TRACKER MIXER
+static void change_track_volume(uint16_t track, float volume) {
+    if (volume>=0.f && volume <=1.0f) sys.audio.track[track].volume = volume;
+    uint16_t asset = sys.audio.track[track].asset;
+	SetMusicVolume(sys.asset.music[asset], sys.audio.track[track].volume);
+}
+
+static void change_global_volume(float amount) {
+    sys.audio.global_volume += amount;
+    if ( sys.audio.global_volume > 1.0f) sys.audio.global_volume = 1.0f; else if ( sys.audio.global_volume < 0.0f) sys.audio.global_volume = 0.0f;
+    SetMasterVolume(sys.audio.global_volume);
+}
+
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
+// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
+
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
+
+typedef enum {
+    VIDEO_RESERVED       = 0b10000000000000000000000000000000, // 
+    VIDEO_ON_TOP         = 0b00001000000000000000000000000000, // 
+    VIDEO_MOVE_X         = 0b00000000000000000100000000000000, // 
+    VIDEO_MOVE_Y         = 0b00000000000000000010000000000000, // 
+    VIDEO_HIDDEN         = 0b00000000000000000000000010000000, // 
+    VIDEO_FROZEN         = 0b00000000000000000000000000100000, // 
+    VIDEO_EXPIRING       = 0b00000000000000000000000000001000, // 
+    VIDEO_EXPIRED        = 0b00000000000000000000000000000010, // 
+    VIDEO_ACTIVE         = 0b00000000000000000000000000000001  // 
+};
+
+void begin_draw(bool clear) {
+    BeginTextureMode(sys.asset.framebuffer[sys.video.vscreen[sys.video.current_virtual].asset_id]);
+    if (clear) ClearBackground(BLACK);
+    rlDisableDepthMask();            // Disable depth writes
+    rlDisableDepthTest();            // Disable depth test for speed
+}
+
+void end_draw(void) {
+    rlEnableDepthMask();
+    rlEnableDepthTest();
+    EndTextureMode();
+}
+
+void flip_frame_buffer(uint16_t display, bool clear) {
+    sys.video.previous_virtual = sys.video.current_virtual;
+    sys.video.current_virtual = display;
+    if (clear) sys.video.screen_refresh = true;
+}
+
+static void draw_frame_buffer(RenderTexture renderer, Vector2 position) {
+	DrawTexturePro (renderer.texture,
+    (Rectangle) {0.0, 0.0, (float)renderer.texture.width, (float)-renderer.texture.height},
+    (Rectangle) {position.x, position.y, sys.video.screen.x, sys.video.screen.y},
+    (Vector2)   {0.0, 0.0}, 0.0f, WHITE);
+}
+
+static uint16_t init_frame_buffer(uint16_t display, Vector2 resolution) {
+    flip_frame_buffer(display, true);
+    sys.video.vscreen[sys.video.current_virtual].size = resolution;
+    sys.video.vscreen[sys.video.current_virtual].frames = 0;
+    sys.video.vscreen[sys.video.current_virtual].elapsed_time_var_ratio = 5.f;
+    sys.video.vscreen[sys.video.current_virtual].frame_time_inc = 0;
+	uint16_t asset_id = load_asset(ASSET_FRAMEBUFFER, NULL, NULL, NULL, NULL, 0);
+    flip_frame_buffer(sys.video.previous_virtual, true);
+    return asset_id;
+}
+
+int16_t init_display_properties(bool hide_mouse) {
+    int16_t status = 0;
+    BITS_INIT(sys.video.windowstate_normal, 0);
+    //sys.video.windowstate_normal = FLAG_WINDOW_UNDECORATED; // AVOID AT ALL COST (SCREEN TEARING when VSYNC)
+    BITS_ON(sys.video.windowstate_normal, FLAG_FULLSCREEN_MODE);
+    BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_ALWAYS_RUN);
+    BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_TOPMOST);
+    BITS_ON(sys.video.windowstate_normal, FLAG_MSAA_4X_HINT);
+    BITS_ON(sys.video.windowstate_normal, FLAG_VSYNC_HINT);
+
+    BITS_INIT(sys.video.windowstate_paused, 0);
+    BITS_ON(sys.video.windowstate_paused, FLAG_FULLSCREEN_MODE);
+    BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_UNFOCUSED);
+    BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_MINIMIZED);
+    BITS_ON(sys.video.windowstate_paused, FLAG_MSAA_4X_HINT);
+    BITS_ON(sys.video.windowstate_paused, FLAG_VSYNC_HINT);
+
+    SetConfigFlags(sys.video.windowstate_normal);
+    InitWindow(0, 0, sys.program.name);
+    sys.video.display_id = GetCurrentMonitor();
+    if (hide_mouse) HideCursor();
+    sys.video.screen = (Vector2){GetScreenWidth(), GetScreenHeight()};
+    sys.video.vscreen[sys.video.display_id].refresh_rate = GetMonitorRefreshRate(sys.video.display_id);
+    SetWindowSize(sys.video.screen.x, sys.video.screen.y);
+
+    if (IsWindowReady()) return status; else return 1;
+}
+
+void flip_display_state(uint32_t state) {
+    if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS))
+        BITS_FLIP(sys.video.windowstate_normal, state);
+    else
+        BITS_FLIP(sys.video.windowstate_paused, state);
+        
+    if (IsWindowState(state)) { 
+        ClearWindowState(state);
+    } else {
+        SetWindowState(state);
+        // if (state & FLAG_VSYNC_HINT)  // ***GLFW issue with Refresh rate reset to 60 on VSYNC
+        // since this is an issue, if we really want to do this right, we would have to possibly reload all assets
+    }
+}
+
+    // The way this works right now is not proper, as we have 4-5 different virtual display, we need a way to display them all at once,
+    // or at least display the MENU + possibly the Terminal + the game
+    // So first, the rendering to a texture part, needs to be expanded
+    // then update_system needs to take into account the different virtual displays and how to decide on;
+    // - The order in which they should be displayed
+    // - Should they display
+    // - And their alpha blending
+int16_t update_display(void) {
+    int16_t status = 0;
+    uint16_t display = sys.video.current_virtual;
+
+
+    double next_frame = sys.video.vscreen[display].prev_time + (double)(1 / sys.video.vscreen[sys.video.display_id].refresh_rate);
+    float wait = (next_frame - GetTime());
+    if (wait < 0) wait = 0;
+    WaitTime(wait * 1000.f);
+
+    double current_time = GetTime();
+
+    sys.video.vscreen[display].elapsed_time = current_time - sys.video.vscreen[display].prev_time;
+    sys.video.vscreen[display].prev_time = current_time;
+
+    if (sys.video.screen_refresh) {
+        //sys.video.screen_refresh = false;
+        BeginDrawing();
+        ClearBackground(BLANK);
+        draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[display].asset_id], sys.video.vscreen[display].offset);
+        if (active_service(CTRL_TERMINAL_SERVICE_MASK)) {
+            draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[TERMINALDISPLAY].asset_id], sys.video.vscreen[TERMINALDISPLAY].offset);
+        }
+        if (active_service(CTRL_DEBUG_SERVICE_MASK)) {
+            status = update_debug();
+        }
+        EndDrawing();
+        sys.video.vscreen[display].frame_time = (float)sys.video.vscreen[display].elapsed_time * (float)sys.video.vscreen[sys.video.display_id].refresh_rate;
+        sys.video.vscreen[display].frame_time_inc += (float)sys.video.vscreen[display].elapsed_time;
+        sys.video.vscreen[display].elapsed_time_var += (float)sys.video.vscreen[display].elapsed_time * sys.video.vscreen[display].elapsed_time_var_ratio;
+        sys.video.vscreen[display].value_anim = fast_sin(fast_cos(fast_sin(sys.video.vscreen[display].frame_time_inc) * fast_sin(sys.video.vscreen[display].elapsed_time_var * 0.1) * 0.1) * fast_cos(sys.video.vscreen[display].elapsed_time_var * 0.015) * 0.1 ) * 0.05 + 0.001;        sys.video.vscreen[display].frames++;
+    };
+
+   sys.video.window_focus = IsWindowFocused();
+   if (sys.video.window_focus) {        // ************** GO TO APP MODE
+        if (sys.program.ctrlstate & CTRL_OFF_FOCUS) {
+            if (GetKeyPressed() != 0) {
+                BITS_OFF(sys.program.ctrlstate, CTRL_OFF_FOCUS);
+                flip_frame_buffer(PRIMARYDISPLAY, true);
+                ClearWindowState(sys.video.windowstate_normal ^ sys.video.windowstate_paused);
+                SetWindowState(sys.video.windowstate_normal);
+                sys.video.vscreen[sys.video.current_virtual].prev_time = current_time;
+            }
+        }
+    } else {        // ************* GO TO PAUSE MODE
+        //IsWindowMinimized()
+        if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS)) {
+            BITS_ON(sys.program.ctrlstate, CTRL_OFF_FOCUS);
+            flip_frame_buffer(UNFOCUSEDDISPLAY, true);
+            ClearWindowState(sys.video.windowstate_paused ^ sys.video.windowstate_normal);
+            SetWindowState(sys.video.windowstate_paused);
+            hint_restart_track(true);
+            sys.video.vscreen[sys.video.current_virtual].prev_time = current_time;
+        };
+    };
+}
+
+void deinit_display(void) {
+    ShowCursor();
+	CloseWindow();
+}
+
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
+// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
 
 // ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
 // ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
 // ********** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** T E R M I N A L   S Y S T E M  ***** B E G I N
 
+// eventually we want to remove all the hardcoded key bindings to allow AZERTY QWERTY QWERTZ etc...
 static const kbmap_scancode[] = {
     KEY_ESCAPE ,0 , 0, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12, 0, KEY_PRINT_SCREEN, KEY_SCROLL_LOCK, KEY_PAUSE, 0, 0, 0, 0, 0, 
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
@@ -3132,7 +3465,6 @@ static const kbmap_ascii[] = {
     0, 0, 90, 88, 67, 86, 66, 78, 77, 44, 46, 47, 0, 0, 0, 0, 0, 0, 0, 0, 49, 50, 51, 13, 
     0, 0, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 48, 48, 46, 13
 };
-
 
 //  Note for ANSi, colors expected are 0: black, 1: red, 2: green, 3: yellow, 4: blue, 5: magenta, 6: cyan, 7: white
 // CSI introduces a Control Sequence, which continues until an alphabetic character is received (general rule).
@@ -3381,6 +3713,7 @@ typedef enum {
     CMD_DECDC   = 126   // #'~  Delete # of columns, shift columns of Right side to the left
 } ansi_commands;
 
+
 typedef enum {
     TCAPS_PAGE8             = 0b10000000000000000000000000000000, // enable page 8
     TCAPS_PAGE7             = 0b01000000000000000000000000000000, // enable page 7
@@ -3414,7 +3747,8 @@ typedef enum {
     TCAPS_KEYBOARD_INPUT    = 0b00000000000000000000000000000100, // enable keyboard input
     TCAPS_DISPLAY           = 0b00000000000000000000000000000010, // enable terminal display
     TCAPS_INITIALIZED       = 0b00000000000000000000000000000001, // terminal was initialized
-    TCAPS_DEFAULT_MASK      = 0b00000001000000010001000001001111  // 
+    TCAPS_DEFAULT_MASK      = 0b00000001000000010001000001001111, // 
+    TCAPS_ENABLE_MASK       = 0b11111111000000000000000000000000  // 
 } terminal_capabilities;
 
 typedef enum {
@@ -3427,15 +3761,15 @@ typedef enum {
     PCAPS_DSTRIKEOUT        = 0b00000010000000000000000000000000, // draws a double line through character
     PCAPS_STRIKEOUT         = 0b00000001000000000000000000000000, // draws a line through character
     PCAPS_UNDERLINED        = 0b00000000100000000000000000000000, // draws a line under character
-    PCAPS_SUPERSCRIPT       = 0b00000000010000000000000000000000, // shifts character upwards
-    PCAPS_SUBSCRIPT         = 0b00000000001000000000000000000000, // shifts character downwards
+    PCAPS_SUPERSCRIPT       = 0b00000000010000000000000000000000, // displace character upwards
+    PCAPS_SUBSCRIPT         = 0b00000000001000000000000000000000, // displace character downwards
     PCAPS_R21               = 0b00000000000100000000000000000000, // 
     PCAPS_STRESSMARK        = 0b00000000000010000000000000000000, // 
     PCAPS_ITALIC            = 0b00000000000001000000000000000000, // uses skew to pent characters
     PCAPS_BLINK             = 0b00000000000000100000000000000000, // set character to blink
-    PCAPS_R17               = 0b00000000000000010000000000000000,
-    PCAPS_LOCAL_ECHO        = 0b00000000000000001000000000000000, // locally show characters typed
-    PCAPS_R13               = 0b00000000000000000100000000000000,
+    PCAPS_R17               = 0b00000000000000010000000000000000, // 
+    PCAPS_LOCAL_ECHO        = 0b00000000000000001000000000000000, // repeat characters to page from input
+    PCAPS_R13               = 0b00000000000000000100000000000000, // 
     PCAPS_SHOW_CURSOR       = 0b00000000000000000010000000000000, // show cursor on page
     PCAPS_SHOW_MOUSE        = 0b00000000000000000001000000000000, // show mouse on page
     PCAPS_SHOW_COMMAND      = 0b00000000000000000000100000000000, // show terminal commands (default is hidden)
@@ -3450,7 +3784,7 @@ typedef enum {
     PCAPS_KEYBOARD_INPUT    = 0b00000000000000000000000000000100, // enable keyboard input
     PCAPS_DISPLAY           = 0b00000000000000000000000000000010, // turn on page display (default is on)
     PCAPS_INITIALIZED       = 0b00000000000000000000000000000001, // page was initialized
-    PCAPS_DEFAULT_MASK      = 0b00000000000000010001111011101011, // 
+    PCAPS_DEFAULT_MASK      = 0b00000000000000010001101010101011, // 
     PCAPS_COL_NORMAL_MASK   = 0b11100000000000000000000000000000, // 
     PCAPS_TF_NORMAL_MASK    = 0b00000000011011100000000000000000  // 
 } page_capabilities;
@@ -3463,7 +3797,7 @@ uint32_t active_terminal(uint32_t state)     {return BITS_TEST(sys.terminal.stat
 static void set_page_state(uint32_t state) { BITS_ON(sys.terminal.page[sys.terminal.page_id].state, state); }
 static void clear_page_state(uint32_t state) { BITS_OFF(sys.terminal.page[sys.terminal.page_id].state, state); }
 static void flip_page_state(uint32_t state) { BITS_FLIP(sys.terminal.page[sys.terminal.page_id].state, state); }
-uint32_t page_status(uint16_t page_id, uint32_t state)     {return BITS_TEST(sys.terminal.page[page_id].state, state);}
+uint32_t page_status(uint32_t state)     {return BITS_TEST(sys.terminal.page[sys.terminal.page_id].state, state);}
 
 static uint16_t set_current_page(uint16_t page_id) {
     if (page_id >= TERM_MAXPAGES) return 1;
@@ -3486,14 +3820,24 @@ static void move_to_previous_page(void) {
     if  (sys.terminal.page_id < 0) sys.terminal.page_id += TERM_MAXPAGES;        
 }
 
-static uint16_t get_terminal_font(uint16_t font_id) {
+static uint16_t get_terminal_font_asset(uint16_t value) {
+    if (value >= TERM_MAXFONTS || value < 0) return 0; // should be flagged as out of range value
+    return sys.terminal.font_id[value];
+}
+
+static uint16_t get_terminal_font_from_asset(uint16_t font_id) {
     for (uint16_t font = 0; font < TERM_MAXFONTS; ++font) {
         if (sys.terminal.font_id[font] == font_id) return font;
     }
     return 0;
 }
 
-static uint16_t get_terminal_palette(uint16_t palette_id) {
+static uint16_t get_terminal_palette_asset(uint16_t value) {
+    if (value >= TERM_MAXPALETTES || value < 0) return 0; // should be flagged as out of range value
+    return sys.terminal.palette_id[value];
+}
+
+static uint16_t get_terminal_palette_from_asset(uint16_t palette_id) {
     for (uint16_t palette = 0; palette < TERM_MAXPALETTES; ++palette) {
         if (sys.terminal.palette_id[palette] == palette_id) return palette;
     }
@@ -3505,24 +3849,24 @@ static bool enable_page(uint16_t page_id) {
     // return error is page not PCAPS_INITIALIZED
 }
 
-static uint16_t get_writing_font(void)              {return sys.terminal.page[sys.terminal.page_id].cell.asset_id; }
-static uint16_t get_writing_palette(void)           {return sys.terminal.page[sys.terminal.page_id].cell.palette_id; }
+static uint16_t get_writing_font(void)              {return get_terminal_font_from_asset(sys.terminal.page[sys.terminal.page_id].cell.asset_id);}
+static uint16_t get_writing_palette(void)           {return get_terminal_palette_from_asset(sys.terminal.page[sys.terminal.page_id].cell.palette_id);}
 static uint16_t get_writing_foreground_color(void)  {return sys.terminal.page[sys.terminal.page_id].cell.colorfg_id;}
 static uint16_t get_writing_background_color(void)  {return sys.terminal.page[sys.terminal.page_id].cell.colorbg_id;}
 
 static bool set_writing_font(uint16_t font) {
     EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (font >= sys.terminal.fonts) return true;
-    page->previous_font = get_terminal_font(page->cell.asset_id);
-    page->cell.asset_id = get_writing_font();
+    page->previous_font = get_terminal_font_from_asset(page->cell.asset_id);
+    page->cell.asset_id = get_terminal_font_asset(font);
     return false;
 }
 
 static bool set_writing_palette(uint16_t palette) {
     EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (palette >= sys.terminal.palettes) return true;
-    page->previous_palette = get_terminal_palette(page->cell.asset_id);
-    page->cell.palette_id = get_writing_palette();
+    page->previous_palette = get_terminal_palette_from_asset(page->cell.asset_id);
+    page->cell.palette_id = get_terminal_palette_asset(palette);
     return false;
 }
 
@@ -3534,7 +3878,7 @@ static bool set_writing_blinking_rate(uint16_t rate) {
 
 static bool set_writing_foreground_color(uint16_t color_id) {
     EX_page *page = &sys.terminal.page[sys.terminal.page_id];
-    uint16_t colors = get_palette_color_count(get_writing_palette());
+    uint16_t colors = 255;//get_palette_color_count(get_writing_palette());
     if (color_id < 0 || color_id >= colors) return true;
     page->previous_colorfg_id = page->cell.colorfg_id;
     page->colorfg_id = color_id;
@@ -3587,11 +3931,10 @@ static bool set_page_default_font(uint16_t font) {
 static bool set_page_margins(uint16_t top, uint16_t bottom, uint16_t left, uint16_t right) {
     EX_page *page = &sys.terminal.page[sys.terminal.page_id];
     if (left > right || top > bottom) return;
-// need to verify if exceeds canvas
-    page->margin_left       = left;
-    page->margin_right      = right;
-    page->margin_top        = top;
-    page->margin_bottom     = bottom;
+    if (page->size.x < left)    page->margin_left = (page->size.x - 1);     else page->margin_left  = left;
+    if (page->size.x < right)   page->margin_right = (page->size.x - 1);    else page->margin_right = right;
+    if (page->size.y < top)     page->margin_top = (page->size.y - 1);      else page->margin_top   = top;
+    if (page->size.y < bottom)  page->margin_bottom = (page->size.y - 1);   else page->margin_bottom= bottom;
     return false;
 }
 
@@ -3621,13 +3964,41 @@ static void unset_page_split(void) {
 } // remove page split configuration
 
 
-static void move_keyboard_cursor_position(Vector2 value) {
-    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
-    Vector2 position = {page->cursor_position.x + value.x, page->cursor_position.y + value.y};
-    if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
-    page->cursor_previous_position = page->cursor_position;
-    page->cursor_position = position;
-    return false;
+static void blank_column_terminal_page(uint16_t column) {
+// copy a cell template with space to whole column
+}
+
+static void blank_row_terminal_page(uint16_t row) {
+    uint16_t page_id = sys.terminal.page_id;
+    EX_canvas *canvas = &sys.terminal.canvas_template;
+    EX_page *page = &sys.terminal.page[page_id];
+    EX_cell *cell = &sys.terminal.page[page_id].cell;
+
+    cell->value = 32;
+    // copy a cell template with space to whole row
+    //page->size
+    Rectangle target = {0,row,page->size.x,1};
+    uint16_t status = init_canvas_section_templated(sys.terminal.canvasgroup_id, page_id, cell, target);
+}
+
+static void scroll_terminal_page(uint16_t direction) {
+
+    switch (direction) {
+        case 1: // scroll up
+        break;
+
+        case 2: // scroll down
+        break;
+
+        case 3: // scroll left
+        break;
+
+        case 4: // scroll right
+        break;
+
+        default: // invalid
+        break;
+    }
 }
 
 static bool set_keyboard_cursor_position(Vector2 position) {
@@ -3636,6 +4007,82 @@ static bool set_keyboard_cursor_position(Vector2 position) {
     page->cursor_previous_position = page->cursor_position;
     page->cursor_position = position;
     return false;
+}
+
+static bool move_keyboard_cursor_position(Vector2 value) {
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    Vector2 position = {page->cursor_position.x + value.x, page->cursor_position.y + value.y};
+    if (position.x > page->margin_right || position.x < page->margin_left || position.y > page->margin_bottom || position.y < page->margin_top) return true;
+    page->cursor_previous_position = page->cursor_position;
+    page->cursor_position = position;
+    return false;
+}
+
+static bool move_keyboard_cursor_up() {
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    Vector2 position = {page->cursor_position.x, page->cursor_position.y - 1};
+    if (position.y < page->margin_top) return true;
+    if (position.y < 0) return true;
+    page->cursor_position = position;
+    return false;
+}
+
+static bool move_keyboard_cursor_down() {
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    Vector2 position = {page->cursor_position.x, page->cursor_position.y + 1};
+    if (position.y > page->margin_bottom) return true;
+    if (position.y >= page->size.y) return true;
+    page->cursor_position = position;
+    return false;
+}
+
+static bool move_keyboard_cursor_left() {
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    Vector2 position = {page->cursor_position.x - 1, page->cursor_position.y};
+    if (position.x < page->margin_left) return true;
+    if (position.x < 0) return true;
+    page->cursor_position = position;
+    return false;
+}
+
+static bool move_keyboard_cursor_right() {
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    Vector2 position = {page->cursor_position.x + 1, page->cursor_position.y};
+    if (position.x > page->margin_right) return true;
+    if (position.x >= page->size.x) return true;
+    page->cursor_position = position;
+    return false;
+}
+
+static bool move_keyboard_cursor_new_line(void) {
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    uint16_t status = false;
+    if (page_status(PCAPS_CURSOR_RTOL)) {
+        page->cursor_position.x = page->margin_right;
+        status = move_keyboard_cursor_down();
+    } else {
+        page->cursor_position.x = page->margin_left;
+        status = move_keyboard_cursor_down();
+    }    
+    if (status) {
+        if (page_status(PCAPS_AUTO_SCROLL)) {
+            scroll_terminal_page(1);
+            blank_row_terminal_page(page->cursor_position.y);
+        }
+    }
+}
+
+static bool move_keyboard_cursor_next() {
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    // check for protected cell, move to new line (check borders)
+    uint16_t status;
+     if (page_status(PCAPS_CURSOR_RTOL)) {
+        status = move_keyboard_cursor_left();
+        if (status) move_keyboard_cursor_new_line();
+    } else {
+        status = move_keyboard_cursor_right();
+        if (status) move_keyboard_cursor_new_line();
+    }
 }
 
 static Vector2 get_keyboard_cursor_position(void) {
@@ -3667,77 +4114,43 @@ static bool page_clear_line(uint16_t line) {
     return false;
 }
 
-static bool write_to_cell(uint8_t value) {
-    uint16_t page_id = sys.terminal.page_id;
-    EX_page *page = &sys.terminal.page[page_id];
-    //    sys.terminal.canvasgroup_id
-    // pass on all graphics rendition to the cell template
-    EX_cell *cell = &sys.terminal.page[page_id].cell;
-    cell->value = value;
-//    state |= 0; // assign corresponding lines based on some states (underline, strikeout, box, ...)
-
-    if (page->state & PCAPS_OVERLINED) cell->state |= CVFE_LINE_TOP;
-    if (page->state & PCAPS_UNDERLINED) cell->state |= CVFE_LINE_BOT;
-    if (page->state & PCAPS_STRIKEOUT) cell->state |= CVFE_LINE_HOR;
-    if (page->state & PCAPS_FRAMED) cell->state |= (CVFE_LINE_BOT | CVFE_LINE_TOP | CVFE_LINE_LEF | CVFE_LINE_RIG);
-
-    if (page->state & PCAPS_ITALIC) cell->skew = (Vector2) {0.25,0}; else  cell->skew = (Vector2) {0,0};
-    cell->offset = (Vector2){0,0};    // set offset for superscript or subscript
-    plot_cell(TERMINALDISPLAY, page_id, &cell, page->cursor_position);
-    return true; // mostly if writing to the cell worked
-}
-
-static void write_char_to_page(uint8_t value) {
-    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
-    uint64_t state;
-    Vector2 position = page->cursor_position;
-    bool status = write_to_cell(value);
-    // if the status did not return ok, then react accordingly
-    // then move cursor + 1 (to left or right)
-    // check for borders, protected cell, move to new line (check borders)
-    // check if beyond last row, and if scroll then copy content of whole page 1 up then
-    // page_scroll_up();
-    // page_clear_line(page->margin_bottom);
-}
-
-static void write_string_to_page(uint8_t* s) {
-    uint16_t length = strlen(s);
-    for (uint16_t i=0; i < length; ++i) {
-        uint8_t value = s[i];
-        write_char_to_page(value);
-    }
-}
-
-static uint16_t init_page(uint16_t page_id) {
+static uint16_t init_terminal_page(uint16_t page_id, Vector2 size) {
     uint16_t status = 0;
     if (page_id >= TERM_MAXPAGES) return 1;
-    if (page_status(page_id, TCAPS_INITIALIZED)) return 9;
+    if (page_status(TCAPS_INITIALIZED)) return 9;
     set_current_page(page_id);
     set_page_state(PCAPS_DEFAULT_MASK);
-    EX_canvas *canvas = &sys.terminal.canvas;
-    status += set_page_default_font(0);
-    status += set_writing_font(0);
-    status += set_writing_palette(0);
+    EX_canvas *canvas = &sys.terminal.canvas_template;
+    EX_page *page = &sys.terminal.page[page_id];
+    canvas->size = size;
+    page->size = size;
+    page->page_split = (Vector2){0,0};
+
+    status += set_page_default_font(3);
+    status += set_writing_font(3);
+    status += set_writing_palette(1);
     status += set_page_default_foreground_color(canvas->default_colorfg_id);
     status += set_page_default_background_color(canvas->default_colorbg_id);
     status += set_writing_foreground_color(canvas->default_colorfg_id);
     status += set_writing_background_color(canvas->default_colorbg_id);
     status += set_writing_blinking_rate(0);
     status += set_page_margins(0, canvas->size.y - 1, 0, canvas->size.x - 1);
-    EX_page *page = &sys.terminal.page[page_id];
     status += set_cursor_home_position((Vector2){page->margin_left, page->margin_top});
     status += move_cursor_home();
-    page->page_split = (Vector2){0,0};
 
     EX_cell *cell = &sys.terminal.page[page_id].cell;
-    cell->state = CVFE_DEFAULT4;
-    cell->asset_id = get_writing_font();
-    cell->value = 65; // temporary testing measure
-    cell->palette_id = get_writing_palette();
+    cell->state = canvas->state;
+    cell->asset_id = get_terminal_font_asset(get_writing_font());
+    //cell->state |= (CVFE_LINE_BOT | CVFE_LINE_TOP | CVFE_LINE_LEF | CVFE_LINE_RIG);
+    cell->value = 32;
+    cell->palette_id = get_terminal_palette_asset(get_writing_palette());
     cell->colorfg_id = get_writing_foreground_color();
     cell->colorbg_id = get_writing_background_color();
-    // call to initialize canvas of page using cell template
-    init_canvas_templated(sys.terminal.canvasgroup_id, page_id, &canvas, &cell);
+    cell->colorln_id = canvas->default_colorln_id;
+    
+    cell->fg_brightness = 1.f;
+    cell->bg_brightness = 1.f;
+    init_canvas_templated(sys.terminal.canvasgroup_id, page_id, canvas, cell);
 
     enable_page(page_id);
     goto_previous_page();
@@ -3765,14 +4178,15 @@ static void set_terminal_assets(void) {
 static void hide_terminal(void) {remove_service(CTRL_TERMINAL);}
 static void show_terminal(void) {add_service(CTRL_TERMINAL);}
 
-static void reset_terminal_canvas_template(void) {
-    EX_canvas *canvas = &sys.terminal.canvas;
+static void reset_terminal_canvas_template(uint64_t canvas_state) {
+    EX_canvas* canvas = &sys.terminal.canvas_template;
     strcpy_s(canvas->name, sizeof(canvas->name), "TERMINAL");
-    canvas->default_palette_id = get_terminal_palette(0);
-    canvas->default_asset_id = get_terminal_font(0);
+    canvas->state = canvas_state;
+    canvas->default_palette_id = get_terminal_palette_asset(0);
+    canvas->default_asset_id = get_terminal_font_asset(0);
     canvas->asset_id[0] = canvas->default_asset_id;
-    canvas->size = get_canvas_size(canvas->default_asset_id);
-    canvas->default_tilesize = get_tile_size_from_asset(canvas->default_asset_id);
+    canvas->size = (Vector2){80.f, 25.f}; //get_canvas_size(sys.video.current_virtual); ************************ REMOVE HARDCODE
+    canvas->default_tilesize = (Vector2){8, 16}; //get_tile_size_from_asset(canvas->default_asset_id); ************************ REMOVE HARDCODE
     canvas->scale = (Vector2){1,1};
     canvas->angle = 0.f;
     canvas->default_colorfg_id = 7;
@@ -3783,8 +4197,87 @@ static void reset_terminal_canvas_template(void) {
     canvas->shadow = (Vector2){0,0};
     canvas->alpha = 255;
     canvas->offset = (Vector2){0,0};
-    EX_cell *keycursor = &sys.terminal.canvas.keycursor;
-    EX_cell *mousecursor = &sys.terminal.canvas.mousecursor;
+//    EX_cell* keycursor = sys.terminal.canvas_template.keycursor;
+//    EX_cell* mousecursor = sys.terminal.canvas_template.mousecursor;
+
+}
+
+static bool write_to_terminal_page(uint16_t value) {
+    uint16_t page_id = sys.terminal.page_id;
+    EX_page *page = &sys.terminal.page[page_id];
+    Vector2 position = page->cursor_position;
+    //    sys.terminal.canvasgroup_id
+    // pass on all graphics rendition to the cell template
+    
+    EX_cell *cell = &sys.terminal.page[page_id].cell;
+
+    cell->value = value;
+//    state |= 0; // assign corresponding lines based on some states (underline, strikeout, box, ...)
+    if (page->state & PCAPS_OVERLINED) set_terminal_state(CVFE_LINE_TOP);
+    if (page->state & PCAPS_UNDERLINED) set_terminal_state(CVFE_LINE_BOT);
+    if (page->state & PCAPS_STRIKEOUT) set_terminal_state(CVFE_LINE_HOR);
+    if (page->state & PCAPS_FRAMED) set_terminal_state(CVFE_LINE_BOT | CVFE_LINE_TOP | CVFE_LINE_LEF | CVFE_LINE_RIG);
+// also set the font and the fg and bg colors
+    if (page->state & PCAPS_ITALIC) cell->skew = (Vector2) {0.25,0}; else  cell->skew = (Vector2) {0,0};
+    cell->offset = (Vector2){0,0};    // set offset for superscript or subscript
+    plot_cell(TERMINALDISPLAY, page_id, cell, position);
+    return true; // mostly if writing to the cell worked
+}
+
+static void handle_terminal_input(uint16_t value) {
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    bool status;
+    Vector2 position = page->cursor_position;
+
+    if (!page_status(PCAPS_HALF_DUPLEX)) {
+        switch (value) {
+        
+            case ASCII_CARRIAGE_RETURN:
+            move_keyboard_cursor_new_line();
+            break;
+
+            case ASCII_ESCAPE:
+            break;
+
+            case ASCII_HORIZONTAL_TAB:
+            break;
+
+            case ASCII_BACKSPACE:
+            break;
+
+            case ASCII_DELETE:
+            break;
+
+            default:
+            status = write_to_terminal_page(value);
+            if (status) {
+                uint16_t border = move_keyboard_cursor_next();
+            // check if beyond last row, and if scroll then copy content of whole page 1 up then
+            // page_scroll_up();
+            // page_clear_line(page->margin_bottom);
+            }
+            break;
+
+        }
+    }
+}
+    
+void render_terminal(void) {
+    // aimed at displaying the terminal canvasgroup only
+    flip_frame_buffer(TERMINALDISPLAY, false);
+
+    begin_draw(true);
+    ClearBackground(BLANK);
+    render_canvas(sys.terminal.page_id);
+    end_draw();
+    flip_frame_buffer(sys.video.previous_virtual, false);
+}
+
+void process_command(uint32_t queue_ptr) {
+
+}
+
+void process_queue() {
     
 }
 
@@ -3792,61 +4285,28 @@ static int16_t init_terminal(void) {
     int16_t status = 0;
     flip_frame_buffer(TERMINALDISPLAY, false);
     SetExitKey(false); // Disables the ESCAPE key from the RayLib core
-    uint16_t display = sys.video.current_virtual;
+    sys.terminal.canvasgroup_id = sys.video.current_virtual;
     set_terminal_assets();
     set_terminal_state(TCAPS_DEFAULT_MASK);
     uint32_t canvasgroup_state = 0;
-    uint64_t canvas_state = CVFE_DEFAULT4;
-    uint64_t cell_state = CVFE_DEFAULT4;
-    sys.terminal.canvasgroup_id = display;
 
+    reset_terminal_canvas_template(CVFE_DEFAULT4); 
     init_canvasgroup(sys.terminal.canvasgroup_id, canvasgroup_state, TERM_MAXPAGES);
-    reset_terminal_canvas_template();
     for (uint16_t page_id = 0; page_id < TERM_MAXPAGES; ++page_id) {
-        init_page(page_id);
+        init_terminal_page(page_id, sys.terminal.canvas_template.size);
     }
-    sys.terminal.page_id = 0;
+    set_current_page(0);
     flip_frame_buffer(sys.video.previous_virtual, false);
     return status;
 }
 
 
-void process_keyboard(void) {
-// Establish keyboard management / buffer
-// RLAPI int GetKeyPressed(void);                                // Get key pressed (keycode), call it multiple times for keys queued
-// RLAPI int GetCharPressed(void);                               // Get char pressed (unicode), call it multiple times for chars queued
-}
-
-// Establish mouse management (old x,y / current x,y)
-void process_mouse(void) {
-// RLAPI bool IsMouseButtonPressed(int button);                  // Check if a mouse button has been pressed once
-// RLAPI bool IsMouseButtonDown(int button);                     // Check if a mouse button is being pressed
-// RLAPI bool IsMouseButtonReleased(int button);                 // Check if a mouse button has been released once
-// RLAPI bool IsMouseButtonUp(int button);                       // Check if a mouse button is NOT being pressed
-}
-
-// https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-oemkeyscan
-int16_t update_terminal(void) {
+int16_t update_terminal(uint16_t value) {
     bool status;
-// RLAPI void PollInputEvents(void);                             // Register all input events
 
-    process_keyboard();
-    process_mouse();
-
-//            if (IsKeyDown(KEY_RIGHT_CONTROL)) {
-    write_char_to_page(65);
+    if (value > 0)     handle_terminal_input(value);
     status = process_canvasgroup(TERMINALDISPLAY);
 
-}
-
-void render_terminal(void) {
-    // aimed at displaying the terminal canvasgroup only
-    flip_frame_buffer(TERMINALDISPLAY, false);
-
-    begin_draw(true);
-    render_canvas(sys.terminal.page_id);
-    end_draw();
-    flip_frame_buffer(sys.video.previous_virtual, false);
 }
 
 void shutdown_terminal(void) {
@@ -3960,7 +4420,7 @@ void display_all_res(void) {
     };
 }
 
-int16_t handle_data_menu(uint16_t size) {
+int16_t debug_data_menu(uint16_t size) {
     sys.video.screen_refresh = true;
     uint16_t x = 0, y = 0;
     DrawText(TextFormat("%s", sys.temporal.datetime), 1400, 0, 40, DARKGRAY);
@@ -3991,7 +4451,7 @@ int16_t handle_data_menu(uint16_t size) {
     if (IsKeyPressed(KEY_KP_6)) {ex_canopy.pal_idx_text += 16; if(ex_canopy.pal_idx_text > 255) {ex_canopy.pal_idx_text -=256;};};
 }
 
-int16_t handle_audio_menu(uint16_t size) {
+int16_t debug_audio_menu(uint16_t size) {
     sys.video.screen_refresh = true;
     if (IsKeyPressed(KEY_ZERO)) change_music_stream(0, 11, true);
     if (IsKeyPressed(KEY_ONE)) change_music_stream(0, 0, true);
@@ -4030,48 +4490,25 @@ int16_t handle_audio_menu(uint16_t size) {
 //    jar_xm_debug(sys.asset.music[sys.audio.asset_playing].ctxData);
 }
 
-int16_t handle_terminal_menu(void) {
-//    debug_console_out("handle_terminal_menu", size});
-
-    sys.video.screen_refresh = true;
-
-    flip_frame_buffer(TERMINALDISPLAY, false);
-//    Vector2 size = get_current_virtual_size();
-    
-    uint16_t canvasgroup_id = TERMINALDISPLAY;
-    uint16_t canvas_id = sys.terminal.page_id;
-//    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
-    EX_canvas *canvas = &sys.terminal.canvas;
-    Vector2 size = canvas->size;
-
-    DrawText(TextFormat("canvasgroup_id=%i", (uint32_t)sys.terminal.canvasgroup_id), 0, 80, 20, GRAY);
-    DrawText(TextFormat("previous_page_id=%i", (uint32_t)sys.terminal.previous_page_id), 0, 100, 20, GRAY);
-    DrawText(TextFormat("page_id=%i", (uint32_t)sys.terminal.page_id), 0, 120, 20, GRAY);
-    DrawText(TextFormat("font_id[0...7]=%i %i %i %i %i %i %i %i", (uint16_t)sys.terminal.font_id[0], (uint16_t)sys.terminal.font_id[1], (uint16_t)sys.terminal.font_id[2], (uint16_t)sys.terminal.font_id[3], (uint16_t)sys.terminal.font_id[4], (uint16_t)sys.terminal.font_id[5], (uint16_t)sys.terminal.font_id[6], (uint16_t)sys.terminal.font_id[7]), 0, 140, 20, GRAY);
-    DrawText(TextFormat("fonts=%i", (uint32_t)sys.terminal.fonts), 0, 160, 20, GRAY);
-    DrawText(TextFormat("palette_id[0...7]=%i %i %i %i %i %i %i %i", (uint16_t)sys.terminal.palette_id[0], (uint16_t)sys.terminal.palette_id[1], (uint16_t)sys.terminal.palette_id[2], (uint16_t)sys.terminal.palette_id[3], (uint16_t)sys.terminal.palette_id[4], (uint16_t)sys.terminal.palette_id[5], (uint16_t)sys.terminal.palette_id[6], (uint16_t)sys.terminal.palette_id[7]), 0, 180, 20, GRAY);
-    DrawText(TextFormat("palettes=%i", (uint32_t)sys.terminal.palettes), 0, 200, 20, GRAY);
-    DrawText(TextFormat("read_position=%i", (uint32_t)sys.terminal.read_position), 0, 240, 20, GRAY);
-    DrawText(TextFormat("write_position=%i", (uint32_t)sys.terminal.write_position), 0, 260, 20, GRAY);
-    
-//    EX_canvas *canvas = &sys.terminal.canvas;
-    DrawText(TextFormat("name = %s", canvas->name), 0, 300, 20, GRAY);
-    DrawText(TextFormat("state = %i", (uint32_t)canvas->state), 0, 320, 20, GRAY);
+int16_t debug_canvas(EX_canvas* canvas, uint16_t xpos, uint16_t fontsize) {
+//    EX_canvas *canvas = &sys.terminal->canvas_template;
+    DrawText(TextFormat("name = %s", canvas->name), xpos, 300, fontsize, WHITE);
+    DrawText(TextFormat("state = %i", (uint32_t)canvas->state), xpos, 320, fontsize, WHITE);
 //    uint16_t    asset_id[CANVAS_MAX_ASSETS];// tilset used for this canvas
-    DrawText(TextFormat("default_asset_id = %i", (uint32_t)canvas->default_asset_id), 0, 360, 20, GRAY);
-    DrawText(TextFormat("size = %ix%i", (uint32_t)canvas->size.x, (uint32_t)canvas->size.y), 0, 380, 20, GRAY);
-    DrawText(TextFormat("default_tilesize = %ix%i", (uint32_t)canvas->default_tilesize.x,  (uint32_t)canvas->default_tilesize.y), 0, 400, 20, GRAY);           
+    DrawText(TextFormat("default_asset_id = %i", (uint32_t)canvas->default_asset_id), xpos, 360, fontsize, WHITE);
+    DrawText(TextFormat("size = %ix%i", (uint32_t)canvas->size.x, (uint32_t)canvas->size.y), xpos, 380, fontsize, WHITE);
+    DrawText(TextFormat("default_tilesize = %ix%i", (uint32_t)canvas->default_tilesize.x,  (uint32_t)canvas->default_tilesize.y), xpos, 400, fontsize, WHITE);           
 //    uint16_t    palette_id[CANVAS_MAX_PALETTES];     // color palette used for whole canvas
-    DrawText(TextFormat("default_palette_id = %i", (uint32_t)canvas->default_palette_id), 0, 440, 20, GRAY);
-    DrawText(TextFormat("default_colorfg_id = %i", (uint32_t)canvas->default_colorfg_id), 0, 460, 20, GRAY);
-    DrawText(TextFormat("default_colorbg_id = %i", (uint32_t)canvas->default_colorbg_id), 0, 480, 20, GRAY);
-    DrawText(TextFormat("default_colorln_id = %i", (uint32_t)canvas->default_colorln_id), 0, 500, 20, GRAY);
-    DrawText(TextFormat("offset = %ix%i", (uint32_t)canvas->offset.x, (uint32_t)canvas->offset.y), 0, 520, 20, GRAY);
+    DrawText(TextFormat("default_palette_id = %i", (uint32_t)canvas->default_palette_id), xpos, 440, fontsize, WHITE);
+    DrawText(TextFormat("default_colorfg_id = %i", (uint32_t)canvas->default_colorfg_id), xpos, 460, fontsize, WHITE);
+    DrawText(TextFormat("default_colorbg_id = %i", (uint32_t)canvas->default_colorbg_id), xpos, 480, fontsize, WHITE);
+    DrawText(TextFormat("default_colorln_id = %i", (uint32_t)canvas->default_colorln_id), xpos, 500, fontsize, WHITE);
+    DrawText(TextFormat("offset = %ix%i", (uint32_t)canvas->offset.x, (uint32_t)canvas->offset.y), xpos, 520, fontsize, WHITE);
 //    Vector2     displace[4];                // cell corner displacement (x,y)
-    DrawText(TextFormat("scale = %ix%i", (uint32_t)canvas->scale.x, (uint32_t)canvas->scale.y), 0, 560, 20, GRAY);
+    DrawText(TextFormat("scale = %ix%i", (uint32_t)canvas->scale.x, (uint32_t)canvas->scale.y), xpos, 560, fontsize, WHITE);
 //    Vector2     scale_speed;                // (x,y) cell scale speed
 //    Vector2     scroll_speed;               // canvas scroll speed (x,y)
-    DrawText(TextFormat("angle = %i", (uint32_t)canvas->angle), 0, 620, 20, GRAY);
+    DrawText(TextFormat("angle = %i", (uint32_t)canvas->angle), xpos, 620, fontsize, WHITE);
 //    float       fg_brightness;              // foreground brightness (values 0...1 divides, values 1 to 255 multiply)
 //    float       bg_brightness;              // background brightness (values 0...1 divides, values 1 to 255 multiply)
 //    uint8_t     alpha;                      // transparency
@@ -4085,21 +4522,56 @@ int16_t handle_terminal_menu(void) {
 //    uint32_t    cell_count;
 //    EX_cell*    cell;                       // could be NULL
 
+}
+
+int16_t debug_terminal_menu(void) {
+    EX_canvas* canvas;
+
+//    debug_console_out("debug_terminal_menu", size});
+
+    sys.video.screen_refresh = true;
+
+    flip_frame_buffer(TERMINALDISPLAY, false);
+//    Vector2 size = get_current_virtual_size();
+    
+    uint16_t canvasgroup_id = TERMINALDISPLAY;
+    uint16_t canvas_id = sys.terminal.page_id;
+
+
+    DrawText(TextFormat("LAST_KEY = %i",(int)sys.io.last_key), 0, 700, 40, WHITE);     
+
+    DrawText(TextFormat("canvasgroup_id=%i", (uint32_t)sys.terminal.canvasgroup_id), 0, 80, 10, WHITE);
+    DrawText(TextFormat("previous_page_id=%i", (uint32_t)sys.terminal.previous_page_id), 0, 100, 10, WHITE);
+    DrawText(TextFormat("page_id=%i", (uint32_t)sys.terminal.page_id), 0, 120, 10, WHITE);
+    DrawText(TextFormat("font_id[0...7]=%i %i %i %i %i %i %i %i", (uint16_t)sys.terminal.font_id[0], (uint16_t)sys.terminal.font_id[1], (uint16_t)sys.terminal.font_id[2], (uint16_t)sys.terminal.font_id[3], (uint16_t)sys.terminal.font_id[4], (uint16_t)sys.terminal.font_id[5], (uint16_t)sys.terminal.font_id[6], (uint16_t)sys.terminal.font_id[7]), 0, 140, 10, WHITE);
+    DrawText(TextFormat("fonts=%i", (uint32_t)sys.terminal.fonts), 0, 160, 10, WHITE);
+    DrawText(TextFormat("palette_id[0...7]=%i %i %i %i %i %i %i %i", (uint16_t)sys.terminal.palette_id[0], (uint16_t)sys.terminal.palette_id[1], (uint16_t)sys.terminal.palette_id[2], (uint16_t)sys.terminal.palette_id[3], (uint16_t)sys.terminal.palette_id[4], (uint16_t)sys.terminal.palette_id[5], (uint16_t)sys.terminal.palette_id[6], (uint16_t)sys.terminal.palette_id[7]), 0, 180, 10, WHITE);
+    DrawText(TextFormat("palettes=%i", (uint32_t)sys.terminal.palettes), 0, 200, 10, WHITE);
+    DrawText(TextFormat("read_position=%i", (uint32_t)sys.terminal.read_position), 0, 240, 10, WHITE);
+    DrawText(TextFormat("write_position=%i", (uint32_t)sys.terminal.write_position), 0, 260, 10, WHITE);
+
+//    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    canvas = &sys.terminal.canvas_template;
+    debug_canvas(canvas, 0, 10);
+
     show_state_bits(sys.terminal.state, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, 0});
-    DrawText(TextFormat("curr %i, size %ix%i", (uint16_t)canvas_id, (uint16_t)size.x, (uint16_t)size.y), sys.video.screen.x - 700, 00, 20, GRAY);
+    DrawText(TextFormat("curr %i", (uint16_t)canvas_id), sys.video.screen.x - 700, 00, 20, WHITE);
+
+    uint16_t xpos = 150;
     for (uint16_t i = 0; i < TERM_MAXPAGES; ++i) {
-        EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[i];
+        canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[i];
         show_state_bits(sys.terminal.page[i].state, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, (i +3) * 32});
-        DrawText(TextFormat("page %i, size %ix%i", (uint16_t)i, (uint16_t)canvas->size.x, (uint16_t)canvas->size.y), sys.video.screen.x - 700, (i +2) * 32, 20, GRAY);
+        DrawText(TextFormat("page %i", (uint16_t)i), sys.video.screen.x - 700, (i +2) * 32, 20, WHITE);
+        debug_canvas(canvas, xpos, 10);
+        xpos += 150;
     }
 
 /*    for (uint16_t i = 0; i < ; ++i) {
     }
 */    flip_frame_buffer(sys.video.previous_virtual, false);
-
 }
 
-int16_t handle_video_menu(uint16_t size) {
+int16_t debug_video_menu(uint16_t size) {
     sys.video.screen_refresh = true;
     if (IsKeyDown(KEY_F9))      display_all_res();
     if (IsKeyPressed(KEY_F10))  flip_debugging(DEBUG_FPS);
@@ -4137,12 +4609,12 @@ int16_t init_debug(void) {
 int16_t update_debug(void) {
     uint16_t size = 80;
 
-    if (active_debugging(DEBUG_AUDIO))      handle_audio_menu(size);
-    if (active_debugging(DEBUG_VIDEO))      handle_video_menu(size);
-    if (active_debugging(DEBUG_DATA))       handle_data_menu(size);
+    if (active_debugging(DEBUG_AUDIO))      debug_audio_menu(size);
+    if (active_debugging(DEBUG_VIDEO))      debug_video_menu(size);
+    if (active_debugging(DEBUG_DATA))       debug_data_menu(size);
     if (active_debugging(DEBUG_CONTROLS))   display_keybed();
-    if (active_debugging(DEBUG_TERMINAL))   handle_terminal_menu();
-    if (active_debugging(DEBUG_FPS))        DrawFPS(sys.video.screen.x - 50, 0);
+    if (active_debugging(DEBUG_TERMINAL))   debug_terminal_menu();
+    if (active_debugging(DEBUG_FPS))        DrawFPS(sys.video.screen.x - size, 0);
     if (IsKeyDown(KEY_LEFT_CONTROL))        handle_debug_menu(size);
 }
 
@@ -4150,298 +4622,52 @@ int16_t update_debug(void) {
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
 // *********** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** D E B U G   S Y S T E M ***** E N D
 
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** B E G I N
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** B E G I N
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** B E G I N
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** B E G I N
+
+// MUSIC SCORING
 typedef enum {
-    TRACK_RESERVED          = 0b10000000000000000000000000000000,
-    TRACK_SWITCH_IMMEDIATE  = 0b00100000000000000000000000000000,
-    TRACK_STOP_UNFOCUSED    = 0b00010000000000000000000000000000,
-    TRACK_RESTART_ON_FOCUS  = 0b00001000000000000000000000000000,
-    TRACK_PAUSE_ON_PAUSE    = 0b00000010000000000000000000000000,
-    TRACK_PAUSE_ON_TERMINAL = 0b00000000100000000000000000000000,
-    TRACK_STOPPED           = 0b00000000000000000000000000100000,
-    TRACK_PAUSED            = 0b00000000000000000000000000010000,
-    TRACK_FINISHED          = 0b00000000000000000000000000001000,
-    TRACK_EXPIRED           = 0b00000000000000000000000000000010,
-    TRACK_ACTIVE            = 0b00000000000000000000000000000001
+    octave_up           = 192,
+    octave_down         = 193,
+    instrument_up       = 194,
+    instrument_down     = 195,
+    enable_arpeggio     = 196,
+    disable_arpeggio    = 197,
+    perc_bd1            = 224,
+    perc_bd2            = 225,
+    perc_sn1            = 226,
+    perc_sn2            = 227,
+    perc_tom1           = 228,
+    perc_tom2           = 229,
+    perc_tom3           = 230,
+    perc_cymbal         = 231,
+    perc_oph            = 232,
+    perc_clhh           = 233,
+    perc_cbell          = 234,
+    perc_wblk           = 235,
+    perc_clap           = 236,
+    perc_rim            = 237,
+    perc_tamb           = 238,
+    null_function       = 255
+} track_editor;
+
+static const kbmap_piano[] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-// no wav or mp3 support implemented yet (!)
+// Add all level design tools and import / export capability
+// Editor design will benefit from the paging system capabilities for menu options
 
-int16_t init_audio_properties(void) {
-    bool status = 0;
-    InitAudioDevice();
-    sys.audio.total_tracks = 0;
-    sys.audio.global_volume = 1.0f;
-    SetMasterVolume(sys.audio.global_volume); 
-    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
-        sys.audio.track[id].is_playing = false;
-        sys.audio.track[id].volume = 1.0f;
-        sys.audio.track[id].order_playing = 0;
-        sys.audio.track[id].total_orders = 0;
-        for (uint16_t j=0; j < MAXORDERS; j++) {
-            sys.audio.track[id].order[j] = 0;
-        }
-    }
-    if  (IsAudioDeviceReady()) return status; else return 1;
-    return status;
-}
-
-int16_t update_audio(void) {
-    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
-        if (sys.audio.track[id].is_playing) {
-            if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
-                UpdateMusicStream(sys.asset.music[sys.audio.track[id].asset]);
-            }
-        }
-    }
-}
-
-static int16_t add_track(uint16_t display, uint32_t state, const char* fileName, const char* fileType, const uint8_t* fileData, uint32_t dataSize, uint32_t pak, uint16_t total_orders, uint16_t orderlist[]) {
-    uint16_t track_id = sys.audio.total_tracks;
-    sys.audio.track[track_id].virtual_display = display;
-    sys.audio.track[track_id].state = state;
-    sys.audio.track[track_id].asset = load_asset(ASSET_XM, fileName, fileType, fileData, dataSize, pak);
-    sys.audio.track[track_id].volume = 1.f;
-    //uint16_t asset = sys.audio.track[].asset_playing;
-
-    //uint16_t total_orders = sizeof(orderlist[0]) / sizeof(int);
-    for (uint16_t i = 0; i < total_orders; i++) {
-        sys.audio.track[track_id].order[i] = orderlist[i];
-    }
-    sys.audio.track[track_id].total_orders = total_orders;
-
-    sys.audio.total_tracks += 1;
-    return track_id;
-}
-
-//StopMusicStream(sys.asset.music[asset]);
-void change_music_stream(uint16_t track_id, uint16_t order_id, bool immediate) {
-    uint16_t asset = sys.audio.track[track_id].asset;
-    sys.audio.track[track_id].order_playing = order_id;
-    
-    if (order_id < sys.audio.track[track_id].total_orders) {
-        if (!immediate) { // switches at end of pattern
-            jar_xm_pattern_jump(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id]);
-        } else { // switches immediately
-            jar_xm_pattern_jump_immediate(sys.asset.music[asset].ctxData, sys.audio.track[track_id].order[order_id], true);
-        };
-    }
-}
-
-static void hint_restart_track(bool immediate) {
-    for (uint16_t id=0; id < MAXAUDIOTRACKS; id++) {
-        if (sys.audio.track[id].virtual_display == sys.video.current_virtual) {
-            if (sys.audio.track[id].state || TRACK_RESTART_ON_FOCUS) {
-                sys.audio.track[id].is_playing = true;
-                uint16_t order = sys.audio.track[id].order_playing;
-                change_music_stream(id, order, immediate);
-            }
-        }
-    }
-}
-
-static void play_track(uint16_t track_id, uint16_t order_id, bool immediate) {
-    sys.audio.track[track_id].is_playing = true;
-    uint16_t asset = sys.audio.track[track_id].asset;
-	PlayMusicStream(sys.asset.music[asset]);
-    change_music_stream(track_id, order_id, immediate);
-}
-
-static void change_track_playing(uint16_t track_id, uint16_t value) {
-    sys.audio.track[track_id].is_playing = true;
-    uint16_t proposed_order = (sys.audio.track[track_id].order_playing + value) % sys.audio.track[track_id].total_orders;
-    change_music_stream(track_id, proposed_order, true);
-}
-
-//    jar_xm_change_all_channel_volumes(sys.asset.music[asset].ctxData, (int) amount); // DO NOT USE, INSTEAD REVAMP TRACKER MIXER
-static void change_track_volume(uint16_t track, float volume) {
-    if (volume>=0.f && volume <=1.0f) sys.audio.track[track].volume = volume;
-    uint16_t asset = sys.audio.track[track].asset;
-	SetMusicVolume(sys.asset.music[asset], sys.audio.track[track].volume);
-}
-
-static void change_global_volume(float amount) {
-    sys.audio.global_volume += amount;
-    if ( sys.audio.global_volume > 1.0f) sys.audio.global_volume = 1.0f; else if ( sys.audio.global_volume < 0.0f) sys.audio.global_volume = 0.0f;
-    SetMasterVolume(sys.audio.global_volume);
-}
-
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
-// ********** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** A U D I O   S Y S T E M  ***** E N D
-
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** B E G I N
-
-typedef enum {
-    VIDEO_RESERVED       = 0b10000000000000000000000000000000, // 
-    VIDEO_ON_TOP         = 0b00001000000000000000000000000000, // 
-    VIDEO_MOVE_X         = 0b00000000000000000100000000000000, // 
-    VIDEO_MOVE_Y         = 0b00000000000000000010000000000000, // 
-    VIDEO_HIDDEN         = 0b00000000000000000000000010000000, // 
-    VIDEO_FROZEN         = 0b00000000000000000000000000100000, // 
-    VIDEO_EXPIRING       = 0b00000000000000000000000000001000, // 
-    VIDEO_EXPIRED        = 0b00000000000000000000000000000010, // 
-    VIDEO_ACTIVE         = 0b00000000000000000000000000000001  // 
-};
-
-void begin_draw(bool clear) {
-    BeginTextureMode(sys.asset.framebuffer[sys.video.vscreen[sys.video.current_virtual].asset_id]);
-    if (clear) ClearBackground(BLACK);
-    rlDisableDepthMask();            // Disable depth writes
-    rlDisableDepthTest();            // Disable depth test for speed
-}
-
-void end_draw(void) {
-    rlEnableDepthMask();
-    rlEnableDepthTest();
-    EndTextureMode();
-}
-
-void flip_frame_buffer(uint16_t display, bool clear) {
-    sys.video.previous_virtual = sys.video.current_virtual;
-    sys.video.current_virtual = display;
-    if (clear) sys.video.screen_refresh = true;
-}
-
-static void draw_frame_buffer(RenderTexture renderer, Vector2 position) {
-	DrawTexturePro (renderer.texture,
-    (Rectangle) {0.0, 0.0, (float)renderer.texture.width, (float)-renderer.texture.height},
-    (Rectangle) {position.x, position.y, sys.video.screen.x, sys.video.screen.y},
-    (Vector2)   {0.0, 0.0}, 0.0f, WHITE);
-}
-
-static uint16_t init_frame_buffer(uint16_t display, Vector2 resolution) {
-    flip_frame_buffer(display, true);
-    sys.video.vscreen[sys.video.current_virtual].size = resolution;
-    sys.video.vscreen[sys.video.current_virtual].frames = 0;
-    sys.video.vscreen[sys.video.current_virtual].elapsed_time_var_ratio = 5.f;
-    sys.video.vscreen[sys.video.current_virtual].frame_time_inc = 0;
-	uint16_t asset_id = load_asset(ASSET_FRAMEBUFFER, NULL, NULL, NULL, NULL, 0);
-    flip_frame_buffer(sys.video.previous_virtual, true);
-    return asset_id;
-}
-
-int16_t init_display_properties(bool hide_mouse) {
-    int16_t status = 0;
-    BITS_INIT(sys.video.windowstate_normal, 0);
-    //sys.video.windowstate_normal = FLAG_WINDOW_UNDECORATED; // AVOID AT ALL COST (SCREEN TEARING when VSYNC)
-    BITS_ON(sys.video.windowstate_normal, FLAG_FULLSCREEN_MODE);
-    BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_ALWAYS_RUN);
-    BITS_ON(sys.video.windowstate_normal, FLAG_WINDOW_TOPMOST);
-    BITS_ON(sys.video.windowstate_normal, FLAG_MSAA_4X_HINT);
-    BITS_ON(sys.video.windowstate_normal, FLAG_VSYNC_HINT);
-
-    BITS_INIT(sys.video.windowstate_paused, 0);
-    BITS_ON(sys.video.windowstate_paused, FLAG_FULLSCREEN_MODE);
-    BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_UNFOCUSED);
-    BITS_ON(sys.video.windowstate_paused, FLAG_WINDOW_MINIMIZED);
-    BITS_ON(sys.video.windowstate_paused, FLAG_MSAA_4X_HINT);
-    BITS_ON(sys.video.windowstate_paused, FLAG_VSYNC_HINT);
-
-    SetConfigFlags(sys.video.windowstate_normal);
-    InitWindow(0, 0, sys.program.name);
-    sys.video.display_id = GetCurrentMonitor();
-    if (hide_mouse) HideCursor();
-    sys.video.screen = (Vector2){GetScreenWidth(), GetScreenHeight()};
-    sys.video.vscreen[sys.video.display_id].refresh_rate = GetMonitorRefreshRate(sys.video.display_id);
-    SetWindowSize(sys.video.screen.x, sys.video.screen.y);
-
-    if (IsWindowReady()) return status; else return 1;
-}
-
-void flip_display_state(uint32_t state) {
-    if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS))
-        BITS_FLIP(sys.video.windowstate_normal, state);
-    else
-        BITS_FLIP(sys.video.windowstate_paused, state);
-        
-    if (IsWindowState(state)) { 
-        ClearWindowState(state);
-    } else {
-        SetWindowState(state);
-        // if (state & FLAG_VSYNC_HINT)  // ***GLFW issue with Refresh rate reset to 60 on VSYNC
-        // since this is an issue, if we really want to do this right, we would have to possibly reload all assets
-    }
-}
-
-    // The way this works right now is not proper, as we have 4-5 different virtual display, we need a way to display them all at once,
-    // or at least display the MENU + poossibly the Terminal + the game
-    // So first, the rendering to a texture part, needs to be expanded
-    // then update_system needs to take into account the different virtual displays and how to decide on;
-    // - The order in which they should be displayed
-    // - Should they display
-    // - And their alpha blending
-int16_t update_display(void) {
-    int16_t status = 0;
-    uint16_t display = sys.video.current_virtual;
-	BeginDrawing();
-        if (sys.video.screen_refresh) {
-            ClearBackground(BLACK);
-            sys.video.screen_refresh = false;
-        };
-        draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[display].asset_id], sys.video.vscreen[display].offset);
-
-        if (active_service(CTRL_TERMINAL_SERVICE_MASK)) {
-            draw_frame_buffer(sys.asset.framebuffer[sys.video.vscreen[TERMINALDISPLAY].asset_id], sys.video.vscreen[TERMINALDISPLAY].offset);
-        }
-
-        if (active_service(CTRL_DEBUG_SERVICE_MASK)) {
-            status = update_debug();
-        }
-	EndDrawing();
-
-    sys.video.window_focus = IsWindowFocused();
-
-    double next_frame = sys.video.vscreen[display].prev_time + (double)(1 / sys.video.vscreen[sys.video.display_id].refresh_rate);
-    float wait = (next_frame - GetTime());
-    if (wait < 0) wait = 0;
-    WaitTime(wait * 1000.f);
-
-    double current_time = GetTime();
-
-    sys.video.vscreen[display].elapsed_time = current_time - sys.video.vscreen[display].prev_time;
-    sys.video.vscreen[display].prev_time = current_time;
-
-   if (sys.video.window_focus) {        // ************** GO TO APP MODE
-        if (sys.program.ctrlstate & CTRL_OFF_FOCUS) {
-            if (GetKeyPressed() != 0) {
-                BITS_OFF(sys.program.ctrlstate, CTRL_OFF_FOCUS);
-                flip_frame_buffer(PRIMARYDISPLAY, true);
-                ClearWindowState(sys.video.windowstate_normal ^ sys.video.windowstate_paused);
-                SetWindowState(sys.video.windowstate_normal);
-                sys.video.vscreen[sys.video.current_virtual].prev_time = current_time;
-            }
-        }
-    } else {        // ************* GO TO PAUSE MODE
-        //IsWindowMinimized()
-        if (!(sys.program.ctrlstate & CTRL_OFF_FOCUS)) {
-            BITS_ON(sys.program.ctrlstate, CTRL_OFF_FOCUS);
-            flip_frame_buffer(UNFOCUSEDDISPLAY, true);
-            ClearWindowState(sys.video.windowstate_paused ^ sys.video.windowstate_normal);
-            SetWindowState(sys.video.windowstate_paused);
-            hint_restart_track(true);
-            sys.video.vscreen[sys.video.current_virtual].prev_time = current_time;
-        };
-    };
-    sys.video.vscreen[display].frame_time = (float)sys.video.vscreen[display].elapsed_time * (float)sys.video.vscreen[sys.video.display_id].refresh_rate;
-    sys.video.vscreen[display].frame_time_inc += (float)sys.video.vscreen[display].elapsed_time;
-    sys.video.vscreen[display].elapsed_time_var += (float)sys.video.vscreen[display].elapsed_time * sys.video.vscreen[display].elapsed_time_var_ratio;
-    sys.video.vscreen[display].value_anim = fast_sin(fast_cos(fast_sin(sys.video.vscreen[display].frame_time_inc) * fast_sin(sys.video.vscreen[display].elapsed_time_var * 0.1) * 0.1) * fast_cos(sys.video.vscreen[display].elapsed_time_var * 0.015) * 0.1 ) * 0.05 + 0.001;
-    sys.video.vscreen[display].frames++;
-}
-
-void deinit_display(void) {
-    ShowCursor();
-	CloseWindow();
-}
-
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
-// ********** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** V I D E O   S Y S T E M  ***** E N D
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E N D
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E N D
+// ********** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E D I T O R   S Y S T E M  ***** E N D
 
 // ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
 // ********** G A M E   L O G I C ********** G A M E   L O G I C ********** G A M E   L O G I C ********** B E G I N
@@ -4552,29 +4778,41 @@ void game_off_focus_scene(void) {
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
 // ********** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** R U N T I M E   S Y S T E M  ***** B E G I N
 
+// ******************** B A S E   A S S E T S
+#include <VGACOLORS.h>
+#include <A8COLORS.h>
+#include <icon.h>
+#include <A8COPPER.h>
+#include <font_JJ.h>
+#include <font_vga.h>
+#include <font_atascii.h>
+#include <font_atascii_big.h>
+#include <font_OSD.h>
+#include <lines.h>
+
 int16_t init_default_assets() {
     bool status = 0;
     
     sys.asset.total_assets = 0;
 
-    uint16_t id; // when read, id returns -1 from total_assets
-    id = init_frame_buffer(TERMINALDISPLAY, (Vector2) {512, 224});
-    id = init_frame_buffer(UNFOCUSEDDISPLAY, (Vector2) {512, 224});
-    id = init_frame_buffer(MENUDISPLAY, (Vector2) {284, 192});
-    id = init_frame_buffer(PRIMARYDISPLAY, (Vector2) {512, 224});
+    uint16_t asset_id; // when read, asset_id returns total_assets - 1
+    asset_id = init_frame_buffer(TERMINALDISPLAY, (Vector2) {640, 400});
+    asset_id = init_frame_buffer(UNFOCUSEDDISPLAY, (Vector2) {512, 224});
+    asset_id = init_frame_buffer(MENUDISPLAY, (Vector2) {284, 192});
+    asset_id = init_frame_buffer(PRIMARYDISPLAY, (Vector2) {512, 224});
 
-	id = load_palette((Vector2){16,16}, VGACOLORS_FILENAME, VGACOLORS_FILEEXT, VGACOLORS_DATA, VGACOLORS_FILESIZE, VGACOLORS_PAK);
-	id = load_palette((Vector2){16,16}, A8COLORS_FILENAME, A8COLORS_FILEEXT, A8COLORS_DATA, A8COLORS_FILESIZE, A8COLORS_PAK);
-	id = load_asset(ASSET_ICON, ICON_FILENAME, ICON_FILEEXT, ICON_DATA, ICON_FILESIZE, ICON_PAK);
+	asset_id = load_palette((Vector2){16,16}, VGACOLORS_FILENAME, VGACOLORS_FILEEXT, VGACOLORS_DATA, VGACOLORS_FILESIZE, VGACOLORS_PAK);
+	asset_id = load_palette((Vector2){16,16}, A8COLORS_FILENAME, A8COLORS_FILEEXT, A8COLORS_DATA, A8COLORS_FILESIZE, A8COLORS_PAK);
+	asset_id = load_asset(ASSET_ICON, ICON_FILENAME, ICON_FILEEXT, ICON_DATA, ICON_FILESIZE, ICON_PAK);
 
-    id = load_tileset((Vector2){16,2}, A8COPPER_FILENAME, A8COPPER_FILEEXT, A8COPPER_DATA, A8COPPER_FILESIZE, A8COPPER_PAK, 0);
-	id = load_tileset((Vector2){16,16}, FONT_ATASCII_FILENAME, FONT_ATASCII_FILEEXT, FONT_ATASCII_DATA, FONT_ATASCII_FILESIZE, FONT_ATASCII_PAK, 0);
-	id = load_tileset((Vector2){16,16}, FONT_ATASCII_BIG_FILENAME, FONT_ATASCII_BIG_FILEEXT, FONT_ATASCII_BIG_DATA, FONT_ATASCII_BIG_FILESIZE, FONT_ATASCII_BIG_PAK, 0);
-	id = load_tileset((Vector2){16,16}, FONT_VGA_FILENAME, FONT_VGA_FILEEXT, FONT_VGA_DATA, FONT_VGA_FILESIZE, FONT_VGA_PAK, 0);
+    asset_id = load_tileset((Vector2){16,2}, A8COPPER_FILENAME, A8COPPER_FILEEXT, A8COPPER_DATA, A8COPPER_FILESIZE, A8COPPER_PAK, 0);
+	asset_id = load_tileset((Vector2){16,16}, FONT_ATASCII_FILENAME, FONT_ATASCII_FILEEXT, FONT_ATASCII_DATA, FONT_ATASCII_FILESIZE, FONT_ATASCII_PAK, 0);
+	asset_id = load_tileset((Vector2){16,16}, FONT_ATASCII_BIG_FILENAME, FONT_ATASCII_BIG_FILEEXT, FONT_ATASCII_BIG_DATA, FONT_ATASCII_BIG_FILESIZE, FONT_ATASCII_BIG_PAK, 0);
+	asset_id = load_tileset((Vector2){16,16}, FONT_VGA_FILENAME, FONT_VGA_FILEEXT, FONT_VGA_DATA, FONT_VGA_FILESIZE, FONT_VGA_PAK, 0);
 	sys.asset.basefont_id = load_tileset((Vector2){64,1}, FONT_JJ_FILENAME, FONT_JJ_FILEEXT, FONT_JJ_DATA, FONT_JJ_FILESIZE, FONT_JJ_PAK, 32);
-	id = load_tileset((Vector2){96,1}, FONT_OSD_FILENAME, FONT_OSD_FILEEXT, FONT_OSD_DATA, FONT_OSD_FILESIZE, FONT_OSD_PAK, 32);
+	asset_id = load_tileset((Vector2){96,1}, FONT_OSD_FILENAME, FONT_OSD_FILEEXT, FONT_OSD_DATA, FONT_OSD_FILESIZE, FONT_OSD_PAK, 32);
 	sys.asset.lines_id = load_tileset((Vector2){256,1}, LINES_FILENAME, LINES_FILEEXT, LINES_DATA, LINES_FILESIZE, LINES_PAK, 0);
-    status = id + 1;
+    status = asset_id + 1;
     return status;
 }
 
@@ -4640,11 +4878,14 @@ static int16_t deinit_system(void) {
 static int16_t update_system(void) {
     int16_t status = 0;
     
+    uint16_t key = process_keyboard();
+    process_mouse();
+
+    if (active_service(CTRL_TEMPORAL_INITIALIZED))  status += update_temporal();
+    if (active_service(CTRL_TERMINAL_INITIALIZED))  status += update_terminal(key);
     if (active_service(CTRL_ASSETS_INITIALIZED))    status += update_assets();
-    if (active_service(CTRL_TERMINAL_INITIALIZED))  status += update_terminal();
     if (active_service(CTRL_VIDEO_INITIALIZED))     status += update_display();
     if (active_service(CTRL_AUDIO_INITIALIZED))     status += update_audio();
-    if (active_service(CTRL_TEMPORAL_INITIALIZED))  status += update_temporal();
 
     return status;
 }
