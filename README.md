@@ -54,4 +54,6 @@ A game engine is a lot of work so I do wish that people following this project t
 
 ![image](https://user-images.githubusercontent.com/8346799/133021039-29cc8938-c58f-4cb9-ab33-61ab39c8fe76.png)
 
+The previous version was produced under Blitz3D and some libraries like FastExtend. https://github.com/jmorel33/Blitz3D_Grid_Terminal
+
 m4ntr0n1c
