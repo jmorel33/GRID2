@@ -44,11 +44,14 @@ Game Engine:
 - Excellent gameflow management
 - Full featured command line terminal system
 - Extensive debugging abilities
+- Full command line driven backend
 
-As of mid July 2021 - Grid ][ is roughly 15% done.  Development is going smoothly yet there is a lot of heavy lifting to do before it becomes useful to anyone.
+As of mid September 2021 - Grid ][ is still in it's very early stages.  Development is going smoothly yet there is a lot of heavy lifting to do before it becomes useful to anyone.
 
 Also I am planning to have it ported to C++ and have multi-threading, in some distant future.
 
-A game engine is a lot of work so I do wish that people following this project to be armed with patience before wanting to work using it.  And of course you may contact me for any type of Game Engien oriented topics.
+A game engine is a lot of work so I do wish that people following this project to be armed with patience before wanting to work using it.  And of course you may contact me for any type of Game Engine oriented topics.
+
+![image](https://user-images.githubusercontent.com/8346799/133021039-29cc8938-c58f-4cb9-ab33-61ab39c8fe76.png)
 
 m4ntr0n1c
