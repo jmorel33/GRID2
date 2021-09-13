@@ -755,6 +755,7 @@ typedef struct page_s {
     uint16_t    colorbg_id, colorfg_id;             // 
     uint16_t    text_blink_rate;                    // 
     uint16_t    margin_left, margin_right, margin_top, margin_bottom; // page margin values for all sides
+    uint16_t    tab_spaces;                         // 
     Vector2     size;                               // Page size (in character count)
     Vector2     page_split;                         // Horizontal and vertical page split position (usually center)
     EX_cell     cell;                               // active cell template for the page
@@ -2311,7 +2312,7 @@ void copy_cell_in_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle 
     if (source.x >= lsx || source.y >= lsy || target.x >= lsx || target.y >= lsy) return;
     if ((source.x + source.width) < 0 || (source.y + source.height) < 0 || (target.x + source.width) < 0 || (target.y + source.height) < 0) return;
     if ((source.x + source.width) > lsx) source.width = lsx - source.x;
-    if ((source.y + source.width) > lsy) source.width = lsy - source.y;
+    if ((source.y + source.height) > lsy) source.height = lsy - source.y;
     int16_t tx = target.x - source.x; // horizontal target displacement (can be positive or negative depending if target is left or right of source)
     int16_t ty = target.y - source.y; // vertical target displacement (can be positive or negative depending if target is above or below of source)
     int16_t xa, xb, xi, ya, yb, yi;
@@ -2325,8 +2326,11 @@ void copy_cell_in_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle 
                 if (x >= 0 && ((x + tx) < lsx) && (x + tx) >= 0) {
                     source_offset = lsx * y + x;
                     target_offset = lsx * (y + ty) + (x + tx);
-                    if (state & CFLD_ALL)                   cell[target_offset]                       = cell[source_offset];
-                    else {
+                    if (state & CFLD_ALL) {
+                        EX_cell *source_cell = &cell[source_offset];
+                        EX_cell *target_cell = &cell[target_offset];
+                        memcpy(target_cell, source_cell, sizeof(EX_cell)); // cell[target_offset]= cell[source_offset];
+                    } else {
                         if (state & CFLD_STATE)             cell[target_offset].state               = cell[source_offset].state;
                         if (state & CFLD_VALUE)             cell[target_offset].value               = cell[source_offset].value;
                         if (state & CFLD_LINES)             cell[target_offset].lines               = cell[source_offset].lines;
@@ -2349,10 +2353,10 @@ void copy_cell_in_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Rectangle 
                         if (state & CFLD_SHADOW_MASK)       cell[target_offset].shadow_mask         = cell[source_offset].shadow_mask;
                     }
                 }
-                x += xi; if (xi == 1) {if (x >= xb) break;} else if (x < xb) break;
+                x += xi; if (xi == 1) {if (x > xb) break;} else if (x < xb) break;
             }
         }
-        y += yi; if (yi == 1) {if (y >= yb) break;} else if (y < yb) break;
+        y += yi; if (yi == 1) {if (y > yb) break;} else if (y < yb) break;
     }
 }
 
@@ -3982,21 +3986,37 @@ static void blank_row_terminal_page(uint16_t row) {
 }
 
 static void scroll_terminal_page(uint16_t direction) {
+    uint16_t page_id = sys.terminal.page_id;
+    EX_page *page = &sys.terminal.page[page_id];
 
+    Rectangle source = {0, 0, 0, 0};
+    Vector2 target = {0, 0};
     switch (direction) {
         case 1: // scroll up
+        source = (Rectangle){0, 1, page->size.x - 1, page->size.y - 2};
+        target = (Vector2){0, 0};
+        copy_cell_in_canvas(sys.terminal.canvasgroup_id, page_id, source, target, CFLD_ALL);
         break;
 
         case 2: // scroll down
+        source = (Rectangle){0, 0, page->size.x - 1, page->size.y - 2};
+        target = (Vector2){0, 1};
+        copy_cell_in_canvas(sys.terminal.canvasgroup_id, page_id, source, target, CFLD_ALL);
         break;
 
         case 3: // scroll left
+        source = (Rectangle){1, 0, page->size.x - 2, page->size.y - 1};
+        target = (Vector2){0, 0};
+        copy_cell_in_canvas(sys.terminal.canvasgroup_id, page_id, source, target, CFLD_ALL);
         break;
 
         case 4: // scroll right
+        source = (Rectangle){0, 0, page->size.x - 2, page->size.y - 1};
+        target = (Vector2){1, 0};
+        copy_cell_in_canvas(sys.terminal.canvasgroup_id, page_id, source, target, CFLD_ALL);
         break;
 
-        default: // invalid
+        default: // invalid parameter
         break;
     }
 }
@@ -4056,7 +4076,7 @@ static bool move_keyboard_cursor_right() {
 
 static bool move_keyboard_cursor_new_line(void) {
     EX_page *page = &sys.terminal.page[sys.terminal.page_id];
-    uint16_t status = false;
+    bool status = false;
     if (page_status(PCAPS_CURSOR_RTOL)) {
         page->cursor_position.x = page->margin_right;
         status = move_keyboard_cursor_down();
@@ -4070,6 +4090,32 @@ static bool move_keyboard_cursor_new_line(void) {
             blank_row_terminal_page(page->cursor_position.y);
         }
     }
+}
+
+Vector2 page_cursor_next_tab(void) {
+    // add margins check
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    Vector2 value = {0,0};
+    value.x = page->tab_spaces - ((int)page->cursor_position.x % page->tab_spaces);
+    if ((value.x + page->cursor_position.x) >= page->size.x)
+        return (Vector2) {page->margin_left, page->cursor_position.y + 1};
+    else if ((value.x + page->cursor_position.x) >= page->margin_right)
+        return (Vector2) {page->margin_left, page->cursor_position.y + 1};
+    else
+        return (Vector2) {page->cursor_position.x + value.x, page->cursor_position.y + value.y};
+}
+
+static bool move_keyboard_cursor_next_tab(void) {
+    EX_page *page = &sys.terminal.page[sys.terminal.page_id];
+    Vector2 position = page_cursor_next_tab();
+    if (position.y >= page->size.y) {
+        move_keyboard_cursor_new_line();
+        return;
+    } else if (position.y >= page->margin_bottom) {
+        move_keyboard_cursor_new_line();
+        return;
+    }
+    page->cursor_position = position;
 }
 
 static bool move_keyboard_cursor_next() {
@@ -4125,7 +4171,7 @@ static uint16_t init_terminal_page(uint16_t page_id, Vector2 size) {
     canvas->size = size;
     page->size = size;
     page->page_split = (Vector2){0,0};
-
+    page->tab_spaces = 4;
     status += set_page_default_font(3);
     status += set_writing_font(3);
     status += set_writing_palette(1);
@@ -4207,11 +4253,11 @@ static bool write_to_terminal_page(uint16_t value) {
     EX_page *page = &sys.terminal.page[page_id];
     Vector2 position = page->cursor_position;
     //    sys.terminal.canvasgroup_id
-    // pass on all graphics rendition to the cell template
     
     EX_cell *cell = &sys.terminal.page[page_id].cell;
-
     cell->value = value;
+
+    // pass on all graphics rendition to the cell template
 //    state |= 0; // assign corresponding lines based on some states (underline, strikeout, box, ...)
     if (page->state & PCAPS_OVERLINED) set_terminal_state(CVFE_LINE_TOP);
     if (page->state & PCAPS_UNDERLINED) set_terminal_state(CVFE_LINE_BOT);
@@ -4231,7 +4277,6 @@ static void handle_terminal_input(uint16_t value) {
 
     if (!page_status(PCAPS_HALF_DUPLEX)) {
         switch (value) {
-        
             case ASCII_CARRIAGE_RETURN:
             move_keyboard_cursor_new_line();
             break;
@@ -4240,6 +4285,7 @@ static void handle_terminal_input(uint16_t value) {
             break;
 
             case ASCII_HORIZONTAL_TAB:
+            move_keyboard_cursor_next_tab();
             break;
 
             case ASCII_BACKSPACE:
