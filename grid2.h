@@ -608,6 +608,7 @@ typedef struct canvas_s {
     EX_cell     mask;                       // used for when replicating
     uint32_t    cell_count;
     EX_cell*    cell;                       // could be NULL
+    uint8_t     blink_temp_ref[8];          // Blink speed references to temporal timing system
 } EX_canvas;
 
 typedef enum {
@@ -796,13 +797,15 @@ typedef struct terminal_s {
 // The heartbeat of the system flows through these 64 oscillator states
 // With this comes a period table spanning from slow 8 second up to fast millisecond level state changes
 // With this a function to poll oscillator states
-#define TEMPORAL_ARRAY_SIZE 64
+#define TEMPORAL_ARRAY_SIZE 128
 
 typedef struct temportal_s {
     char        datetime[20];                       // 
     double      period_table[TEMPORAL_ARRAY_SIZE];  // time slice period per oscillator
-    uint64_t    prev_osc;                           // previous oscillator bits
+    uint64_t    osc_previous;                       // previous oscillator bits
+    uint64_t    user_osc_previous;                  // previous oscillator bits
     uint64_t    osc;                                // all oscillator bits
+    uint64_t    user_osc;                           // all oscillator bits
     uint64_t    osc_count[TEMPORAL_ARRAY_SIZE];     // number of cycles since start of program (counts are on full cycles)
     double      osc_next_frame[TEMPORAL_ARRAY_SIZE];// trigger for oscillator state update (calculated following frame)
 } EX_temporal;
@@ -1037,6 +1040,14 @@ Color get_palette_color_pro(uint16_t palette_id, uint16_t id, uint8_t alpha, flo
     return (Color){color[id].r * brightness, color[id].g * brightness, color[id].b * brightness, alpha};
 }
 
+Color get_average_2colors(Color a, Color b) {
+    return (Color){(float)(a.r + b.r) * 0.5f, (float)(a.g + b.g) * 0.5f, (float)(a.b + b.b) * 0.5f, (float)(a.a + b.a) * 0.5f};
+}
+
+Color get_average_3colors(Color a, Color b, Color c) {
+    return (Color){(float)(a.r + b.r + c.r) * 0.3334f, (float)(a.g + b.g + c.g) * 0.3334f, (float)(a.b + b.b + c.b) * 0.3334f, (float)(a.a + b.a + c.a) * 0.3334f};
+}
+
 Vector2 get_current_virtual_size(void) {
     return sys.video.vscreen[sys.video.current_virtual].size;
 }
@@ -1074,16 +1085,23 @@ uint16_t init_temporal() {
 
     double t = GetTime();
     for (osc = 0; osc < TEMPORAL_ARRAY_SIZE; osc++) {
+        if (osc <64) {
 //        printf (" %i = %lf\n", osc, value);
-        sys.temporal.period_table[osc] = value;
-        sys.temporal.osc_count[osc] = 0;
-        sys.temporal.osc_next_frame[osc] = sys.temporal.period_table[osc];
-
-        value += range_low * ratio;
-        ratio *= GRIDILON;
+            sys.temporal.period_table[osc] = value;
+            sys.temporal.osc_count[osc] = 0;
+            sys.temporal.osc_next_frame[osc] = sys.temporal.period_table[osc];
+            value += range_low * ratio;
+            ratio *= GRIDILON;
+        } else {
+            sys.temporal.period_table[osc] = 1;
+            sys.temporal.osc_count[osc] = 0;
+            sys.temporal.osc_next_frame[osc] = sys.temporal.period_table[osc];
+        }
     }
-    sys.temporal.prev_osc = 0;  // oscillator states
-    sys.temporal.osc = 0;       // oscillator states
+    sys.temporal.osc_previous = 0;      // oscillator states
+    sys.temporal.osc = 0;           // oscillator states
+    sys.temporal.user_osc_previous = 0; // oscillator user states
+    sys.temporal.user_osc = 0;      // oscillator user states
 
     return osc;
 }
@@ -1091,19 +1109,44 @@ uint16_t init_temporal() {
 int16_t update_temporal(void) {
     datetime_literal(&sys.temporal.datetime);
 
-    sys.temporal.prev_osc = sys.temporal.osc;
+    sys.temporal.osc_previous       = sys.temporal.osc;
+    sys.temporal.user_osc_previous  = sys.temporal.user_osc;
     double t = GetTime();
     for (uint64_t osc = 0; osc < TEMPORAL_ARRAY_SIZE; osc++) {
         if (t > sys.temporal.osc_next_frame[osc]) {
             while (1) {
-                sys.temporal.osc_next_frame[osc] += sys.temporal.period_table[osc];
-                sys.temporal.osc ^= ((uint64_t)1 << osc);
-                sys.temporal.osc_count[osc] += 1;
-                if (sys.temporal.osc_next_frame[osc] > t) break;
+                if (osc <64) {
+                    sys.temporal.osc_next_frame[osc] += sys.temporal.period_table[osc];
+                    sys.temporal.osc ^= ((uint64_t)1 << osc);
+                    sys.temporal.osc_count[osc] += 1;
+                    if (sys.temporal.osc_next_frame[osc] > t) break;
+                } else {
+                    sys.temporal.osc_next_frame[osc] += sys.temporal.period_table[osc];
+                    sys.temporal.user_osc ^= ((uint64_t)1 << (osc - 64));
+                    sys.temporal.osc_count[osc] += 1;
+                    if (sys.temporal.osc_next_frame[osc] > t) break;
+                }
             }
         }
     }
 }
+
+bool read_temporal_state(uint8_t position) {
+    if (position >= TEMPORAL_ARRAY_SIZE) return false;
+    if (position < 64) {
+        if (sys.temporal.osc ^= ((uint64_t)1 << position)) return true; else return false;
+    } else {
+        if (sys.temporal.user_osc ^= ((uint64_t)1 << (position - 64))) return true; else return false;
+    }
+}
+
+void set_temporal_period(uint8_t position, double period) {
+    if (position >= TEMPORAL_ARRAY_SIZE) return;
+    double t = GetTime();
+    sys.temporal.period_table[position] = period;
+    sys.temporal.osc_next_frame[position] = t + period;
+}
+
 
 // ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** B E G I N
 // ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** I / O   H A N D L I N G ********** B E G I N
@@ -1610,6 +1653,17 @@ uint16_t load_tileset(Vector2 count, const char* fileName, const char* fileType,
 // ********** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** C A N V A S   S Y S T E M  ***** B E G I N
 
 typedef enum {
+    DIR_UP      = 0,
+    DIR_UR      = 1,
+    DIR_RIGHT   = 2,
+    DIR_DRIGHT  = 3,
+    DIR_DOWN    = 4,
+    DIR_DLEFT   = 5,
+    DIR_LEFT    = 6,
+    DIR_UPL     = 7
+} direcions_clockwise;
+
+typedef enum {
     CVFE_LINE_TOP           = 0b1000000000000000000000000000000000000000000000000000000000000000, // turn on line top
     CVFE_LINE_BOT           = 0b0100000000000000000000000000000000000000000000000000000000000000, // turn on line bottom
     CVFE_LINE_LEF           = 0b0010000000000000000000000000000000000000000000000000000000000000, // turn on line left
@@ -1618,41 +1672,41 @@ typedef enum {
     CVFE_LINE_VER           = 0b0000010000000000000000000000000000000000000000000000000000000000, // turn on line center vertical
     CVFE_LINE_DOW           = 0b0000001000000000000000000000000000000000000000000000000000000000, // turn on line angle down
     CVFE_LINE_UP            = 0b0000000100000000000000000000000000000000000000000000000000000000, // turn on line angle up
-    CVFE_LIABLEND_LL        = 0b0000000010000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend lower left
-    CVFE_LIABLEND_LR        = 0b0000000001000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend lower right
-    CVFE_LIABLEND_UR        = 0b0000000000100000000000000000000000000000000000000000000000000000, // lines vertex alpha blend upper right
-    CVFE_LIABLEND_UL        = 0b0000000000010000000000000000000000000000000000000000000000000000, // lines vertex alpha blend upper left
-    CVFE_LICBLEND_LL        = 0b0000000000001000000000000000000000000000000000000000000000000000, // lines vertex color blend lower left
-    CVFE_LICBLEND_LR        = 0b0000000000000100000000000000000000000000000000000000000000000000, // lines vertex color blend lower right
-    CVFE_LICBLEND_UR        = 0b0000000000000010000000000000000000000000000000000000000000000000, // lines vertex color blend upper right
-    CVFE_LICBLEND_UL        = 0b0000000000000001000000000000000000000000000000000000000000000000, // lines vertex color blend upper left
-    CVFE_BGABLEND_LL        = 0b0000000000000000100000000000000000000000000000000000000000000000, // background vertex alpha blend lower left
-    CVFE_BGABLEND_LR        = 0b0000000000000000010000000000000000000000000000000000000000000000, // background vertex alpha blend lower right
-    CVFE_BGABLEND_UR        = 0b0000000000000000001000000000000000000000000000000000000000000000, // background vertex alpha blend upper right
-    CVFE_BGABLEND_UL        = 0b0000000000000000000100000000000000000000000000000000000000000000, // background vertex alpha blend upper left
-    CVFE_BGCBLEND_LL        = 0b0000000000000000000010000000000000000000000000000000000000000000, // background vertex color blend lower left
-    CVFE_BGCBLEND_LR        = 0b0000000000000000000001000000000000000000000000000000000000000000, // background vertex color blend lower right
-    CVFE_BGCBLEND_UR        = 0b0000000000000000000000100000000000000000000000000000000000000000, // background vertex color blend upper right
-    CVFE_BGCBLEND_UL        = 0b0000000000000000000000010000000000000000000000000000000000000000, // background vertex color blend upper left
-    CVFE_FGABLEND_LL        = 0b0000000000000000000000001000000000000000000000000000000000000000, // foreground vertex alpha blend lower left
-    CVFE_FGABLEND_LR        = 0b0000000000000000000000000100000000000000000000000000000000000000, // foreground vertex alpha blend lower right
-    CVFE_FGABLEND_UR        = 0b0000000000000000000000000010000000000000000000000000000000000000, // foreground vertex alpha blend upper right
-    CVFE_FGABLEND_UL        = 0b0000000000000000000000000001000000000000000000000000000000000000, // foreground vertex alpha blend upper left
-    CVFE_FGCBLEND_LL        = 0b0000000000000000000000000000100000000000000000000000000000000000, // foreground vertex color blend lower left
-    CVFE_FGCBLEND_LR        = 0b0000000000000000000000000000010000000000000000000000000000000000, // foreground vertex color blend lower right
-    CVFE_FGCBLEND_UR        = 0b0000000000000000000000000000001000000000000000000000000000000000, // foreground vertex color blend upper right
-    CVFE_FGCBLEND_UL        = 0b0000000000000000000000000000000100000000000000000000000000000000, // foreground vertex color blend upper left
-    CVFE_LNBLINK3           = 0b0000000000000000000000000000000010000000000000000000000000000000, // lines blinking speed (0...7) 0 = no blink
-    CVFE_LNBLINK2           = 0b0000000000000000000000000000000001000000000000000000000000000000, // lines blinking speed
-    CVFE_LNBLINK1           = 0b0000000000000000000000000000000000100000000000000000000000000000, // lines blinking speed
-    CVFE_BGBLINK3           = 0b0000000000000000000000000000000000010000000000000000000000000000, // background blinking speed (0...7) 0 = no blink
-    CVFE_BGBLINK2           = 0b0000000000000000000000000000000000001000000000000000000000000000, // background blinking speed
-    CVFE_BGBLINK1           = 0b0000000000000000000000000000000000000100000000000000000000000000, // background blinking speed
-    CVFE_FGBLINK3           = 0b0000000000000000000000000000000000000010000000000000000000000000, // foreground blinking speed (0...7) 0 = no blink
-    CVFE_FGBLINK2           = 0b0000000000000000000000000000000000000001000000000000000000000000, // foreground blinking speed
-    CVFE_FGBLINK1           = 0b0000000000000000000000000000000000000000100000000000000000000000, // foreground blinking speed
-    CVFE_DOUBLEHEIGHT       = 0b0000000000000000000000000000000000000000010000000000000000000000, // double height content
-    CVFE_DOUBLEWIDTH        = 0b0000000000000000000000000000000000000000001000000000000000000000, // double width content
+    CVFE_LIABLEND_2         = 0b0000000010000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend position picker (0...7)
+    CVFE_LIABLEND_1         = 0b0000000001000000000000000000000000000000000000000000000000000000, // lines vertex alpha blend position picker
+    CVFE_LIABLEND_0         = 0b0000000000100000000000000000000000000000000000000000000000000000, // lines vertex alpha blend position picker
+    CVFE_LICBLEND_2         = 0b0000000000010000000000000000000000000000000000000000000000000000, // lines vertex color blend position picker (0...7)
+    CVFE_LICBLEND_1         = 0b0000000000001000000000000000000000000000000000000000000000000000, // lines vertex color blend position picker
+    CVFE_LICBLEND_0         = 0b0000000000000100000000000000000000000000000000000000000000000000, // lines vertex color blend position picker
+    CVFE_BGABLEND_2         = 0b0000000000000010000000000000000000000000000000000000000000000000, // background vertex alpha blend position picker (0...7)
+    CVFE_BGABLEND_1         = 0b0000000000000001000000000000000000000000000000000000000000000000, // background vertex alpha blend position picker
+    CVFE_BGABLEND_0         = 0b0000000000000000100000000000000000000000000000000000000000000000, // background vertex alpha blend position picker
+    CVFE_BGCBLEND_2         = 0b0000000000000000010000000000000000000000000000000000000000000000, // background vertex color blend position picker (0...7)
+    CVFE_BGCBLEND_1         = 0b0000000000000000001000000000000000000000000000000000000000000000, // background vertex color blend position picker
+    CVFE_BGCBLEND_0         = 0b0000000000000000000100000000000000000000000000000000000000000000, // background vertex color blend position picker
+    CVFE_FGABLEND_2         = 0b0000000000000000000010000000000000000000000000000000000000000000, // foreground vertex alpha blend position picker (0...7)
+    CVFE_FGABLEND_1         = 0b0000000000000000000001000000000000000000000000000000000000000000, // foreground vertex alpha blend position picker
+    CVFE_FGABLEND_0         = 0b0000000000000000000000100000000000000000000000000000000000000000, // foreground vertex alpha blend position picker
+    CVFE_FGCBLEND_2         = 0b0000000000000000000000010000000000000000000000000000000000000000, // foreground vertex color blend position picker (0...7)
+    CVFE_FGCBLEND_1         = 0b0000000000000000000000001000000000000000000000000000000000000000, // foreground vertex color blend position picker
+    CVFE_FGCBLEND_0         = 0b0000000000000000000000000100000000000000000000000000000000000000, // foreground vertex color blend position picker
+    CVFE_HEIGHT_MUL2        = 0b0000000000000000000000000010000000000000000000000000000000000000, // height size multiplier (0...7)
+    CVFE_HEIGHT_MUL1        = 0b0000000000000000000000000001000000000000000000000000000000000000, // height size multiplier
+    CVFE_HEIGHT_MUL0        = 0b0000000000000000000000000000100000000000000000000000000000000000, // height size multiplier
+    CVFE_WIDTH_MUL2         = 0b0000000000000000000000000000010000000000000000000000000000000000, // width size multiplier (0...7)
+    CVFE_WIDTH_MUL1         = 0b0000000000000000000000000000001000000000000000000000000000000000, // width size multiplier
+    CVFE_WIDTH_MUL0         = 0b0000000000000000000000000000000100000000000000000000000000000000, // width size multiplier
+    CVFE_LNBLINK2           = 0b0000000000000000000000000000000010000000000000000000000000000000, // lines blinking speed (0...7) 0 = no blink
+    CVFE_LNBLINK1           = 0b0000000000000000000000000000000001000000000000000000000000000000, // lines blinking speed
+    CVFE_LNBLINK0           = 0b0000000000000000000000000000000000100000000000000000000000000000, // lines blinking speed
+    CVFE_BGBLINK2           = 0b0000000000000000000000000000000000010000000000000000000000000000, // background blinking speed (0...7) 0 = no blink
+    CVFE_BGBLINK1           = 0b0000000000000000000000000000000000001000000000000000000000000000, // background blinking speed
+    CVFE_BGBLINK0           = 0b0000000000000000000000000000000000000100000000000000000000000000, // background blinking speed
+    CVFE_FGBLINK2           = 0b0000000000000000000000000000000000000010000000000000000000000000, // foreground blinking speed (0...7) 0 = no blink
+    CVFE_FGBLINK1           = 0b0000000000000000000000000000000000000001000000000000000000000000, // foreground blinking speed
+    CVFE_FGBLINK0           = 0b0000000000000000000000000000000000000000100000000000000000000000, // foreground blinking speed
+    CVFE_R22                = 0b0000000000000000000000000000000000000000010000000000000000000000, // 
+    CVFE_R21                = 0b0000000000000000000000000000000000000000001000000000000000000000, // 
     CVFE_LINESSEQ           = 0b0000000000000000000000000000000000000000000100000000000000000000, // turn on lines sequencing
     CVFE_COLORSEQ           = 0b0000000000000000000000000000000000000000000010000000000000000000, // turn on color sequencing
     CVFE_VALUESEQ           = 0b0000000000000000000000000000000000000000000001000000000000000000, // turn on cell value sequencing
@@ -1675,20 +1729,37 @@ typedef enum {
     CVFE_BACKGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000010, // turn on cell background (tile rectangle fill)
     CVFE_FOREGROUND         = 0b0000000000000000000000000000000000000000000000000000000000000001, // turn on cell foreground (value) (used for hidden mode)
     CVFE_LINES_MASK         = 0b1111111100000000000000000000000000000000000000000000000000000000, 
-    CVFE_BLENDING_MASK      = 0b0000000011111111111111111111111100000000000000000000000000000000, 
+    CVFE_BLENDING_MASK      = 0b0000000011111111111111111100000000000000000000000000000000000000,
+    CVFE_LIABLEND_MASK      = 0b0000000011100000000000000000000000000000000000000000000000000000, // lines vertex alpha blend position picker
+    CVFE_LICBLEND_MASK      = 0b0000000000011100000000000000000000000000000000000000000000000000, // lines vertex color blend position picker
+    CVFE_BGABLEND_MASK      = 0b0000000000000011100000000000000000000000000000000000000000000000, // background vertex alpha blend position picker
+    CVFE_BGCBLEND_MASK      = 0b0000000000000000011100000000000000000000000000000000000000000000, // background vertex color blend position picker
+    CVFE_FGABLEND_MASK      = 0b0000000000000000000011100000000000000000000000000000000000000000, // foreground vertex alpha blend position picker
+    CVFE_FGCBLEND_MASK      = 0b0000000000000000000000011100000000000000000000000000000000000000, // foreground vertex color blend position picker
+    CVFE_HEIGHT_MULT_MASK   = 0b0000000000000000000000000011100000000000000000000000000000000000,
+    CVFE_WIDTH_MULT_MASK    = 0b0000000000000000000000000000011100000000000000000000000000000000,
     CVFE_LNBLINK_MASK       = 0b0000000000000000000000000000000011100000000000000000000000000000,
     CVFE_BGBLINK_MASK       = 0b0000000000000000000000000000000000011100000000000000000000000000,
     CVFE_FGBLINK_MASK       = 0b0000000000000000000000000000000000000011100000000000000000000000,
-    CVFE_DEFAULT1           = 0b0000000000000000000000000000000000000000011100000000000011110101, // DEFAULT STATE :HEAVY PROCESSING
+    CVFE_DEFAULT1           = 0b0000000000000000000000000000000000000000000000000000000011110101, // DEFAULT STATE :
     CVFE_DEFAULT2           = 0b0000000000000000000000000000000000000000000000001100000011110111, // DEFAULT STATE :SCROLLTEXT
     CVFE_DEFAULT3           = 0b0000000000000000000000000000000000000000000011110000000011110001, // DEFAULT STATE :GAME canvas
     CVFE_DEFAULT4           = 0b0000000000000000000000000000000000000000000000000100000011110101  // DEFAULT STATE :TERMINAL DISPLAY
 } canvas_features;
 
-#define CVFE_LINES_BITS     56
-#define CVFE_LNBLINK_BITS   29
-#define CVFE_BGBLINK_BITS   26
-#define CVFE_FGBLINK_BITS   23
+#define CVFE_LINES_BITS         56
+#define CVFE_LIABLEND_BITS      53
+#define CVFE_LICBLEND_BITS      50
+#define CVFE_BGABLEND_BITS      47
+#define CVFE_BGCBLEND_BITS      44
+#define CVFE_FGABLEND_BITS      41
+#define CVFE_FGCBLEND_BITS      38
+#define CVFE_BLENDING_BITS      38
+#define CVFE_HEIGHT_MULT_BITS   35
+#define CVFE_WIDTH_MULT_BITS    32
+#define CVFE_LNBLINK_BITS       29
+#define CVFE_BGBLINK_BITS       26
+#define CVFE_FGBLINK_BITS       23
 #define GET_FROM_STATE(state, mask, shift) ((state & mask) >> shift) // be weary that shifting greater than 31 is invalid in non 64bit -march...
 
 void plot_character(uint16_t asset_id, uint16_t palette_id, uint16_t code, Vector2 position, Vector2 scale, Vector2 skew, Vector2 shadow, float angle, Color colorfg, Color colorbg, Color colorln, uint64_t state) {
@@ -1775,14 +1846,23 @@ int16_t init_cell_zone_linear(EX_cell *cell, uint64_t cell_state, uint32_t color
     return 0;
 }
 
-void set_canvas_default_palette(uint16_t canvasgroup_id, uint16_t canvas_id, uint16_t palette_id) {
+static void set_canvas_default_palette(uint16_t canvasgroup_id, uint16_t canvas_id, uint16_t palette_id) {
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     canvas->default_palette_id = palette_id;
 }
 
-void set_canvas_default_asset(uint16_t canvasgroup_id, uint16_t canvas_id, uint16_t asset_id) {
+static void set_canvas_default_asset(uint16_t canvasgroup_id, uint16_t canvas_id, uint16_t asset_id) {
     EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
     canvas->default_asset_id = asset_id;
+}
+
+static void set_canvas_temporal_references(uint16_t canvasgroup_id, uint16_t canvas_id, uint8_t *references) {
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+
+    uint8_t *source = references[0];
+    uint8_t *dest   = canvas->blink_temp_ref[0];
+    memcpy(dest, source, sizeof(canvas->blink_temp_ref));
+
 }
 
 uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 size, uint64_t canvas_state, uint64_t cell_state, uint16_t asset_id, uint16_t palette_id) {
@@ -1802,6 +1882,9 @@ uint16_t init_canvas(uint16_t canvasgroup_id, uint16_t canvas_id, Vector2 size, 
     canvas->fg_brightness = 1.f;
     canvas->bg_brightness = 1.f;
     canvas->alpha = 255;
+
+    uint8_t temp_values[8] = {0, 5, 10, 15, 20, 25, 30, 35};
+    set_canvas_temporal_references(canvasgroup_id, canvas_id, temp_values);
 
     EX_cell *cell = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
     for (uint32_t i = 0; i < cell_count; i++) {
@@ -2436,6 +2519,21 @@ void copy_canvas() {
     // potentially use calloc.... then ....memcpy(dest, src, len);
 }
 
+// GOAL IS TO ELABORATE A COLOR BLENDING SCHEME ON NEIGHBORING COLORS BASED ON 8 POSSIBLE PICKING POSITIONS
+Color canvas_get_color_up(uint16_t canvas_id, Vector2 position) {
+    uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
+    EX_canvas *canvas = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id];
+    EX_cell  *cell  = &sys.video.canvasgroup[canvasgroup_id].canvas[canvas_id].cell[0];
+    uint16_t lsx = canvas->size.x, lsy = canvas->size.y;    if (!lsx || !lsy) return; // empty canvas, can not process
+    position.y -= 1; if (position.y < 0) position.y = canvas->size.y - 1;
+    uint32_t cell_offset = (lsx * position.y + position.x);
+    EX_cell *c = &cell[cell_offset];
+    uint16_t palette_id = c->palette_id;   if (!palette_id) palette_id = canvas->default_palette_id;
+                    // get_average_2colors(Color a, Color b)
+                    // get_average_3colors(Color a, Color b, Color c)
+    return get_palette_color_pro(palette_id, c->colorfg_id, 255, c->fg_brightness * canvas->fg_brightness); // canvas->alpha
+}
+
 void render_canvas(uint16_t canvas_id) {
     static Color vertex_colors[4];
     uint16_t canvasgroup_id = sys.video.current_virtual; // A single canvasgroup per Virtual Display
@@ -2498,6 +2596,7 @@ void render_canvas(uint16_t canvas_id) {
                     if (state & CVFE_GREEN) vertex_colors[0].g = colorbg.g; else vertex_colors[0].g = 0;
                     if (state & CVFE_BLUE)  vertex_colors[0].b = colorbg.b; else vertex_colors[0].b = 0;
                     if (state & CVFE_ALPHA) vertex_colors[0].a = colorbg.a; else vertex_colors[0].a = 0;
+                    
                     vertex_colors[1] = vertex_colors[0]; //  for now just copy the color content to all corners... (TEMPORARY) *******************
                     vertex_colors[2] = vertex_colors[0];
                     vertex_colors[3] = vertex_colors[0];
@@ -4483,7 +4582,8 @@ int16_t debug_data_menu(uint16_t size) {
     DrawText(TextFormat("     sin = %f", sin(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 240, 20, DARKGRAY);
     DrawText(TextFormat("fast_cos = %f", fast_cos(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 260, 20, DARKGRAY);
     DrawText(TextFormat("     cos = %f", cos(sys.video.vscreen[sys.video.display_id].frame_time_inc)), 0, 280, 20, DARKGRAY);
-    show_state_bits(sys.temporal.osc, TEMPORAL_ARRAY_SIZE, (Vector2){16, 32}, (Vector2) {sys.video.screen.y * 0.5, sys.video.screen.y - 32});
+    show_state_bits(sys.temporal.osc, 64, (Vector2){16, 32}, (Vector2) {sys.video.screen.y * 0.5, sys.video.screen.y - 64});
+    show_state_bits(sys.temporal.user_osc, 64, (Vector2){16, 32}, (Vector2) {sys.video.screen.y * 0.5, sys.video.screen.y - 32});
 
     show_state_bits(sys.program.ctrlstate, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, 96});
     show_state_bits(sys.program.pmsnstate, 32, (Vector2) {16, 32}, (Vector2) {sys.video.screen.x - 512, 128});
